@@ -30,7 +30,7 @@
     .btn-red { background: linear-gradient(135deg, #ef4444, #dc2626); }
     .btn-blue { background: linear-gradient(135deg, #3b82f6, #2563eb); }
     .btn-gray { background: linear-gradient(135deg, #64748b, #475569); }
-    .btn-blue.active, .btn-gray.active { background: linear-gradient(135deg, #1d4ed8, #1e40af); ring: 2px solid #60a5fa; }
+    .btn-purple.active, .btn-gray.active, .btn-blue.active { background: linear-gradient(135deg, #1d4ed8, #1e40af); ring: 2px solid #60a5fa; }
 
     #bottom-info {
       position: absolute; bottom: 16px; left: 16px; z-index: 100;
@@ -62,6 +62,12 @@
       box-shadow: 0 20px 50px rgba(0,0,0,0.8); color: white; text-align: center; padding: 10px;
     }
     #preview-canvas { border-radius: 10px; margin-bottom: 10px; }
+
+    /* 드래그 영역 선택 UI */
+    #select-box {
+      position: absolute; border: 2px dashed #60a5fa; background: rgba(96, 165, 250, 0.2);
+      pointer-events: none; display: none; z-index: 150;
+    }
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -69,15 +75,16 @@
 </head>
 <body>
 
+<div id="select-box"></div>
+
 <div id="top-bar">
   <div class="btn-group-left">
     <button class="ui-btn btn-purple" id="prop-menu-btn">🎮 소품</button>
     <button class="ui-btn btn-green" id="shuffle-btn">🔀 섞기(R)</button>
     <button class="ui-btn btn-teal" id="draw-btn">🎴 가져오기</button>
-    <button class="ui-btn btn-purple" id="group-btn">🔗 묶기(G)</button>
+    <button class="ui-btn btn-purple" id="select-mode-btn">🟦 영역 선택 [OFF]</button>
     <button class="ui-btn btn-teal" id="spread-btn">↔️ 펼치기</button>
     <button class="ui-btn btn-orange" id="cut-btn">✂️ 떼어내기</button>
-    <button class="ui-btn btn-orange" id="snap-btn">🎯 스냅존</button>
     <button class="ui-btn btn-red" id="clear-btn">판 비우기</button>
   </div>
   <div class="btn-group-right">
@@ -105,8 +112,7 @@
     <button id="connect-btn">연결</button>
     <span id="status" style="color:#f59e0b;">(오프라인)</span>
   </div>
-  <div>🔒 <b>길게 터치:</b> 기물 잠금/해제 (Lock)</div>
-  <div>🎲 <b>주사위:</b> '소품 -> 주사위 추가' 메뉴를 눌렀을 때만 따로 생성됩니다.</div>
+  <div>🟦 <b>영역 선택 묶기:</b> '영역 선택 [ON]' 누른 후 드래그하여 범위 지정 -> 묶인 카드 한 번에 이동!</div>
 </div>
 
 <script>
@@ -139,10 +145,7 @@
   dirLight.castShadow = true;
   scene.add(dirLight);
 
-  // 2. 보드판 및 스냅존
-  let snapZonesEnabled = false;
-  let snapPoints = [];
-
+  // 2. 보드판
   function createWoodTexture() {
     const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 512;
     const ctx = canvas.getContext('2d');
@@ -191,31 +194,8 @@
   boardMatMesh.position.y = 0.26;
   scene.add(boardMatMesh);
 
-  const snapGroup = new THREE.Group();
-  scene.add(snapGroup);
-  
-  function toggleSnapZones() {
-    snapZonesEnabled = !snapZonesEnabled;
-    document.getElementById('snap-btn').classList.toggle('active', snapZonesEnabled);
-    snapGroup.clear();
-    snapPoints = [];
-
-    if (snapZonesEnabled) {
-      for (let x = -2; x <= 2; x += 2) {
-        for (let z = -1; z <= 1; z += 2) {
-          snapPoints.push({ x: x, z: z });
-          const gridGeo = new THREE.RingGeometry(0.5, 0.55, 32);
-          const gridMat = new THREE.MeshBasicMaterial({ color: 0xf59e0b, side: THREE.DoubleSide });
-          const ring = new THREE.Mesh(gridGeo, gridMat);
-          ring.rotation.x = Math.PI / 2;
-          ring.position.set(x, 0.27, z);
-          snapGroup.add(ring);
-        }
-      }
-    }
-  }
-
   let objects = [];
+  let selectedGroup = []; // 묶인 카드의 배열
   let objectIdCounter = 0;
 
   // 3. 트럼프 카드 텍스처
@@ -347,18 +327,14 @@
   }
 
   // 5. 테이블탑 기믹
-  function groupCards(isLocal = true) {
-    const tableCards = objects.filter(o => o.userData.type === 'card' && o.position.z <= HAND_ZONE_Z);
-    if (tableCards.length === 0) return;
-
-    tableCards.forEach((card, i) => {
-      card.position.set(0, 0.28 + i * 0.02, 0);
-      card.rotation.z = Math.PI;
-      card.userData.isFlipped = true;
-      sendMoveData(card);
+  function clearSelectionGroup() {
+    selectedGroup.forEach(obj => {
+      if (obj.userData.outlineMesh) {
+        obj.remove(obj.userData.outlineMesh);
+        obj.userData.outlineMesh = null;
+      }
     });
-    updateStacking();
-    if (isLocal) sendData({ type: 'group' });
+    selectedGroup = [];
   }
 
   function spreadCards(isLocal = true) {
@@ -501,15 +477,22 @@
 
   document.getElementById('shuffle-btn').addEventListener('click', () => shuffleCards(true));
   document.getElementById('draw-btn').addEventListener('click', () => drawCards(true));
-  document.getElementById('group-btn').addEventListener('click', () => groupCards(true));
   document.getElementById('spread-btn').addEventListener('click', () => spreadCards(true));
   document.getElementById('cut-btn').addEventListener('click', () => cutDeck(true));
-  document.getElementById('snap-btn').addEventListener('click', toggleSnapZones);
 
   document.getElementById('clear-btn').addEventListener('click', () => {
     objects.forEach(obj => scene.remove(obj));
     objects = [];
+    clearSelectionGroup();
     sendData({ type: 'clear' });
+  });
+
+  let isSelectMode = false;
+  const selectBtn = document.getElementById('select-mode-btn');
+  selectBtn.addEventListener('click', () => {
+    isSelectMode = !isSelectMode;
+    selectBtn.innerText = isSelectMode ? '🟦 영역 선택 [ON]' : '🟦 영역 선택 [OFF]';
+    selectBtn.classList.toggle('active', isSelectMode);
   });
 
   let isInspectMode = false;
@@ -527,21 +510,23 @@
     camBtn.classList.toggle('active', isCamModeAlwaysOn);
   });
 
-  // 6. 터치 및 기물 조작
+  // 6. 영역 드래그 선택 & 기물 이동 조작
   const raycaster = new THREE.Raycaster();
   const touch = new THREE.Vector2();
   let selectedObj = null;
+  let groupDragOffsets = []; // 묶여서 이동할 오브젝트들의 상대 위치 Offset
   const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -0.26);
+  
   let touchStartTime = 0;
   let touchStartPos = { x: 0, y: 0 };
-  let longPressTimer = null;
+  let isBoxSelecting = false;
+  const selectBox = document.getElementById('select-box');
 
   function getTouchPos(e) {
     const t = e.touches ? e.touches[0] : e;
     return { x: (t.clientX / window.innerWidth) * 2 - 1, y: -(t.clientY / window.innerHeight) * 2 + 1, rawX: t.clientX, rawY: t.clientY };
   }
 
-  // 오타 수정 위치 (12, 65)
   function showCardPreview(card) {
     const modal = document.getElementById('card-preview-modal');
     const canvas = document.getElementById('preview-canvas');
@@ -578,21 +563,23 @@
     touchStartTime = Date.now();
     touchStartPos = { x: pos.rawX, y: pos.rawY };
 
+    // 영역 선택 [ON] 상태에서 빈 공간 드래그 시작 시 영역 선택 박스 활성화
+    if (isSelectMode) {
+      isBoxSelecting = true;
+      controls.enabled = false;
+      selectBox.style.left = pos.rawX + 'px';
+      selectBox.style.top = pos.rawY + 'px';
+      selectBox.style.width = '0px';
+      selectBox.style.height = '0px';
+      selectBox.style.display = 'block';
+      return;
+    }
+
     raycaster.setFromCamera(touch, camera);
     const intersects = raycaster.intersectObjects(objects);
 
     if (intersects.length > 0) {
       const hitObj = intersects[0].object;
-
-      longPressTimer = setTimeout(() => {
-        hitObj.userData.isLocked = !hitObj.userData.isLocked;
-        if (hitObj.userData.isLocked) {
-          alert('🔒 기물이 잠겼습니다 (Lock)');
-        } else {
-          alert('🔓 잠금이 해제되었습니다 (Unlock)');
-        }
-        selectedObj = null;
-      }, 600);
 
       if (hitObj.userData.isLocked) {
         controls.enabled = true;
@@ -600,40 +587,102 @@
       }
 
       selectedObj = hitObj;
-      if (selectedObj.userData.type === 'card') {
-        selectedObj.position.y += 0.2;
+
+      // 이미 선택된 그룹 안에 포함된 카드를 잡았을 경우, 그룹 전체 동시 이동 준비
+      if (selectedGroup.includes(selectedObj)) {
+        groupDragOffsets = selectedGroup.map(obj => ({
+          obj: obj,
+          offsetX: obj.position.x - selectedObj.position.x,
+          offsetZ: obj.position.z - selectedObj.position.z
+        }));
+      } else {
+        // 단일 선택 이동일 경우 기존 선택 그룹 해제
+        clearSelectionGroup();
+        groupDragOffsets = [{ obj: selectedObj, offsetX: 0, offsetZ: 0 }];
       }
+
       controls.enabled = false;
     } else {
+      // 빈 바닥 탭 시 그룹 선택 해제
+      clearSelectionGroup();
       selectedObj = null;
       controls.enabled = true;
     }
   }
 
   function onTouchMove(e) {
-    if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+    const pos = getTouchPos(e);
+
+    // 영역 박스 드래그 선택 처리
+    if (isBoxSelecting) {
+      const left = Math.min(touchStartPos.x, pos.rawX);
+      const top = Math.min(touchStartPos.y, pos.rawY);
+      const width = Math.abs(pos.rawX - touchStartPos.x);
+      const height = Math.abs(pos.rawY - touchStartPos.y);
+
+      selectBox.style.left = left + 'px';
+      selectBox.style.top = top + 'px';
+      selectBox.style.width = width + 'px';
+      selectBox.style.height = height + 'px';
+      return;
+    }
+
     if (!selectedObj || selectedObj.userData.isLocked) return;
 
-    const pos = getTouchPos(e);
     touch.x = pos.x; touch.y = pos.y;
-
     raycaster.setFromCamera(touch, camera);
     const target = new THREE.Vector3();
     raycaster.ray.intersectPlane(plane, target);
 
-    selectedObj.position.x = target.x;
-    selectedObj.position.z = target.z;
+    // 묶인 모든 카드를 드래그 기준점 위치에 맞춰 한 번에 이동
+    groupDragOffsets.forEach(item => {
+      item.obj.position.x = target.x + item.offsetX;
+      item.obj.position.z = target.z + item.offsetZ;
 
-    if (selectedObj.userData.type === 'card') {
-      updateHandVisibility(selectedObj);
-    }
+      if (item.obj.userData.type === 'card') {
+        updateHandVisibility(item.obj);
+      }
+      sendMoveData(item.obj);
+    });
+
     updateStacking();
-
-    sendMoveData(selectedObj);
   }
 
   function onTouchEnd(e) {
-    if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+    const pos = getTouchPos(e);
+
+    // 영역 선택 박스 지정 종료 시 해당 박스 내의 카드들을 그룹으로 지정
+    if (isBoxSelecting) {
+      isBoxSelecting = false;
+      selectBox.style.display = 'none';
+      controls.enabled = true;
+
+      clearSelectionGroup();
+
+      const minX = Math.min(touchStartPos.x, pos.rawX);
+      const maxX = Math.max(touchStartPos.x, pos.rawX);
+      const minY = Math.min(touchStartPos.y, pos.rawY);
+      const maxY = Math.max(touchStartPos.y, pos.rawY);
+
+      // 화면 좌표를 감지하여 3D 카드가 박스 영역 안인지 판별
+      objects.forEach(obj => {
+        const screenPos = obj.position.clone().project(camera);
+        const x = (screenPos.x * 0.5 + 0.5) * window.innerWidth;
+        const y = (-screenPos.y * 0.5 + 0.5) * window.innerHeight;
+
+        if (x >= minX && x <= maxX && y >= minY && y <= maxY) {
+          selectedGroup.push(obj);
+
+          // 선택된 카드 하이라이트 가이드 추가
+          const outlineGeo = new THREE.BoxGeometry(1.24, 0.04, 1.84);
+          const outlineMat = new THREE.MeshBasicMaterial({ color: 0x10b981, wireframe: true });
+          const outlineMesh = new THREE.Mesh(outlineGeo, outlineMat);
+          obj.add(outlineMesh);
+          obj.userData.outlineMesh = outlineMesh;
+        }
+      });
+      return;
+    }
 
     if (selectedObj && !selectedObj.userData.isLocked) {
       const touchDuration = Date.now() - touchStartTime;
@@ -647,15 +696,6 @@
           if (selectedObj.userData.type === 'card') flipCard(selectedObj, true);
           else if (selectedObj.userData.type === 'dice') rollDice(selectedObj, true);
         }
-      } else if (snapZonesEnabled) {
-        snapPoints.forEach(sp => {
-          const d = Math.hypot(selectedObj.position.x - sp.x, selectedObj.position.z - sp.z);
-          if (d < 0.8) {
-            selectedObj.position.x = sp.x;
-            selectedObj.position.z = sp.z;
-            sendMoveData(selectedObj);
-          }
-        });
       }
       updateStacking();
     }
@@ -761,6 +801,7 @@
       if (data.type === 'clear') {
         objects.forEach(obj => scene.remove(obj));
         objects = [];
+        clearSelectionGroup();
       } else if (data.type === 'reset_deck') {
         spawnFullDeck(false);
       } else if (data.type === 'spawn') {
@@ -768,8 +809,6 @@
         else if (data.propType === 'dice') createDice(data.x, data.z, false);
       } else if (data.type === 'shuffle') {
         shuffleCards(false);
-      } else if (data.type === 'group') {
-        groupCards(false);
       } else if (data.type === 'spread') {
         spreadCards(false);
       } else if (data.type === 'cut') {
