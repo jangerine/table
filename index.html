@@ -86,7 +86,7 @@
     <button id="connect-btn">연결</button>
     <span id="status" style="color:#f59e0b;">(오프라인)</span>
   </div>
-  <div>🎴 <b>기본 시작:</b> 52장 트럼프 카드 덱이 생성되어 있습니다.</div>
+  <div>🎴 <b>기본 시작:</b> 52장 카드가 뒷면 상태로 덱 생성됩니다.</div>
   <div>🕹️ <b>기물 이동/포개기:</b> 카드를 포개어 덱 적재 가능</div>
   <div>👆 <b>카드 탭/더블클릭:</b> 3D Flip 뒤집기</div>
 </div>
@@ -215,8 +215,12 @@
 
     const card = new THREE.Mesh(geo, materials);
     card.position.set(x, 0.28, z);
+    
+    // 카드가 뒷면이 위로 오도록 Z축으로 180도(Math.PI) 회전
+    card.rotation.z = Math.PI;
+    
     card.castShadow = true;
-    card.userData = { id: id, type: 'card', suit: suit, value: value, isFlipped: false, isAnimating: false };
+    card.userData = { id: id, type: 'card', suit: suit, value: value, isFlipped: true, isAnimating: false };
     
     scene.add(card);
     objects.push(card);
@@ -263,7 +267,6 @@
 
   // 52장 전체 덱 생성 함수
   function spawnFullDeck(isLocal = true) {
-    // 기존 객체 삭제
     objects.forEach(obj => scene.remove(obj));
     objects = [];
 
@@ -452,7 +455,7 @@
   window.addEventListener('mousemove', onTouchMove, false);
   window.addEventListener('mouseup', onTouchEnd, false);
 
-  // 8. 애니메이션 로직
+  // 8. 애니메이션 로직 (flipCard 시 targetRotZ 계산 자동화)
   function flipCard(card, isLocal = false) {
     if (card.userData.isAnimating) return;
     card.userData.isAnimating = true;
