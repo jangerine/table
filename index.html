@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Mobile Tabletop Simulator - OneCard</title>
+  <title>Mobile Tabletop Simulator - Ultimate Edition</title>
   <style>
     * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
     body { margin: 0; overflow: hidden; touch-action: none; font-family: 'Pretendard', sans-serif; background-color: #0f172a; }
@@ -13,12 +13,12 @@
       padding: 10px 16px; display: flex; justify-content: space-between; align-items: center;
       z-index: 100; pointer-events: none;
     }
-    .btn-group-left, .btn-group-right { display: flex; gap: 8px; pointer-events: auto; flex-wrap: wrap; }
+    .btn-group-left, .btn-group-right { display: flex; gap: 6px; pointer-events: auto; flex-wrap: wrap; }
 
     .ui-btn {
-      padding: 8px 14px; font-size: 13px; font-weight: 700; color: white;
-      border: none; border-radius: 12px; cursor: pointer;
-      display: flex; align-items: center; gap: 6px;
+      padding: 7px 12px; font-size: 12px; font-weight: 700; color: white;
+      border: none; border-radius: 10px; cursor: pointer;
+      display: flex; align-items: center; gap: 4px;
       box-shadow: 0 4px 10px rgba(0,0,0,0.3); transition: all 0.2s ease;
     }
     .ui-btn:active { transform: scale(0.95); }
@@ -29,17 +29,18 @@
     .btn-orange { background: linear-gradient(135deg, #f59e0b, #d97706); }
     .btn-red { background: linear-gradient(135deg, #ef4444, #dc2626); }
     .btn-blue { background: linear-gradient(135deg, #3b82f6, #2563eb); }
-    .btn-blue.active { background: linear-gradient(135deg, #1d4ed8, #1e40af); ring: 2px solid #60a5fa; }
+    .btn-gray { background: linear-gradient(135deg, #64748b, #475569); }
+    .btn-blue.active, .btn-gray.active { background: linear-gradient(135deg, #1d4ed8, #1e40af); ring: 2px solid #60a5fa; }
 
     #bottom-info {
       position: absolute; bottom: 16px; left: 16px; z-index: 100;
       background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(8px);
       border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px;
-      padding: 12px 16px; color: #e2e8f0; font-size: 12px; line-height: 1.6;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.4); max-width: 340px;
+      padding: 10px 14px; color: #e2e8f0; font-size: 11px; line-height: 1.5;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.4); max-width: 360px;
     }
-    #peer-ui { margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-    #peer-ui input { width: 90px; padding: 4px 8px; font-size: 11px; border-radius: 6px; border: 1px solid #475569; background: #1e293b; color: white; text-transform: uppercase; }
+    #peer-ui { margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    #peer-ui input { width: 80px; padding: 4px 6px; font-size: 11px; border-radius: 6px; border: 1px solid #475569; background: #1e293b; color: white; text-transform: uppercase; }
     #peer-ui button { padding: 4px 8px; font-size: 11px; border-radius: 6px; border: none; background: #10b981; color: white; font-weight: bold; }
 
     #prop-modal {
@@ -52,7 +53,16 @@
       padding: 8px 12px; font-size: 12px; font-weight: bold; color: white;
       background: #334155; border: 1px solid #475569; border-radius: 8px; text-align: left;
     }
-    #prop-modal button:hover { background: #475569; }
+
+    /* 카드 확대보기 팝업 (Alt 키 기능 대체) */
+    #card-preview-modal {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      width: 220px; height: 330px; z-index: 300; background: #1e293b;
+      border: 3px solid #60a5fa; border-radius: 16px; display: none;
+      flex-direction: column; justify-content: center; align-items: center;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.8); color: white; text-align: center; padding: 10px;
+    }
+    #preview-canvas { border-radius: 10px; margin-bottom: 10px; }
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -62,22 +72,32 @@
 
 <div id="top-bar">
   <div class="btn-group-left">
-    <button class="ui-btn btn-purple" id="prop-menu-btn">🎮 소품 추가 메뉴</button>
-    <button class="ui-btn btn-green" id="shuffle-btn">🔀 카드 섞기</button>
-    <button class="ui-btn btn-teal" id="draw-btn">🎴 카드 가져오기</button>
-    <button class="ui-btn btn-teal" id="deal-btn">🎴 카드 펼치기</button>
-    <button class="ui-btn btn-orange" id="roll-btn">🎲 주사위 굴리기</button>
+    <button class="ui-btn btn-purple" id="prop-menu-btn">🎮 소품</button>
+    <button class="ui-btn btn-green" id="shuffle-btn">🔀 섞기(R)</button>
+    <button class="ui-btn btn-teal" id="draw-btn">🎴 가져오기</button>
+    <button class="ui-btn btn-purple" id="group-btn">🔗 묶기(G)</button>
+    <button class="ui-btn btn-teal" id="spread-btn">↔️ 펼치기</button>
+    <button class="ui-btn btn-orange" id="cut-btn">✂️ 떼어내기</button>
+    <button class="ui-btn btn-orange" id="snap-btn">🎯 스냅존</button>
     <button class="ui-btn btn-red" id="clear-btn">판 비우기</button>
   </div>
   <div class="btn-group-right">
-    <button class="ui-btn btn-blue" id="cam-mode-btn">카메라 회전 모드</button>
+    <button class="ui-btn btn-gray" id="inspect-btn">🔍 확대보기 [OFF]</button>
+    <button class="ui-btn btn-blue" id="cam-mode-btn">카메라 회전</button>
   </div>
 </div>
 
 <div id="prop-modal">
   <button id="add-card-btn">🃏 무작위 카드 1장 추가</button>
-  <button id="add-deck-btn">🎴 52장 전체 덱 다시 리셋</button>
+  <button id="add-deck-btn">🎴 52장 전체 덱 리셋</button>
   <button id="add-dice-btn">🎲 주사위 추가</button>
+</div>
+
+<!-- 카드 확대 팝업 -->
+<div id="card-preview-modal">
+  <canvas id="preview-canvas" width="180" height="260"></canvas>
+  <div id="preview-title" style="font-size: 14px; font-weight: bold;">카드 정보</div>
+  <div style="font-size: 10px; color: #94a3b8; margin-top:4px;">(화면 탭 시 닫힘)</div>
 </div>
 
 <div id="bottom-info">
@@ -87,11 +107,12 @@
     <button id="connect-btn">연결</button>
     <span id="status" style="color:#f59e0b;">(오프라인)</span>
   </div>
-  <div>👁️ <b>손패 자동 줄바꿈:</b> 카드를 많이 뽑으면 손패 영역 안에서 자동으로 2줄, 3줄로 나누어 정렬됩니다.</div>
+  <div>🔒 <b>길게 터치:</b> 기물 잠금/해제 (Lock)</div>
+  <div>🔍 <b>확대보기:</b> 상단 버튼 [ON] 후 카드를 탭하면 크게 확대 (Alt 키 대체)</div>
 </div>
 
 <script>
-  // 1. Three.js 기본 설정
+  // 1. Scene 설정
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x0f172a);
 
@@ -120,7 +141,10 @@
   dirLight.castShadow = true;
   scene.add(dirLight);
 
-  // 2. TTS 8각 보드판
+  // 2. 보드판 & 스냅 존
+  let snapZonesEnabled = false;
+  let snapPoints = [];
+
   function createWoodTexture() {
     const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 512;
     const ctx = canvas.getContext('2d');
@@ -135,10 +159,18 @@
     const ctx = canvas.getContext('2d');
     ctx.fillStyle = '#1b4d2e'; ctx.fillRect(0, 0, 512, 512);
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)'; ctx.lineWidth = 6; ctx.strokeRect(20, 20, 472, 472);
+    
+    // 내 손패 & 상대 손패 영역
     ctx.strokeStyle = 'rgba(96, 165, 250, 0.5)'; ctx.lineWidth = 4;
-    ctx.strokeRect(40, 310, 432, 170);
-    ctx.fillStyle = 'rgba(96, 165, 250, 0.7)'; ctx.font = '20px sans-serif'; ctx.textAlign = 'center';
-    ctx.fillText('MY HAND ZONE (비공개 손패 영역)', 256, 400);
+    ctx.strokeRect(40, 330, 432, 150);
+    ctx.fillStyle = 'rgba(96, 165, 250, 0.7)'; ctx.font = '18px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('MY HAND ZONE (내 손패 영역)', 256, 410);
+
+    ctx.strokeStyle = 'rgba(239, 68, 68, 0.4)'; ctx.lineWidth = 4;
+    ctx.strokeRect(40, 30, 432, 120);
+    ctx.fillStyle = 'rgba(239, 68, 68, 0.6)';
+    ctx.fillText('OPPONENT HAND ZONE (상대 손패 영역)', 256, 90);
+
     return new THREE.CanvasTexture(canvas);
   }
 
@@ -161,6 +193,32 @@
   boardMatMesh.rotation.x = -Math.PI / 2;
   boardMatMesh.position.y = 0.26;
   scene.add(boardMatMesh);
+
+  // 스냅 존 가이드 시각화
+  const snapGroup = new THREE.Group();
+  scene.add(snapGroup);
+  
+  function toggleSnapZones() {
+    snapZonesEnabled = !snapZonesEnabled;
+    document.getElementById('snap-btn').classList.toggle('active', snapZonesEnabled);
+    snapGroup.clear();
+    snapPoints = [];
+
+    if (snapZonesEnabled) {
+      // 3x2 정렬 그리드 생성
+      for (let x = -2; x <= 2; x += 2) {
+        for (let z = -1; z <= 1; z += 2) {
+          snapPoints.push({ x: x, z: z });
+          const gridGeo = new THREE.RingGeometry(0.5, 0.55, 32);
+          const gridMat = new THREE.MeshBasicMaterial({ color: 0xf59e0b, side: THREE.DoubleSide });
+          const ring = new THREE.Mesh(gridGeo, gridMat);
+          ring.rotation.x = Math.PI / 2;
+          ring.position.set(x, 0.27, z);
+          snapGroup.add(ring);
+        }
+      }
+    }
+  }
 
   let objects = [];
   let objectIdCounter = 0;
@@ -220,7 +278,7 @@
     card.position.set(x, 0.28, z);
     card.rotation.z = Math.PI;
     card.castShadow = true;
-    card.userData = { id: id, type: 'card', suit: suit, value: value, isFlipped: true, isAnimating: false, isMovedToHand: false };
+    card.userData = { id: id, type: 'card', suit: suit, value: value, isFlipped: true, isLocked: false, isAnimating: false, isMovedToHand: false };
     
     scene.add(card);
     objects.push(card);
@@ -238,7 +296,7 @@
     const dice = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0xe74c3c, roughness: 0.3 }));
     dice.position.set(x, 0.66, z);
     dice.castShadow = true;
-    dice.userData = { id: id, type: 'dice', isRolling: false };
+    dice.userData = { id: id, type: 'dice', isRolling: false, isLocked: false };
     scene.add(dice);
     objects.push(dice);
 
@@ -246,8 +304,8 @@
     return dice;
   }
 
-  // 4. 내 손패 영역(HAND ZONE) 및 회전 처리
-  const HAND_ZONE_Z = 2.5;
+  // 4. 손패 영역 / 포개짐
+  const HAND_ZONE_Z = 2.0;
 
   function updateHandVisibility(card) {
     if (card.position.z > HAND_ZONE_Z && !card.userData.isMovedToHand) {
@@ -294,7 +352,58 @@
     if (isLocal) sendData({ type: 'reset_deck' });
   }
 
-  // 5. 카드 섞기
+  // 5. 테이블탑 기믹 기능 (G: 그룹 묶기 / Spread: 펼치기 / Cut: 떼어내기)
+  
+  // 묶기 (Group): 흩어진 카드들을 보드판 중앙으로 포개어 묶음
+  function groupCards(isLocal = true) {
+    const tableCards = objects.filter(o => o.userData.type === 'card' && o.position.z <= HAND_ZONE_Z);
+    if (tableCards.length === 0) return;
+
+    tableCards.forEach((card, i) => {
+      card.position.set(0, 0.28 + i * 0.02, 0);
+      card.rotation.z = Math.PI; // 뒷면으로 포갬
+      card.userData.isFlipped = true;
+      sendMoveData(card);
+    });
+    updateStacking();
+    if (isLocal) sendData({ type: 'group' });
+  }
+
+  // 펼쳐보기 (Card Spread): 덱 카드를 가로로 한눈에 펼쳐 보여줌
+  function spreadCards(isLocal = true) {
+    const deckCards = objects.filter(o => o.userData.type === 'card' && Math.hypot(o.position.x, o.position.z) < 1.5);
+    if (deckCards.length === 0) return;
+
+    const startX = -((deckCards.length - 1) * 0.2) / 2;
+    deckCards.forEach((card, i) => {
+      card.position.set(startX + i * 0.2, 0.28, 0);
+      sendMoveData(card);
+    });
+    updateStacking();
+    if (isLocal) sendData({ type: 'spread' });
+  }
+
+  // 떼어내기 (Cut / Split): 덱에서 카드를 지정 장수만큼 떼어냄
+  function cutDeck(isLocal = true) {
+    const deckCards = objects.filter(o => o.userData.type === 'card' && Math.hypot(o.position.x, o.position.z) < 1.5);
+    if (deckCards.length < 2) return;
+
+    const input = prompt(`몇 장의 카드를 떼어내시겠습니까? (최대 ${deckCards.length - 1}장)`, '5');
+    const cutCount = parseInt(input, 10);
+    if (isNaN(cutCount) || cutCount < 1 || cutCount >= deckCards.length) return;
+
+    deckCards.sort((a, b) => b.position.y - a.position.y);
+    const cutCards = deckCards.slice(0, cutCount);
+
+    cutCards.forEach((card, i) => {
+      card.position.set(2.0, 0.28 + i * 0.02, 0); // 오른쪽으로 떼어놓음
+      sendMoveData(card);
+    });
+    updateStacking();
+    if (isLocal) sendData({ type: 'cut', cutCount: cutCount });
+  }
+
+  // 섞기 (Shuffle)
   function shuffleCards(isLocal = true) {
     const allCards = objects.filter(o => o.userData.type === 'card');
     if (allCards.length === 0) return;
@@ -345,7 +454,7 @@
     if (isLocal) sendData({ type: 'shuffle' });
   }
 
-  // 손패 자동 줄바꿈 정렬 함수 (한 줄에 최대 6장씩 배치)
+  // 카드 가져오기 (Draw)
   function drawCards(isLocal = true, numToDraw = null) {
     const allCards = objects.filter(o => o.userData.type === 'card');
     const deckCards = allCards.filter(c => Math.hypot(c.position.x, c.position.z) < 1.5);
@@ -363,24 +472,22 @@
     deckCards.sort((a, b) => b.position.y - a.position.y);
     const selectedCards = deckCards.slice(0, numToDraw);
 
-    // 기존 손패 카드들와 새로 뽑을 카드를 포함해 전체 다시 재정렬
     const existingHand = allCards.filter(c => c.position.z > HAND_ZONE_Z && !selectedCards.includes(c));
     const fullHand = [...existingHand, ...selectedCards];
 
-    const CARDS_PER_ROW = 6;  // 한 줄에 배치할 카드 수
-    const CARD_SPACING_X = 0.8; // 카드 가로 간격
-    const ROW_SPACING_Z = 0.9;  // 줄간격 (Z축)
+    const CARDS_PER_ROW = 6;
+    const CARD_SPACING_X = 0.8;
+    const ROW_SPACING_Z = 0.9;
 
     fullHand.forEach((card, index) => {
-      const rowIndex = Math.floor(index / CARDS_PER_ROW); // 몇 번째 줄인지
-      const colIndex = index % CARDS_PER_ROW;             // 줄 내에서 몇 번째 칼럼인지
+      const rowIndex = Math.floor(index / CARDS_PER_ROW);
+      const colIndex = index % CARDS_PER_ROW;
 
-      // 각 줄마다 가로 중앙 정렬
       const currentCardsInRow = Math.min(CARDS_PER_ROW, fullHand.length - (rowIndex * CARDS_PER_ROW));
       const startX = -((currentCardsInRow - 1) * CARD_SPACING_X) / 2;
 
       const targetX = startX + (colIndex * CARD_SPACING_X);
-      const targetZ = 3.0 + (rowIndex * ROW_SPACING_Z); // 줄바꿈 시 Z축 아래로 배치
+      const targetZ = 2.8 + (rowIndex * ROW_SPACING_Z);
 
       card.position.set(targetX, 0.28, targetZ);
       updateHandVisibility(card);
@@ -388,33 +495,6 @@
     });
 
     updateStacking();
-  }
-
-  function dealCards(isLocal = true, numPiles = null) {
-    const cards = objects.filter(o => o.userData.type === 'card');
-    if (cards.length === 0) return;
-
-    if (numPiles === null) {
-      const input = prompt('몇 개 영역(플레이어 수)으로 나누시겠습니까?', '4');
-      numPiles = parseInt(input, 10);
-      if (isNaN(numPiles) || numPiles < 1) return;
-    }
-
-    const radius = 2.5;
-    cards.forEach((card, index) => {
-      const pileIndex = index % numPiles;
-      const stackLevel = Math.floor(index / numPiles);
-      const angle = (pileIndex / numPiles) * Math.PI * 2;
-
-      const targetX = Math.cos(angle) * radius;
-      const targetZ = Math.sin(angle) * radius;
-      const targetY = 0.28 + stackLevel * 0.02;
-
-      card.position.set(targetX, targetY, targetZ);
-      updateHandVisibility(card);
-    });
-
-    if (isLocal) sendData({ type: 'deal', numPiles: numPiles });
   }
 
   spawnFullDeck(false);
@@ -433,7 +513,10 @@
 
   document.getElementById('shuffle-btn').addEventListener('click', () => shuffleCards(true));
   document.getElementById('draw-btn').addEventListener('click', () => drawCards(true));
-  document.getElementById('deal-btn').addEventListener('click', () => dealCards(true));
+  document.getElementById('group-btn').addEventListener('click', () => groupCards(true));
+  document.getElementById('spread-btn').addEventListener('click', () => spreadCards(true));
+  document.getElementById('cut-btn').addEventListener('click', () => cutDeck(true));
+  document.getElementById('snap-btn').addEventListener('click', toggleSnapZones);
 
   document.getElementById('clear-btn').addEventListener('click', () => {
     objects.forEach(obj => scene.remove(obj));
@@ -441,8 +524,13 @@
     sendData({ type: 'clear' });
   });
 
-  document.getElementById('roll-btn').addEventListener('click', () => {
-    objects.filter(o => o.userData.type === 'dice').forEach(d => rollDice(d, true));
+  // Alt 미리보기 토글
+  let isInspectMode = false;
+  const inspectBtn = document.getElementById('inspect-btn');
+  inspectBtn.addEventListener('click', () => {
+    isInspectMode = !isInspectMode;
+    inspectBtn.innerText = isInspectMode ? '🔍 확대보기 [ON]' : '🔍 확대보기 [OFF]';
+    inspectBtn.classList.toggle('active', isInspectMode);
   });
 
   let isCamModeAlwaysOn = false;
@@ -452,21 +540,47 @@
     camBtn.classList.toggle('active', isCamModeAlwaysOn);
   });
 
-  // 6. 터치 조작 및 이동 송신
+  // 6. 터치 제스처 & 잠금(Lock) / 스냅(Snap) / 확대(Alt)
   const raycaster = new THREE.Raycaster();
   const touch = new THREE.Vector2();
   let selectedObj = null;
   const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -0.26);
   let touchStartTime = 0;
   let touchStartPos = { x: 0, y: 0 };
+  let longPressTimer = null;
 
   function getTouchPos(e) {
     const t = e.touches ? e.touches[0] : e;
     return { x: (t.clientX / window.innerWidth) * 2 - 1, y: -(t.clientY / window.innerHeight) * 2 + 1, rawX: t.clientX, rawY: t.clientY };
   }
 
+  function showCardPreview(card) {
+    const modal = document.getElementById('card-preview-modal');
+    const canvas = document.getElementById('preview-canvas');
+    const ctx = canvas.getContext('2d');
+    
+    // 확대 카드 렌더링
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, 180, 260);
+    ctx.strokeStyle = '#cccccc'; ctx.lineWidth = 4; ctx.strokeRect(4, 4, 172, 252);
+
+    const color = (card.userData.suit === '♥' || card.userData.suit === '♦') ? '#e63946' : '#1d3557';
+    ctx.fillStyle = color;
+    ctx.font = 'bold 28px sans-serif'; ctx.textAlign = 'left';
+    ctx.fillText(card.userData.value, 12, 35);
+    ctx.fillText(card.userData.suit, 12 = 65, 65);
+    ctx.font = '60px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(card.userData.suit, 90, 130);
+
+    document.getElementById('preview-title').innerText = `${card.userData.suit} ${card.userData.value}`;
+    modal.style.display = 'flex';
+  }
+
+  document.getElementById('card-preview-modal').addEventListener('click', () => {
+    document.getElementById('card-preview-modal').style.display = 'none';
+  });
+
   function onTouchStart(e) {
-    if (e.target.closest('#top-bar, #bottom-info, #prop-modal')) return;
+    if (e.target.closest('#top-bar, #bottom-info, #prop-modal, #card-preview-modal')) return;
 
     if (isCamModeAlwaysOn || (e.touches && e.touches.length > 1)) {
       selectedObj = null; controls.enabled = true; return;
@@ -481,7 +595,26 @@
     const intersects = raycaster.intersectObjects(objects);
 
     if (intersects.length > 0) {
-      selectedObj = intersects[0].object;
+      const hitObj = intersects[0].object;
+
+      // 롱 프레스 (0.5초 길게 터치) 시 기물 잠금 (L 키 기능)
+      longPressTimer = setTimeout(() => {
+        hitObj.userData.isLocked = !hitObj.userData.isLocked;
+        if (hitObj.userData.isLocked) {
+          hitObj.material = Array.isArray(hitObj.material) ? hitObj.material : hitObj.material;
+          alert('🔒 기물이 잠겼습니다 (Lock)');
+        } else {
+          alert('🔓 잠금이 해제되었습니다 (Unlock)');
+        }
+        selectedObj = null;
+      }, 600);
+
+      if (hitObj.userData.isLocked) {
+        controls.enabled = true;
+        return;
+      }
+
+      selectedObj = hitObj;
       if (selectedObj.userData.type === 'card') {
         selectedObj.position.y += 0.2;
       }
@@ -493,7 +626,9 @@
   }
 
   function onTouchMove(e) {
-    if (!selectedObj) return;
+    if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+    if (!selectedObj || selectedObj.userData.isLocked) return;
+
     const pos = getTouchPos(e);
     touch.x = pos.x; touch.y = pos.y;
 
@@ -513,14 +648,31 @@
   }
 
   function onTouchEnd(e) {
-    if (selectedObj) {
+    if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+
+    if (selectedObj && !selectedObj.userData.isLocked) {
       const touchDuration = Date.now() - touchStartTime;
       const lastPos = e.changedTouches ? e.changedTouches[0] : e;
       const dist = Math.hypot(lastPos.clientX - touchStartPos.x, lastPos.clientY - touchStartPos.y);
 
+      // 짧게 탭했을 때
       if (touchDuration < 300 && dist < 10) {
-        if (selectedObj.userData.type === 'card') flipCard(selectedObj, true);
-        else if (selectedObj.userData.type === 'dice') rollDice(selectedObj, true);
+        if (isInspectMode && selectedObj.userData.type === 'card') {
+          showCardPreview(selectedObj); // Alt 키 확대 기능
+        } else {
+          if (selectedObj.userData.type === 'card') flipCard(selectedObj, true);
+          else if (selectedObj.userData.type === 'dice') rollDice(selectedObj, true);
+        }
+      } else if (snapZonesEnabled) {
+        // 스냅 존 자동 정렬 체크
+        snapPoints.forEach(sp => {
+          const d = Math.hypot(selectedObj.position.x - sp.x, selectedObj.position.z - sp.z);
+          if (d < 0.8) {
+            selectedObj.position.x = sp.x;
+            selectedObj.position.z = sp.z;
+            sendMoveData(selectedObj);
+          }
+        });
       }
       updateStacking();
     }
@@ -537,10 +689,16 @@
 
   function sendMoveData(obj) {
     let isFlippedForPeer = obj.userData.isFlipped;
+    let peerX = obj.position.x;
+    let peerZ = obj.position.z;
+
     if (obj.userData.type === 'card' && obj.position.z > HAND_ZONE_Z) {
       isFlippedForPeer = true;
+      peerX = -obj.position.x;
+      peerZ = -obj.position.z;
     }
-    sendData({ type: 'move', id: obj.userData.id, x: obj.position.x, z: obj.position.z, isFlipped: isFlippedForPeer });
+
+    sendData({ type: 'move', id: obj.userData.id, x: peerX, z: peerZ, isFlipped: isFlippedForPeer });
   }
 
   function flipCard(card, isLocal = false) {
@@ -627,8 +785,12 @@
         else if (data.propType === 'dice') createDice(data.x, data.z, false);
       } else if (data.type === 'shuffle') {
         shuffleCards(false);
-      } else if (data.type === 'deal') {
-        dealCards(false, data.numPiles);
+      } else if (data.type === 'group') {
+        groupCards(false);
+      } else if (data.type === 'spread') {
+        spreadCards(false);
+      } else if (data.type === 'cut') {
+        cutDeck(false);
       } else {
         const targetObj = objects.find(o => o.userData.id === data.id);
         if (!targetObj) return;
