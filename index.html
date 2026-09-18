@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Mobile Tabletop Simulator - 4 Players Edition</title>
+  <title>Mobile Tabletop Simulator - Fixed Seat Rotation</title>
   <style>
     * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
     body { margin: 0; overflow: hidden; touch-action: none; font-family: 'Pretendard', sans-serif; background-color: #0f172a; }
@@ -30,14 +30,13 @@
     .btn-red { background: linear-gradient(135deg, #ef4444, #dc2626); }
     .btn-blue { background: linear-gradient(135deg, #3b82f6, #2563eb); }
     .btn-gray { background: linear-gradient(135deg, #64748b, #475569); }
-    .btn-purple.active, .btn-gray.active, .btn-blue.active { background: linear-gradient(135deg, #1d4ed8, #1e40af); ring: 2px solid #60a5fa; }
 
     #bottom-info {
       position: absolute; bottom: 16px; left: 16px; z-index: 100;
       background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(8px);
       border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px;
       padding: 10px 14px; color: #e2e8f0; font-size: 11px; line-height: 1.5;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.4); max-width: 420px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.4); max-width: 450px;
     }
     #peer-ui { margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
     #peer-ui input { width: 80px; padding: 4px 6px; font-size: 11px; border-radius: 6px; border: 1px solid #475569; background: #1e293b; color: white; text-transform: uppercase; }
@@ -119,16 +118,14 @@
     </select>
     <span id="status" style="color:#f59e0b;">(대기중)</span>
   </div>
-  <div>✨ <b>수정 완료:</b> Z-Fighting(겹침 그래픽 깨짐) 및 좌석별 플레이어 시선 자동 정렬 적용</div>
+  <div>✅ <b>수정 완료:</b> 좌석(P1~P4) 시선에 맞춘 카드 방향 자동 정렬 & Z-Fighting 완전 해결</div>
 </div>
 
 <script>
   let mySeat = 1;
+  const CARD_BASE_Y = 0.32; // 그래픽 겹침 방지용 고정 Y값
 
-  // BASE Y높이 조절로 레이어 그래픽 깨짐(Z-Fighting) 방지
-  const CARD_BASE_Y = 0.32;
-
-  // 1. Scene 설정
+  // 1. Scene & Camera
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x0f172a);
 
@@ -164,7 +161,7 @@
   dirLight.castShadow = true;
   scene.add(dirLight);
 
-  // 2. 보드판 및 텍스처
+  // 2. 테이블 및 영역 텍스처
   function createWoodTexture() {
     const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 512;
     const ctx = canvas.getContext('2d');
@@ -235,7 +232,7 @@
   let selectedGroup = [];
   let objectIdCounter = 0;
 
-  // 3. 트럼프 카드 텍스처
+  // 3. 트럼프 카드 생성
   const suits = ['♠', '♥', '♦', '♣'];
   const values = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 
@@ -290,13 +287,14 @@
 
     const card = new THREE.Mesh(geo, materials);
     card.position.set(x, CARD_BASE_Y, z);
-    card.rotation.z = Math.PI;
+    card.rotation.z = Math.PI; // 기본은 뒷면이 위
     card.castShadow = true;
     card.userData = { id: id, type: 'card', suit: suit, value: value, isFlipped: true, isLocked: false, isAnimating: false };
     
     scene.add(card);
     objects.push(card);
 
+    alignCardRotationBySeat(card);
     updateHandVisibility(card);
     updateStacking();
 
@@ -320,25 +318,39 @@
     return dice;
   }
 
-  // 4. 영역 및 위치 감지
+  // 4. 위치/시선별 카드 회전 핵심 로직 (개선된 부분)
   function getSeatFromPosition(x, z) {
     if (z > 2.8) return 1;       // P1 남
     if (z < -2.8) return 2;      // P2 북
     if (x < -2.8) return 3;      // P3 서
     if (x > 2.8) return 4;       // P4 동
-    return 0;                    // 중앙 공유 영역 (필드)
+    return 0;                    // 중앙 공유 필드
+  }
+
+  // 좌석 영역에 놓일 때 그 플레이어의 정면 시선 각도로 자동 회전시키는 함수
+  function alignCardRotationBySeat(card) {
+    const seat = getSeatFromPosition(card.position.x, card.position.z);
+    
+    if (seat === 1) card.rotation.y = 0;               // P1 정면
+    else if (seat === 2) card.rotation.y = Math.PI;     // P2 정면 (180도)
+    else if (seat === 3) card.rotation.y = -Math.PI / 2; // P3 정면 (-90도)
+    else if (seat === 4) card.rotation.y = Math.PI / 2;  // P4 정면 (90도)
+    // 필드(seat === 0)에 있는 카드는 기존 각도 유지
   }
 
   function updateHandVisibility(card) {
     const seat = getSeatFromPosition(card.position.x, card.position.z);
     
+    // 내 영역에 있으면 나에게 앞면으로 보여줌
     if (seat === mySeat) {
       card.rotation.z = 0;
       card.userData.isFlipped = false;
     } else if (seat !== 0) {
+      // 남의 영역에 있으면 뒷면으로 숨김
       card.rotation.z = Math.PI;
       card.userData.isFlipped = true;
     } else {
+      // 중앙 필드는 원래 뒤집힘 상태 유지
       card.rotation.z = card.userData.isFlipped ? Math.PI : 0;
     }
   }
@@ -397,23 +409,15 @@
 
     selectedCards.forEach((card, index) => {
       let targetX = 0, targetZ = 0;
-      let targetRotY = 0;
       const offset = (index - (numToDraw - 1) / 2) * spacing;
 
-      // 시선 각도 보정 적용: 본인 시점에 카드가 정방향으로 서 있도록 계산
-      if (mySeat === 1) { 
-        targetX = offset; targetZ = 4.2; targetRotY = 0; 
-      } else if (mySeat === 2) { 
-        targetX = -offset; targetZ = -4.2; targetRotY = Math.PI; 
-      } else if (mySeat === 3) { 
-        targetX = -4.2; targetZ = -offset; targetRotY = -Math.PI / 2; 
-      } else if (mySeat === 4) { 
-        targetX = 4.2; targetZ = offset; targetRotY = Math.PI / 2; 
-      }
+      if (mySeat === 1) { targetX = offset; targetZ = 4.2; }
+      else if (mySeat === 2) { targetX = -offset; targetZ = -4.2; }
+      else if (mySeat === 3) { targetX = -4.2; targetZ = -offset; }
+      else if (mySeat === 4) { targetX = 4.2; targetZ = offset; }
 
       card.position.set(targetX, CARD_BASE_Y, targetZ);
-      card.rotation.y = targetRotY;
-
+      alignCardRotationBySeat(card);
       updateHandVisibility(card);
       sendMoveData(card);
     });
@@ -436,7 +440,6 @@
     if (tableCards.length === 0) return;
 
     const movingCards = tableCards.filter(o => Math.hypot(o.position.x, o.position.z) >= 1.0);
-
     if (movingCards.length === 0) return;
 
     movingCards.forEach((card, i) => {
@@ -530,7 +533,7 @@
 
   spawnFullDeck(false);
 
-  // UI 이벤트
+  // UI 핸들러
   const propModal = document.getElementById('prop-modal');
   document.getElementById('prop-menu-btn').addEventListener('click', (e) => {
     e.stopPropagation();
@@ -559,7 +562,10 @@
     mySeat = parseInt(e.target.value, 10);
     updateCameraPosition();
     controls.target.set(0, 0.2, 0);
-    objects.filter(o => o.userData.type === 'card').forEach(updateHandVisibility);
+    objects.filter(o => o.userData.type === 'card').forEach(c => {
+      alignCardRotationBySeat(c);
+      updateHandVisibility(c);
+    });
   });
 
   let isSelectMode = false;
@@ -585,7 +591,7 @@
     camBtn.classList.toggle('active', isCamModeAlwaysOn);
   });
 
-  // 5. 터치 및 영역 선택 로직
+  // 5. 드래그 & 터치 상호작용
   const raycaster = new THREE.Raycaster();
   const touch = new THREE.Vector2();
   let selectedObj = null;
@@ -709,6 +715,7 @@
       item.obj.position.z = target.z + item.offsetZ;
 
       if (item.obj.userData.type === 'card') {
+        alignCardRotationBySeat(item.obj); // 드래그 도중 손 영역 이동 시 해당 시점에 맞게 자동 회전
         updateHandVisibility(item.obj);
       }
       sendMoveData(item.obj);
@@ -776,7 +783,7 @@
   window.addEventListener('mousemove', onTouchMove, false);
   window.addEventListener('mouseup', onTouchEnd, false);
 
-  // 6. 카드 이동 전송
+  // 6. 데이터 동기화
   function sendMoveData(obj) {
     const seat = getSeatFromPosition(obj.position.x, obj.position.z);
     
@@ -843,7 +850,7 @@
     if (isLocal) broadcastData({ type: 'roll', id: dice.userData.id, targetRot: { x: rotX, y: rotY, z: rotZ } });
   }
 
-  // 7. PeerJS 1:N 연결
+  // 7. PeerJS 멀티플레이
   function generateShortId() {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     let result = '';
