@@ -74,8 +74,8 @@
 </div>
 
 <div id="prop-modal">
-  <button id="add-card-btn">🃏 무작위 원카드 추가</button>
-  <button id="add-deck-btn">🎴 52장 전체 덱 추가</button>
+  <button id="add-card-btn">🃏 무작위 카드 1장 추가</button>
+  <button id="add-deck-btn">🎴 52장 전체 덱 다시 리셋</button>
   <button id="add-dice-btn">🎲 주사위 추가</button>
 </div>
 
@@ -86,7 +86,8 @@
     <button id="connect-btn">연결</button>
     <span id="status" style="color:#f59e0b;">(오프라인)</span>
   </div>
-  <div>🕹️ <b>기물 이동/포개기:</b> 카드를 포개어 덱 형태로 적재 지원</div>
+  <div>🎴 <b>기본 시작:</b> 52장 트럼프 카드 덱이 생성되어 있습니다.</div>
+  <div>🕹️ <b>기물 이동/포개기:</b> 카드를 포개어 덱 적재 가능</div>
   <div>👆 <b>카드 탭/더블클릭:</b> 3D Flip 뒤집기</div>
 </div>
 
@@ -161,7 +162,7 @@
   let objects = [];
   let objectIdCounter = 0;
 
-  // 3. 트럼프 카드 생성
+  // 3. 트럼프 카드 텍스처
   const suits = ['♠', '♥', '♦', '♣'];
   const values = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 
@@ -197,7 +198,7 @@
 
   const cardBackTexture = createCardBackTexture();
 
-  function createCard(x = (Math.random() - 0.5) * 4, z = (Math.random() - 0.5) * 4, isLocal = true, customSuit = null, customValue = null) {
+  function createCard(x = 0, z = 0, isLocal = true, customSuit = null, customValue = null) {
     const id = 'card_' + (++objectIdCounter);
     const suit = customSuit || suits[Math.floor(Math.random() * suits.length)];
     const value = customValue || values[Math.floor(Math.random() * values.length)];
@@ -244,7 +245,7 @@
   function updateStacking() {
     const cards = objects.filter(o => o.userData.type === 'card' && !o.userData.isAnimating);
     const BASE_Y = 0.28;
-    const LAYER_HEIGHT = 0.025;
+    const LAYER_HEIGHT = 0.02;
 
     cards.forEach(card => {
       let stackLevel = 0;
@@ -260,23 +261,40 @@
     });
   }
 
+  // 52장 전체 덱 생성 함수
+  function spawnFullDeck(isLocal = true) {
+    // 기존 객체 삭제
+    objects.forEach(obj => scene.remove(obj));
+    objects = [];
+
+    suits.forEach(s => {
+      values.forEach(v => {
+        createCard(0, 0, false, s, v);
+      });
+    });
+
+    shuffleCards(false);
+    createDice(2, 0, false);
+
+    if (isLocal) sendData({ type: 'reset_deck' });
+  }
+
   // 5. 카드 섞기 (Shuffle) 애니메이션 & 로직
   function shuffleCards(isLocal = true) {
     const cards = objects.filter(o => o.userData.type === 'card');
     if (cards.length === 0) return;
 
-    // 무작위 순서 섞기 (Fisher-Yates)
     for (let i = cards.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [cards[i], cards[j]] = [cards[j], cards[i]];
     }
 
     const BASE_Y = 0.28;
-    const LAYER_HEIGHT = 0.03;
+    const LAYER_HEIGHT = 0.02;
 
     cards.forEach((card, index) => {
       card.userData.isAnimating = true;
-      const targetX = (Math.random() - 0.5) * 0.1; // 중앙 부근으로 모음
+      const targetX = (Math.random() - 0.5) * 0.1;
       const targetZ = (Math.random() - 0.5) * 0.1;
       const targetY = BASE_Y + index * LAYER_HEIGHT;
 
@@ -287,7 +305,6 @@
         progress += 0.08;
         card.position.x = THREE.MathUtils.lerp(startX, targetX, progress);
         card.position.z = THREE.MathUtils.lerp(startZ, targetZ, progress);
-        // 공중으로 튀어 오르는 애니메이션
         card.position.y = THREE.MathUtils.lerp(startY, targetY, progress) + Math.sin(progress * Math.PI) * 1.5;
 
         if (progress < 1) {
@@ -303,7 +320,6 @@
     if (isLocal) sendData({ type: 'shuffle' });
   }
 
-  // 카드 펼쳐 깔기 (Deal)
   function dealCards(isLocal = true) {
     const cards = objects.filter(o => o.userData.type === 'card');
     if (cards.length === 0) return;
@@ -321,12 +337,10 @@
     if (isLocal) sendData({ type: 'deal' });
   }
 
-  // 초기 기물 생성
-  createCard(-1, 0, false, '♠', 'A');
-  createCard(0, 0, false, '♥', '7');
-  createDice(2, 0, false);
+  // 6. 시작 시 52장 자동 생성
+  spawnFullDeck(false);
 
-  // 6. UI 이벤트
+  // UI 이벤트
   const propModal = document.getElementById('prop-modal');
   document.getElementById('prop-menu-btn').addEventListener('click', (e) => {
     e.stopPropagation();
@@ -335,15 +349,7 @@
   document.addEventListener('click', () => { propModal.style.display = 'none'; });
 
   document.getElementById('add-card-btn').addEventListener('click', () => createCard());
-  
-  // 52장 트럼프 전체 덱 생성
-  document.getElementById('add-deck-btn').addEventListener('click', () => {
-    suits.forEach(s => {
-      values.forEach(v => createCard(0, 0, true, s, v));
-    });
-    shuffleCards(true);
-  });
-
+  document.getElementById('add-deck-btn').addEventListener('click', () => spawnFullDeck(true));
   document.getElementById('add-dice-btn').addEventListener('click', () => createDice());
 
   document.getElementById('shuffle-btn').addEventListener('click', () => shuffleCards(true));
@@ -513,6 +519,8 @@
       if (data.type === 'clear') {
         objects.forEach(obj => scene.remove(obj));
         objects = [];
+      } else if (data.type === 'reset_deck') {
+        spawnFullDeck(false);
       } else if (data.type === 'spawn') {
         if (data.propType === 'card') createCard(data.x, data.z, false, data.suit, data.value);
         else if (data.propType === 'dice') createDice(data.x, data.z, false);
