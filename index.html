@@ -13,7 +13,7 @@
       padding: 10px 16px; display: flex; justify-content: space-between; align-items: center;
       z-index: 100; pointer-events: none;
     }
-    .btn-group-left, .btn-group-right { display: flex; gap: 8px; pointer-events: auto; }
+    .btn-group-left, .btn-group-right { display: flex; gap: 8px; pointer-events: auto; flex-wrap: wrap; }
 
     .ui-btn {
       padding: 8px 14px; font-size: 13px; font-weight: 700; color: white;
@@ -24,6 +24,8 @@
     .ui-btn:active { transform: scale(0.95); }
 
     .btn-purple { background: linear-gradient(135deg, #8b5cf6, #7c3aed); }
+    .btn-green { background: linear-gradient(135deg, #10b981, #059669); }
+    .btn-teal { background: linear-gradient(135deg, #14b8a6, #0d9488); }
     .btn-orange { background: linear-gradient(135deg, #f59e0b, #d97706); }
     .btn-red { background: linear-gradient(135deg, #ef4444, #dc2626); }
     .btn-blue { background: linear-gradient(135deg, #3b82f6, #2563eb); }
@@ -61,6 +63,8 @@
 <div id="top-bar">
   <div class="btn-group-left">
     <button class="ui-btn btn-purple" id="prop-menu-btn">🎮 소품 추가 메뉴</button>
+    <button class="ui-btn btn-green" id="shuffle-btn">🔀 카드 섞기</button>
+    <button class="ui-btn btn-teal" id="deal-btn">🎴 카드 펼치기</button>
     <button class="ui-btn btn-orange" id="roll-btn">🎲 주사위 굴리기</button>
     <button class="ui-btn btn-red" id="clear-btn">판 비우기</button>
   </div>
@@ -71,6 +75,7 @@
 
 <div id="prop-modal">
   <button id="add-card-btn">🃏 무작위 원카드 추가</button>
+  <button id="add-deck-btn">🎴 52장 전체 덱 추가</button>
   <button id="add-dice-btn">🎲 주사위 추가</button>
 </div>
 
@@ -81,8 +86,8 @@
     <button id="connect-btn">연결</button>
     <span id="status" style="color:#f59e0b;">(오프라인)</span>
   </div>
-  <div>🕹️ <b>기물 이동/포개기:</b> 카드를 다른 카드 위로 올려 포개기 지원</div>
-  <div>👆 <b>카드 탭/더블클릭:</b> 3D Flip으로 뒤집기</div>
+  <div>🕹️ <b>기물 이동/포개기:</b> 카드를 포개어 덱 형태로 적재 지원</div>
+  <div>👆 <b>카드 탭/더블클릭:</b> 3D Flip 뒤집기</div>
 </div>
 
 <script>
@@ -156,28 +161,20 @@
   let objects = [];
   let objectIdCounter = 0;
 
-  // 3. 트럼프 카드 텍스처 생성 (원카드용)
+  // 3. 트럼프 카드 생성
   const suits = ['♠', '♥', '♦', '♣'];
   const values = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 
   function createTrumpCardTexture(suit, value) {
     const canvas = document.createElement('canvas'); canvas.width = 256; canvas.height = 384;
     const ctx = canvas.getContext('2d');
-    
-    // 바탕
     ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, 256, 384);
     ctx.strokeStyle = '#cccccc'; ctx.lineWidth = 4; ctx.strokeRect(4, 4, 248, 376);
 
-    // 색상 (하트, 다이아 = 빨강 / 스페이드, 클로버 = 검정)
     const color = (suit === '♥' || suit === '♦') ? '#e63946' : '#1d3557';
     ctx.fillStyle = color;
-
-    // 코너 텍스트
     ctx.font = 'bold 32px sans-serif'; ctx.textAlign = 'left';
-    ctx.fillText(value, 16, 40);
-    ctx.fillText(suit, 16, 75);
-
-    // 중앙 문양
+    ctx.fillText(value, 16, 40); ctx.fillText(suit, 16, 75);
     ctx.font = '80px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(suit, 128, 192);
 
@@ -200,7 +197,6 @@
 
   const cardBackTexture = createCardBackTexture();
 
-  // 4. 카드 및 기물 생성 함수
   function createCard(x = (Math.random() - 0.5) * 4, z = (Math.random() - 0.5) * 4, isLocal = true, customSuit = null, customValue = null) {
     const id = 'card_' + (++objectIdCounter);
     const suit = customSuit || suits[Math.floor(Math.random() * suits.length)];
@@ -210,8 +206,8 @@
     const materials = [
       new THREE.MeshStandardMaterial({ color: 0xdddddd }),
       new THREE.MeshStandardMaterial({ color: 0xdddddd }),
-      new THREE.MeshStandardMaterial({ map: createTrumpCardTexture(suit, value) }), // 앞면
-      new THREE.MeshStandardMaterial({ map: cardBackTexture }),                     // 뒷면
+      new THREE.MeshStandardMaterial({ map: createTrumpCardTexture(suit, value) }),
+      new THREE.MeshStandardMaterial({ map: cardBackTexture }),
       new THREE.MeshStandardMaterial({ color: 0xdddddd }),
       new THREE.MeshStandardMaterial({ color: 0xdddddd })
     ];
@@ -244,19 +240,18 @@
     return dice;
   }
 
-  // 5. 카드 포개어 쌓기 (Stacking) 위치 계산 알고리즘
+  // 4. 포개어 쌓기 (Stacking) 위치 계산
   function updateStacking() {
     const cards = objects.filter(o => o.userData.type === 'card' && !o.userData.isAnimating);
     const BASE_Y = 0.28;
-    const LAYER_HEIGHT = 0.025; // 겹칠 때 올려줄 높이
+    const LAYER_HEIGHT = 0.025;
 
     cards.forEach(card => {
       let stackLevel = 0;
       cards.forEach(other => {
         if (card !== other) {
-          // X, Z 축 거리 측정 (가까운 거리에 위치한 카드가 있을 경우 포갬)
           const dist = Math.hypot(card.position.x - other.position.x, card.position.z - other.position.z);
-          if (dist < 0.9 && other.position.y <= card.position.y) {
+          if (dist < 0.8 && other.position.y <= card.position.y) {
             stackLevel++;
           }
         }
@@ -265,12 +260,73 @@
     });
   }
 
-  // 초기 기물 배치
+  // 5. 카드 섞기 (Shuffle) 애니메이션 & 로직
+  function shuffleCards(isLocal = true) {
+    const cards = objects.filter(o => o.userData.type === 'card');
+    if (cards.length === 0) return;
+
+    // 무작위 순서 섞기 (Fisher-Yates)
+    for (let i = cards.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [cards[i], cards[j]] = [cards[j], cards[i]];
+    }
+
+    const BASE_Y = 0.28;
+    const LAYER_HEIGHT = 0.03;
+
+    cards.forEach((card, index) => {
+      card.userData.isAnimating = true;
+      const targetX = (Math.random() - 0.5) * 0.1; // 중앙 부근으로 모음
+      const targetZ = (Math.random() - 0.5) * 0.1;
+      const targetY = BASE_Y + index * LAYER_HEIGHT;
+
+      let progress = 0;
+      const startX = card.position.x, startY = card.position.y, startZ = card.position.z;
+
+      function animateShuffle() {
+        progress += 0.08;
+        card.position.x = THREE.MathUtils.lerp(startX, targetX, progress);
+        card.position.z = THREE.MathUtils.lerp(startZ, targetZ, progress);
+        // 공중으로 튀어 오르는 애니메이션
+        card.position.y = THREE.MathUtils.lerp(startY, targetY, progress) + Math.sin(progress * Math.PI) * 1.5;
+
+        if (progress < 1) {
+          requestAnimationFrame(animateShuffle);
+        } else {
+          card.position.set(targetX, targetY, targetZ);
+          card.userData.isAnimating = false;
+        }
+      }
+      animateShuffle();
+    });
+
+    if (isLocal) sendData({ type: 'shuffle' });
+  }
+
+  // 카드 펼쳐 깔기 (Deal)
+  function dealCards(isLocal = true) {
+    const cards = objects.filter(o => o.userData.type === 'card');
+    if (cards.length === 0) return;
+
+    const radius = 2.5;
+    cards.forEach((card, index) => {
+      const angle = (index / cards.length) * Math.PI * 2;
+      const targetX = Math.cos(angle) * radius;
+      const targetZ = Math.sin(angle) * radius;
+
+      card.position.set(targetX, 0.28, targetZ);
+    });
+    updateStacking();
+
+    if (isLocal) sendData({ type: 'deal' });
+  }
+
+  // 초기 기물 생성
   createCard(-1, 0, false, '♠', 'A');
   createCard(0, 0, false, '♥', '7');
   createDice(2, 0, false);
 
-  // 6. UI 버튼 핸들러
+  // 6. UI 이벤트
   const propModal = document.getElementById('prop-modal');
   document.getElementById('prop-menu-btn').addEventListener('click', (e) => {
     e.stopPropagation();
@@ -279,7 +335,19 @@
   document.addEventListener('click', () => { propModal.style.display = 'none'; });
 
   document.getElementById('add-card-btn').addEventListener('click', () => createCard());
+  
+  // 52장 트럼프 전체 덱 생성
+  document.getElementById('add-deck-btn').addEventListener('click', () => {
+    suits.forEach(s => {
+      values.forEach(v => createCard(0, 0, true, s, v));
+    });
+    shuffleCards(true);
+  });
+
   document.getElementById('add-dice-btn').addEventListener('click', () => createDice());
+
+  document.getElementById('shuffle-btn').addEventListener('click', () => shuffleCards(true));
+  document.getElementById('deal-btn').addEventListener('click', () => dealCards(true));
 
   document.getElementById('clear-btn').addEventListener('click', () => {
     objects.forEach(obj => scene.remove(obj));
@@ -298,7 +366,7 @@
     camBtn.classList.toggle('active', isCamModeAlwaysOn);
   });
 
-  // 7. 터치 조작 및 레이어 처리
+  // 7. 터치 조작 연동
   const raycaster = new THREE.Raycaster();
   const touch = new THREE.Vector2();
   let selectedObj = null;
@@ -328,7 +396,6 @@
 
     if (intersects.length > 0) {
       selectedObj = intersects[0].object;
-      // 드래그 중인 카드는 맨 위로 올려 보이도록 임시 Y높이 조정
       if (selectedObj.userData.type === 'card') {
         selectedObj.position.y += 0.2;
       }
@@ -351,7 +418,7 @@
     selectedObj.position.x = target.x;
     selectedObj.position.z = target.z;
 
-    updateStacking(); // 이동 시 포개짐 실시간 갱신
+    updateStacking();
 
     sendData({ type: 'move', id: selectedObj.userData.id, x: target.x, z: target.z });
   }
@@ -379,7 +446,7 @@
   window.addEventListener('mousemove', onTouchMove, false);
   window.addEventListener('mouseup', onTouchEnd, false);
 
-  // 8. 뒤집기 및 굴리기 애니메이션
+  // 8. 애니메이션 로직
   function flipCard(card, isLocal = false) {
     if (card.userData.isAnimating) return;
     card.userData.isAnimating = true;
@@ -427,7 +494,7 @@
     if (isLocal) sendData({ type: 'roll', id: dice.userData.id, targetRot: { x: rotX, y: rotY, z: rotZ } });
   }
 
-  // 9. PeerJS 통신
+  // 9. PeerJS 동기화
   const peer = new Peer();
   let conn = null;
 
@@ -449,6 +516,10 @@
       } else if (data.type === 'spawn') {
         if (data.propType === 'card') createCard(data.x, data.z, false, data.suit, data.value);
         else if (data.propType === 'dice') createDice(data.x, data.z, false);
+      } else if (data.type === 'shuffle') {
+        shuffleCards(false);
+      } else if (data.type === 'deal') {
+        dealCards(false);
       } else {
         const targetObj = objects.find(o => o.userData.id === data.id);
         if (!targetObj) return;
