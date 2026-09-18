@@ -86,8 +86,8 @@
     <button id="connect-btn">연결</button>
     <span id="status" style="color:#f59e0b;">(오프라인)</span>
   </div>
-  <div>🎴 <b>기본 시작:</b> 52장 카드가 뒷면 상태로 덱 생성됩니다.</div>
-  <div>🕹️ <b>기물 이동/포개기:</b> 카드를 포개어 덱 적재 가능</div>
+  <div>🎴 <b>카드 섞기:</b> 덱에 쌓인 카드만 뒷면으로 섞입니다.</div>
+  <div>🕹️ <b>카드 펼치기:</b> 나눌 플레이어 수(묶음 수) 지정 가능</div>
   <div>👆 <b>카드 탭/더블클릭:</b> 3D Flip 뒤집기</div>
 </div>
 
@@ -215,10 +215,7 @@
 
     const card = new THREE.Mesh(geo, materials);
     card.position.set(x, 0.28, z);
-    
-    // 카드가 뒷면이 위로 오도록 Z축으로 180도(Math.PI) 회전
-    card.rotation.z = Math.PI;
-    
+    card.rotation.z = Math.PI; // 기본 뒷면
     card.castShadow = true;
     card.userData = { id: id, type: 'card', suit: suit, value: value, isFlipped: true, isAnimating: false };
     
@@ -282,38 +279,52 @@
     if (isLocal) sendData({ type: 'reset_deck' });
   }
 
-  // 5. 카드 섞기 (Shuffle) 애니메이션 & 로직
+  // 5. 카드 섞기 (Shuffle) 로직 - 덱 중심 부근(거리 1.5 이내) 카드들만 대상
   function shuffleCards(isLocal = true) {
-    const cards = objects.filter(o => o.userData.type === 'card');
-    if (cards.length === 0) return;
+    const allCards = objects.filter(o => o.userData.type === 'card');
+    if (allCards.length === 0) return;
 
-    for (let i = cards.length - 1; i > 0; i--) {
+    // 중앙 근처(x, z 반경 1.5)에 위치한 포개진 카드들만 선별
+    const deckCards = allCards.filter(c => Math.hypot(c.position.x, c.position.z) < 1.5);
+    
+    // 포개진 카드가 없으면 무시
+    if (deckCards.length === 0) return;
+
+    // 대상 카드 무작위 섞기 (Fisher-Yates)
+    for (let i = deckCards.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
-      [cards[i], cards[j]] = [cards[j], cards[i]];
+      [deckCards[i], deckCards[j]] = [deckCards[j], deckCards[i]];
     }
 
     const BASE_Y = 0.28;
     const LAYER_HEIGHT = 0.02;
 
-    cards.forEach((card, index) => {
+    deckCards.forEach((card, index) => {
       card.userData.isAnimating = true;
-      const targetX = (Math.random() - 0.5) * 0.1;
-      const targetZ = (Math.random() - 0.5) * 0.1;
+      card.userData.isFlipped = true; // 섞을 때 강제로 뒷면 상태로 지정
+
+      const targetX = (Math.random() - 0.5) * 0.05;
+      const targetZ = (Math.random() - 0.5) * 0.05;
       const targetY = BASE_Y + index * LAYER_HEIGHT;
 
       let progress = 0;
       const startX = card.position.x, startY = card.position.y, startZ = card.position.z;
+      const startRotZ = card.rotation.z;
+      const targetRotZ = Math.PI; // 뒷면 회전 각도 (180도)
 
       function animateShuffle() {
         progress += 0.08;
         card.position.x = THREE.MathUtils.lerp(startX, targetX, progress);
         card.position.z = THREE.MathUtils.lerp(startZ, targetZ, progress);
         card.position.y = THREE.MathUtils.lerp(startY, targetY, progress) + Math.sin(progress * Math.PI) * 1.5;
+        // 섞이면서 회전 각도도 뒷면(Math.PI)으로 복구
+        card.rotation.z = THREE.MathUtils.lerp(startRotZ, targetRotZ, progress);
 
         if (progress < 1) {
           requestAnimationFrame(animateShuffle);
         } else {
           card.position.set(targetX, targetY, targetZ);
+          card.rotation.z = targetRotZ;
           card.userData.isAnimating = false;
         }
       }
@@ -323,21 +334,31 @@
     if (isLocal) sendData({ type: 'shuffle' });
   }
 
-  function dealCards(isLocal = true) {
+  // 카드 나누기 / 펼치기 (Deal) - 인원 수 프롬프트 입력
+  function dealCards(isLocal = true, numPiles = null) {
     const cards = objects.filter(o => o.userData.type === 'card');
     if (cards.length === 0) return;
 
+    if (numPiles === null) {
+      const input = prompt('몇 개 영역(플레이어 수)으로 나누시겠습니까?', '4');
+      numPiles = parseInt(input, 10);
+      if (isNaN(numPiles) || numPiles < 1) return;
+    }
+
     const radius = 2.5;
     cards.forEach((card, index) => {
-      const angle = (index / cards.length) * Math.PI * 2;
+      const pileIndex = index % numPiles;
+      const stackLevel = Math.floor(index / numPiles);
+      const angle = (pileIndex / numPiles) * Math.PI * 2;
+
       const targetX = Math.cos(angle) * radius;
       const targetZ = Math.sin(angle) * radius;
+      const targetY = 0.28 + stackLevel * 0.02;
 
-      card.position.set(targetX, 0.28, targetZ);
+      card.position.set(targetX, targetY, targetZ);
     });
-    updateStacking();
 
-    if (isLocal) sendData({ type: 'deal' });
+    if (isLocal) sendData({ type: 'deal', numPiles: numPiles });
   }
 
   // 6. 시작 시 52장 자동 생성
@@ -455,7 +476,7 @@
   window.addEventListener('mousemove', onTouchMove, false);
   window.addEventListener('mouseup', onTouchEnd, false);
 
-  // 8. 애니메이션 로직 (flipCard 시 targetRotZ 계산 자동화)
+  // 8. 카드 뒤집기 애니메이션
   function flipCard(card, isLocal = false) {
     if (card.userData.isAnimating) return;
     card.userData.isAnimating = true;
@@ -530,7 +551,7 @@
       } else if (data.type === 'shuffle') {
         shuffleCards(false);
       } else if (data.type === 'deal') {
-        dealCards(false);
+        dealCards(false, data.numPiles);
       } else {
         const targetObj = objects.find(o => o.userData.id === data.id);
         if (!targetObj) return;
