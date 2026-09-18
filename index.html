@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Mobile Tabletop Simulator - Stacking Direction Fixed</title>
+  <title>Mobile Tabletop Simulator - Smooth Snap Fixed</title>
   <style>
     * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
     body { margin: 0; overflow: hidden; touch-action: none; font-family: 'Pretendard', sans-serif; background-color: #0f172a; }
@@ -119,7 +119,7 @@
     </select>
     <span id="status" style="color:#f59e0b;">(대기중)</span>
   </div>
-  <div>✅ <b>쌓임 방향 고침:</b> 카드가 아래로 파묻히지 않고 무조건 **기존 카드 위로 쌓이도록** 고쳐졌습니다.</div>
+  <div>✅ <b>완벽 해결:</b> 카드가 자석처럼 자리에 착 끌려가며, 뒤집기 동작 없이도 정상적으로 쌓입니다.</div>
 </div>
 
 <script>
@@ -139,7 +139,7 @@
   }
   updateCameraPosition();
 
-  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.shadowMap.enabled = true;
@@ -426,12 +426,14 @@
     }
   }
 
+  // 🔥 [개선] 슬롯 영역으로 자석처럼 부드럽게 끌려가는 보간 애니메이션 적용
   function snapCardsToSlots(movedCards) {
     const SNAP_DISTANCE = 0.8;
     const cardsToSnap = Array.isArray(movedCards) ? movedCards : [movedCards];
 
-    cardsToSnap.forEach(card => {
-      card.userData.lastMovedTime = Date.now(); // 가장 마지막에 놓은 시간을 기록
+    cardsToSnap.forEach((card, idx) => {
+      card.userData.lastMovedTime = Date.now() + idx;
+      
       const sortedSlots = [...cardSlots].sort((a, b) => {
         const distA = Math.hypot(card.position.x - a.position.x, card.position.z - a.position.z);
         const distB = Math.hypot(card.position.x - b.position.x, card.position.z - b.position.z);
@@ -441,10 +443,30 @@
       for (let slot of sortedSlots) {
         const dist = Math.hypot(card.position.x - slot.position.x, card.position.z - slot.position.z);
         if (dist < SNAP_DISTANCE) {
-          card.position.x = slot.position.x;
-          card.position.z = slot.position.z;
-          card.rotation.y = 0;
-          break;
+          // 착 끌려가는 부드러운 자석 애니메이션
+          let progress = 0;
+          const startX = card.position.x, startZ = card.position.z;
+          const targetX = slot.position.x, targetZ = slot.position.z;
+          card.userData.isAnimating = true;
+
+          function animateSnap() {
+            progress += 0.2;
+            card.position.x = THREE.MathUtils.lerp(startX, targetX, progress);
+            card.position.z = THREE.MathUtils.lerp(startZ, targetZ, progress);
+
+            if (progress < 1) {
+              requestAnimationFrame(animateSnap);
+            } else {
+              card.position.x = targetX;
+              card.position.z = targetZ;
+              card.rotation.y = 0;
+              card.userData.isAnimating = false;
+              updateStacking();
+              sendMoveData(card);
+            }
+          }
+          animateSnap();
+          return;
         }
       }
       sendMoveData(card);
@@ -453,15 +475,13 @@
     updateStacking();
   }
 
-  // 🔥 [핵심 수정] 먼저 놓인 카드부터 아래에 두고, 새로 놓인 카드가 무조건 위로 높이(+0.02)를 쌓도록 보정
+  // 🔥 [핵심] 렌더링 순서(renderOrder) 및 고도(Y) 동시 정렬로 Z-Fighting 완벽 제거
   function updateStacking() {
     const cards = objects.filter(o => o.userData.type === 'card' && !o.userData.isAnimating);
-    const LAYER_HEIGHT = 0.02;
+    const LAYER_HEIGHT = 0.025; // 레이어 간격을 넓혀 시각 구분 명확화
 
-    // 카드가 놓인 시간(lastMovedTime) 기준 오름차순 정렬 (먼저 놓인 카드가 아래)
     cards.sort((a, b) => (a.userData.lastMovedTime || 0) - (b.userData.lastMovedTime || 0));
 
-    // 같은 위치에 있는 그룹별로 순서대로 차곡차곡 위로 쌓기
     cards.forEach((card, index) => {
       let stackIndex = 0;
       for (let i = 0; i < index; i++) {
@@ -471,7 +491,12 @@
           stackIndex++;
         }
       }
+      
       card.position.y = CARD_BASE_Y + stackIndex * LAYER_HEIGHT;
+      card.renderOrder = stackIndex + 1; // 렌더링 레이어 순서 명시
+      
+      alignCardRotationBySeat(card);
+      updateHandVisibility(card);
     });
   }
 
@@ -604,7 +629,7 @@
       [deckCards[i], deckCards[j]] = [deckCards[j], deckCards[i]];
     }
 
-    const LAYER_HEIGHT = 0.02;
+    const LAYER_HEIGHT = 0.025;
     const now = Date.now();
 
     deckCards.forEach((card, index) => {
@@ -635,6 +660,7 @@
           alignCardRotationBySeat(card);
           card.rotation.z = targetRotZ;
           card.userData.isAnimating = false;
+          updateStacking();
         }
       }
       animateShuffle();
@@ -799,6 +825,7 @@
       }
 
       selectedObj = hitObj;
+      selectedObj.userData.lastMovedTime = Date.now(); // 터치하는 순간 제일 최신으로 갱신
 
       if (selectedGroup.includes(selectedObj)) {
         groupDragOffsets = selectedGroup.map(obj => ({
