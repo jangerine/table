@@ -114,16 +114,16 @@
       <option value="1">P1 (남)</option>
       <option value="2">P2 (북)</option>
       <option value="3">P3 (서)</option>
-      <option value="4">P4 (동)</option>
+      <option value="4" selected>P4 (동)</option>
     </select>
     <span id="status" style="color:#f59e0b;">(대기중)</span>
   </div>
-  <div>✅ <b>수정 완료:</b> 좌석(P1~P4) 시선에 맞춘 카드 방향 자동 정렬 & Z-Fighting 완전 해결</div>
+  <div>✅ <b>수정 완료:</b> 동/서/남/북(P1~P4) 좌석별 시선 방향 90도 회전축 정밀 수정 완료</div>
 </div>
 
 <script>
-  let mySeat = 1;
-  const CARD_BASE_Y = 0.32; // 그래픽 겹침 방지용 고정 Y값
+  let mySeat = 4; // 기본 시점 설정 (동쪽 테스트 가능)
+  const CARD_BASE_Y = 0.32;
 
   // 1. Scene & Camera
   const scene = new THREE.Scene();
@@ -287,7 +287,7 @@
 
     const card = new THREE.Mesh(geo, materials);
     card.position.set(x, CARD_BASE_Y, z);
-    card.rotation.z = Math.PI; // 기본은 뒷면이 위
+    card.rotation.z = Math.PI; // 기본 뒷면
     card.castShadow = true;
     card.userData = { id: id, type: 'card', suit: suit, value: value, isFlipped: true, isLocked: false, isAnimating: false };
     
@@ -318,7 +318,7 @@
     return dice;
   }
 
-  // 4. 위치/시선별 카드 회전 핵심 로직 (개선된 부분)
+  // 4. 위치/시선별 카드 회전 핵심 로직 (수정 완료)
   function getSeatFromPosition(x, z) {
     if (z > 2.8) return 1;       // P1 남
     if (z < -2.8) return 2;      // P2 북
@@ -327,30 +327,25 @@
     return 0;                    // 중앙 공유 필드
   }
 
-  // 좌석 영역에 놓일 때 그 플레이어의 정면 시선 각도로 자동 회전시키는 함수
   function alignCardRotationBySeat(card) {
     const seat = getSeatFromPosition(card.position.x, card.position.z);
     
-    if (seat === 1) card.rotation.y = 0;               // P1 정면
-    else if (seat === 2) card.rotation.y = Math.PI;     // P2 정면 (180도)
-    else if (seat === 3) card.rotation.y = -Math.PI / 2; // P3 정면 (-90도)
-    else if (seat === 4) card.rotation.y = Math.PI / 2;  // P4 정면 (90도)
-    // 필드(seat === 0)에 있는 카드는 기존 각도 유지
+    if (seat === 1) card.rotation.y = 0;                  // P1 (남쪽): 기본 정면
+    else if (seat === 2) card.rotation.y = Math.PI;        // P2 (북쪽): 180도 회전
+    else if (seat === 3) card.rotation.y = Math.PI / 2;    // P3 (서쪽): +90도 수정
+    else if (seat === 4) card.rotation.y = -Math.PI / 2;   // P4 (동쪽): -90도 수정
   }
 
   function updateHandVisibility(card) {
     const seat = getSeatFromPosition(card.position.x, card.position.z);
     
-    // 내 영역에 있으면 나에게 앞면으로 보여줌
     if (seat === mySeat) {
       card.rotation.z = 0;
       card.userData.isFlipped = false;
     } else if (seat !== 0) {
-      // 남의 영역에 있으면 뒷면으로 숨김
       card.rotation.z = Math.PI;
       card.userData.isFlipped = true;
     } else {
-      // 중앙 필드는 원래 뒤집힘 상태 유지
       card.rotation.z = card.userData.isFlipped ? Math.PI : 0;
     }
   }
@@ -715,7 +710,7 @@
       item.obj.position.z = target.z + item.offsetZ;
 
       if (item.obj.userData.type === 'card') {
-        alignCardRotationBySeat(item.obj); // 드래그 도중 손 영역 이동 시 해당 시점에 맞게 자동 회전
+        alignCardRotationBySeat(item.obj);
         updateHandVisibility(item.obj);
       }
       sendMoveData(item.obj);
