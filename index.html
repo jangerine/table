@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Mobile Tabletop Simulator - UI Touch Raycast Pass Prevention</title>
+  <title>Mobile Tabletop Simulator - Dynamic Prop Actions</title>
   <style>
     * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
     body { margin: 0; overflow: hidden; touch-action: none; font-family: 'Pretendard', sans-serif; background-color: #0f172a; }
@@ -31,12 +31,14 @@
     .btn-blue { background: linear-gradient(135deg, #3b82f6, #2563eb); }
     .btn-gray { background: linear-gradient(135deg, #64748b, #475569); }
 
-    #object-action-bar {
+    /* 🔥 테이블 위 소품 유무에 따라 자동으로 뜨는 동적 액션 패널 */
+    #dynamic-action-bar {
       position: absolute; top: 70px; left: 50%; transform: translateX(-50%);
       z-index: 120; display: none; gap: 8px; padding: 6px 12px;
       background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(8px);
       border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 14px;
       box-shadow: 0 10px 25px rgba(0,0,0,0.5); pointer-events: auto;
+      flex-wrap: wrap; justify-content: center;
     }
 
     #bottom-info {
@@ -84,23 +86,20 @@
 
 <div id="select-box"></div>
 
+<!-- 상단 공통 바 -->
 <div id="top-bar">
   <div class="btn-group-left">
     <button class="ui-btn btn-purple" id="prop-menu-btn">🎮 소품 추가</button>
-    <button class="ui-btn btn-green" id="shuffle-btn">🔀 섞기(R)</button>
     <button class="ui-btn btn-orange" id="add-slot-btn">🔲 슬롯 생성</button>
-    <button class="ui-btn btn-purple" id="gather-btn">📥 모으기</button>
     <button class="ui-btn btn-purple" id="select-mode-btn">🟦 영역 선택 [OFF]</button>
-    <button class="ui-btn btn-teal" id="spread-btn">↔️ 펼치기</button>
-    <button class="ui-btn btn-orange" id="cut-btn">✂️ 떼어내기</button>
-    <button class="ui-btn btn-red" id="clear-btn">판 비우기</button>
   </div>
   <div class="btn-group-right">
     <button class="ui-btn btn-blue" id="cam-mode-btn">카메라 회전</button>
   </div>
 </div>
 
-<div id="object-action-bar"></div>
+<!-- 🔥 판 위 소품 존재 시 자동 표시되는 동적 버튼 바 -->
+<div id="dynamic-action-bar"></div>
 
 <div id="prop-modal">
   <button id="add-card-btn">🃏 무작위 카드 1장 추가</button>
@@ -127,7 +126,7 @@
     </select>
     <span id="status" style="color:#f59e0b;">(대기중)</span>
   </div>
-  <div>✅ <b>터치 투과 방지:</b> UI 버튼 클릭 시 3D 판 위 물체로 터치가 전달되지 않도록 방지했습니다.</div>
+  <div>✅ <b>자동 동적 UI:</b> 테이블에 카드나 주사위가 꺼내져 있을 때만 해당 동작 버튼 패널이 뜹니다.</div>
 </div>
 
 <script>
@@ -300,11 +299,8 @@
     canvas.width = 256; canvas.height = 256;
     const ctx = canvas.getContext('2d');
 
-    ctx.fillStyle = '#f8fafc';
-    ctx.fillRect(0, 0, 256, 256);
-    ctx.strokeStyle = '#cbd5e1';
-    ctx.lineWidth = 12;
-    ctx.strokeRect(6, 6, 244, 244);
+    ctx.fillStyle = '#f8fafc'; ctx.fillRect(0, 0, 256, 256);
+    ctx.strokeStyle = '#cbd5e1'; ctx.lineWidth = 12; ctx.strokeRect(6, 6, 244, 244);
 
     const dotColor = (number === 1) ? '#dc2626' : '#0f172a';
     ctx.fillStyle = dotColor;
@@ -411,6 +407,7 @@
     alignCardRotationBySeat(card);
     updateHandVisibility(card);
     updateStacking();
+    updateDynamicActionBar(); // 소품 상태 변화 갱신
 
     if (isLocal) broadcastData({ type: 'spawn', propType: 'card', id: id, x: x, z: z, suit: suit, value: value });
     return card;
@@ -427,6 +424,8 @@
     dice.userData = { id: id, type: 'dice', isRolling: false, isLocked: false };
     scene.add(dice);
     objects.push(dice);
+
+    updateDynamicActionBar(); // 소품 상태 변화 갱신
 
     if (isLocal) broadcastData({ type: 'spawn', propType: 'dice', id: id, x: x, z: z });
     return dice;
@@ -557,6 +556,7 @@
     });
 
     shuffleCards(false);
+    updateDynamicActionBar();
     if (isLocal) broadcastData({ type: 'reset_deck' });
   }
 
@@ -715,42 +715,66 @@
     if (isLocal) broadcastData({ type: 'shuffle' });
   }
 
-  const actionBar = document.getElementById('object-action-bar');
+  // 🔥 [핵심 추가] 소품 유무 상태를 종합해 동적 버튼 바를 실시간 생성/제거
+  const dynamicActionBar = document.getElementById('dynamic-action-bar');
 
-  function renderObjectActions(targetObj) {
-    actionBar.innerHTML = '';
-    if (!targetObj) {
-      actionBar.style.display = 'none';
+  function updateDynamicActionBar() {
+    const hasCards = objects.some(o => o.userData.type === 'card');
+    const hasDice = objects.some(o => o.userData.type === 'dice');
+
+    if (!hasCards && !hasDice) {
+      dynamicActionBar.style.display = 'none';
+      dynamicActionBar.innerHTML = '';
       return;
     }
 
-    const type = targetObj.userData.type;
+    let html = '';
 
-    if (type === 'card') {
-      actionBar.innerHTML = `
-        <button class="ui-btn btn-teal" id="act-draw-btn">🎴 카드가져오기</button>
-        <button class="ui-btn btn-purple" id="act-flip-btn">🔄 뒤집기</button>
-        <button class="ui-btn btn-gray" id="act-inspect-btn">🔍 확대보기</button>
+    if (hasCards) {
+      html += `
+        <button class="ui-btn btn-green" id="dyn-shuffle-btn">🔀 섞기</button>
+        <button class="ui-btn btn-purple" id="dyn-gather-btn">📥 모으기</button>
+        <button class="ui-btn btn-teal" id="dyn-spread-btn">↔️ 펼치기</button>
+        <button class="ui-btn btn-orange" id="dyn-cut-btn">✂️ 떼어내기</button>
       `;
-      actionBar.style.display = 'flex';
-
-      document.getElementById('act-draw-btn').onclick = () => drawCards(true, 1);
-      document.getElementById('act-flip-btn').onclick = () => flipCard(targetObj, true);
-      document.getElementById('act-inspect-btn').onclick = () => showCardPreview(targetObj);
-
-    } else if (type === 'dice') {
-      actionBar.innerHTML = `
-        <button class="ui-btn btn-orange" id="act-roll-btn">🎲 주사위 굴리기</button>
-      `;
-      actionBar.style.display = 'flex';
-
-      document.getElementById('act-roll-btn').onclick = () => rollDice(targetObj, true);
-    } else {
-      actionBar.style.display = 'none';
     }
+
+    if (hasDice) {
+      html += `
+        <button class="ui-btn btn-orange" id="dyn-roll-btn">🎲 주사위 굴리기</button>
+      `;
+    }
+
+    html += `<button class="ui-btn btn-red" id="dyn-clear-btn">판 비우기</button>`;
+
+    dynamicActionBar.innerHTML = html;
+    dynamicActionBar.style.display = 'flex';
+
+    // 바인딩
+    if (hasCards) {
+      document.getElementById('dyn-shuffle-btn').onclick = () => shuffleCards(true);
+      document.getElementById('dyn-gather-btn').onclick = () => gatherCards(true);
+      document.getElementById('dyn-spread-btn').onclick = () => spreadCards(true);
+      document.getElementById('dyn-cut-btn').onclick = () => cutDeck(true);
+    }
+    if (hasDice) {
+      document.getElementById('dyn-roll-btn').onclick = () => {
+        objects.filter(o => o.userData.type === 'dice').forEach(d => rollDice(d, true));
+      };
+    }
+    document.getElementById('dyn-clear-btn').onclick = () => {
+      objects.forEach(obj => scene.remove(obj));
+      cardSlots.forEach(slot => scene.remove(slot));
+      objects = [];
+      cardSlots = [];
+      clearSelectionGroup();
+      updateDynamicActionBar();
+      broadcastData({ type: 'clear' });
+    };
   }
 
-  spawnFullDeck(false);
+  // 초기 시작 시에는 소품이 없으므로 자동 숨김 처리
+  updateDynamicActionBar();
 
   const propModal = document.getElementById('prop-modal');
   document.getElementById('prop-menu-btn').addEventListener('click', (e) => {
@@ -763,26 +787,10 @@
   document.getElementById('add-deck-btn').addEventListener('click', () => spawnFullDeck(true));
   document.getElementById('add-dice-btn').addEventListener('click', () => createDice());
 
-  document.getElementById('shuffle-btn').addEventListener('click', () => shuffleCards(true));
-  
   document.getElementById('add-slot-btn').addEventListener('click', () => {
     const input = prompt('생성할 슬롯(순서 칸)의 개수를 입력하세요:', '5');
     const count = parseInt(input, 10);
     if (!isNaN(count) && count > 0) createSlotLine(count, true);
-  });
-
-  document.getElementById('gather-btn').addEventListener('click', () => gatherCards(true));
-  document.getElementById('spread-btn').addEventListener('click', () => spreadCards(true));
-  document.getElementById('cut-btn').addEventListener('click', () => cutDeck(true));
-
-  document.getElementById('clear-btn').addEventListener('click', () => {
-    objects.forEach(obj => scene.remove(obj));
-    cardSlots.forEach(slot => scene.remove(slot));
-    objects = [];
-    cardSlots = [];
-    clearSelectionGroup();
-    renderObjectActions(null);
-    broadcastData({ type: 'clear' });
   });
 
   document.getElementById('player-seat-select').addEventListener('change', (e) => {
@@ -810,8 +818,8 @@
     camBtn.classList.toggle('active', isCamModeAlwaysOn);
   });
 
-  // 🔥 [핵심 추가] 모든 UI 패널 터치/클릭 시 이벤트가 3D 판으로 투과되지 않도록 차단
-  const uiElements = ['#top-bar', '#bottom-info', '#prop-modal', '#card-preview-modal', '#object-action-bar'];
+  // UI 터치 투과 차단
+  const uiElements = ['#top-bar', '#bottom-info', '#prop-modal', '#card-preview-modal', '#dynamic-action-bar'];
   uiElements.forEach(selector => {
     const el = document.querySelector(selector);
     if (el) {
@@ -875,7 +883,7 @@
   });
 
   function onTouchStart(e) {
-    if (e.target.closest('#top-bar, #bottom-info, #prop-modal, #card-preview-modal, #object-action-bar')) return;
+    if (e.target.closest('#top-bar, #bottom-info, #prop-modal, #card-preview-modal, #dynamic-action-bar')) return;
 
     if (isCamModeAlwaysOn || (e.touches && e.touches.length > 1)) {
       selectedObj = null; controls.enabled = true; return;
@@ -910,8 +918,6 @@
 
       selectedObj = hitObj;
       selectedObj.userData.lastMovedTime = Date.now();
-      
-      renderObjectActions(selectedObj);
 
       if (selectedGroup.includes(selectedObj)) {
         groupDragOffsets = selectedGroup.map(obj => ({
@@ -928,14 +934,12 @@
     } else {
       clearSelectionGroup();
       selectedObj = null;
-      renderObjectActions(null);
       controls.enabled = true;
     }
   }
 
   function onTouchMove(e) {
-    // UI 위로 드래그 시 3D 레이캐스트 반응 차단
-    if (e.target.closest('#top-bar, #bottom-info, #prop-modal, #card-preview-modal, #object-action-bar')) return;
+    if (e.target.closest('#top-bar, #bottom-info, #prop-modal, #card-preview-modal, #dynamic-action-bar')) return;
 
     const pos = getTouchPos(e);
 
@@ -1007,11 +1011,20 @@
     }
 
     if (selectedObj && !selectedObj.userData.isLocked) {
+      const touchDuration = Date.now() - touchStartTime;
+      const lastPos = e.changedTouches ? e.changedTouches[0] : e;
+      const dist = Math.hypot(lastPos.clientX - touchStartPos.x, lastPos.clientY - touchStartPos.y);
+
       if (selectedGroup.length > 0) {
         const movedCards = selectedGroup.filter(o => o.userData.type === 'card');
         snapCardsToSlots(movedCards);
       } else if (selectedObj.userData.type === 'card') {
         snapCardsToSlots(selectedObj);
+      }
+
+      if (touchDuration < 300 && dist < 10) {
+        if (selectedObj.userData.type === 'card') flipCard(selectedObj, true);
+        else if (selectedObj.userData.type === 'dice') rollDice(selectedObj, true);
       }
 
       updateStacking();
@@ -1157,7 +1170,7 @@
       objects = [];
       cardSlots = [];
       clearSelectionGroup();
-      renderObjectActions(null);
+      updateDynamicActionBar();
     } else if (data.type === 'create_slots') {
       createSlotLine(data.count, false);
     } else if (data.type === 'reset_deck') {
@@ -1205,3 +1218,4 @@
 </script>
 </body>
 </html>
+
