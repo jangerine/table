@@ -112,7 +112,7 @@
     <button id="connect-btn">연결</button>
     <span id="status" style="color:#f59e0b;">(오프라인)</span>
   </div>
-  <div>📥 <b>모으기:</b> 흩어진 카드를 중앙으로 포갭니다.</div>
+  <div>📥 <b>모으기:</b> 흩어진 카드를 중앙 맨 밑으로 집어넣습니다.</div>
   <div>🟦 <b>영역 선택:</b> 드래그 범위 내 카드들을 한 번에 같이 이동시킵니다.</div>
 </div>
 
@@ -348,12 +348,26 @@
     const tableCards = objects.filter(o => o.userData.type === 'card' && o.position.z <= HAND_ZONE_Z);
     if (tableCards.length === 0) return;
 
-    tableCards.forEach((card, i) => {
+    // 이미 중앙(0,0) 근처에 있는 기존 카드 묶음과 이동시킬 외곽 카드를 분리
+    const existingDeck = tableCards.filter(o => Math.hypot(o.position.x, o.position.z) < 1.0);
+    const movingCards = tableCards.filter(o => Math.hypot(o.position.x, o.position.z) >= 1.0);
+
+    if (movingCards.length === 0) return;
+
+    // 기존 덱에 있던 카드는 모아지는 카드 수만큼 y축 높이를 올려 상단에 위치시킴
+    existingDeck.forEach(card => {
+      card.position.y += movingCards.length * 0.02;
+      sendMoveData(card);
+    });
+
+    // 새로 들어오는 모으기 카드들을 중앙 바닥(y축 높이 최하단)부터 순서대로 삽입
+    movingCards.forEach((card, i) => {
       card.position.set(0, 0.28 + i * 0.02, 0);
       card.rotation.z = Math.PI;
       card.userData.isFlipped = true;
       sendMoveData(card);
     });
+
     updateStacking();
     if (isLocal) sendData({ type: 'gather' });
   }
