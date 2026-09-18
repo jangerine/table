@@ -119,12 +119,11 @@
     </select>
     <span id="status" style="color:#f59e0b;">(대기중)</span>
   </div>
-  <div>👥 <b>4인 멀티:</b> 플레이어 위치 선택 후 방장 ID로 참가하세요.</div>
+  <div>👥 <b>4인 멀티:</b> 카드 크기 축소 및 간격 최적화 적용됨.</div>
   <div>📥 <b>모으기:</b> 흩어진 카드를 중앙 맨 밑으로 집어넣습니다.</div>
 </div>
 
 <script>
-  // 플레이어 위치 정보 (1: 남, 2: 북, 3: 서, 4: 동)
   let mySeat = 1;
 
   // 1. Scene 설정
@@ -163,7 +162,7 @@
   dirLight.castShadow = true;
   scene.add(dirLight);
 
-  // 2. 4인용 보드판 및 펠트 매트 텍스처 생성
+  // 2. 보드판 및 텍스처
   function createWoodTexture() {
     const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 512;
     const ctx = canvas.getContext('2d');
@@ -277,7 +276,8 @@
     const suit = customSuit || suits[Math.floor(Math.random() * suits.length)];
     const value = customValue || values[Math.floor(Math.random() * values.length)];
 
-    const geo = new THREE.BoxGeometry(1.2, 0.02, 1.8);
+    // 4인용 겹침 방지를 위해 카드 규격 살짝 조절 (0.9 x 1.35)
+    const geo = new THREE.BoxGeometry(0.9, 0.02, 1.35);
     const materials = [
       new THREE.MeshStandardMaterial({ color: 0xdddddd }),
       new THREE.MeshStandardMaterial({ color: 0xdddddd }),
@@ -319,12 +319,12 @@
     return dice;
   }
 
-  // 4. 4인 손패 위치 감지 및 보안 처리
+  // 4. 영역 및 위치 감지 (감지 반경 2.8로 넓힘)
   function getSeatFromPosition(x, z) {
-    if (z > 2.5) return 1;       // P1 남
-    if (z < -2.5) return 2;      // P2 북
-    if (x < -2.5) return 3;      // P3 서
-    if (x > 2.5) return 4;       // P4 동
+    if (z > 2.8) return 1;       // P1 남
+    if (z < -2.8) return 2;      // P2 북
+    if (x < -2.8) return 3;      // P3 서
+    if (x > 2.8) return 4;       // P4 동
     return 0;                    // 중앙 공유 영역
   }
 
@@ -332,11 +332,9 @@
     const seat = getSeatFromPosition(card.position.x, card.position.z);
     
     if (seat === mySeat) {
-      // 본인 영역 손패에 들어온 카드는 앞면으로 보임
       card.rotation.z = 0;
       card.userData.isFlipped = false;
     } else if (seat !== 0) {
-      // 타인 손패 영역에 들어간 카드는 내 화면에서 뒷면으로 보임
       card.rotation.z = Math.PI;
       card.userData.isFlipped = true;
     }
@@ -352,7 +350,7 @@
       cards.forEach(other => {
         if (card !== other) {
           const dist = Math.hypot(card.position.x - other.position.x, card.position.z - other.position.z);
-          if (dist < 0.8 && other.position.y <= card.position.y) {
+          if (dist < 0.6 && other.position.y <= card.position.y) {
             stackLevel++;
           }
         }
@@ -375,7 +373,44 @@
     if (isLocal) broadcastData({ type: 'reset_deck' });
   }
 
-  // 5. 테이블탑 기믹
+  // 5. 겹침 방지가 적용된 카드 가져오기(Draw)
+  function drawCards(isLocal = true, numToDraw = null) {
+    const allCards = objects.filter(o => o.userData.type === 'card');
+    const deckCards = allCards.filter(c => Math.hypot(c.position.x, c.position.z) < 1.5);
+    if (deckCards.length === 0) {
+      alert('가져올 카드가 덱에 없습니다!');
+      return;
+    }
+
+    if (numToDraw === null) {
+      const input = prompt('몇 장의 카드를 가져오시겠습니까?', '1');
+      numToDraw = parseInt(input, 10);
+      if (isNaN(numToDraw) || numToDraw < 1) return;
+    }
+
+    deckCards.sort((a, b) => b.position.y - a.position.y);
+    const selectedCards = deckCards.slice(0, numToDraw);
+
+    // 겹침 방지: 카드 간격을 0.5로 조절하여 촘촘하지만 차례대로 나열
+    const spacing = 0.5;
+
+    selectedCards.forEach((card, index) => {
+      let targetX = 0, targetZ = 0;
+      const offset = (index - (numToDraw - 1) / 2) * spacing;
+
+      if (mySeat === 1) { targetX = offset; targetZ = 4.2; }
+      else if (mySeat === 2) { targetX = -offset; targetZ = -4.2; }
+      else if (mySeat === 3) { targetX = -4.2; targetZ = -offset; }
+      else if (mySeat === 4) { targetX = 4.2; targetZ = offset; }
+
+      card.position.set(targetX, 0.28, targetZ);
+      updateHandVisibility(card);
+      sendMoveData(card);
+    });
+
+    updateStacking();
+  }
+
   function clearSelectionGroup() {
     selectedGroup.forEach(obj => {
       if (obj.userData.outlineMesh) {
@@ -436,7 +471,7 @@
     const cutCards = deckCards.slice(0, cutCount);
 
     cutCards.forEach((card, i) => {
-      card.position.set(2.0, 0.28 + i * 0.02, 0);
+      card.position.set(1.8, 0.28 + i * 0.02, 0);
       sendMoveData(card);
     });
     updateStacking();
@@ -488,38 +523,6 @@
     });
 
     if (isLocal) broadcastData({ type: 'shuffle' });
-  }
-
-  function drawCards(isLocal = true, numToDraw = null) {
-    const allCards = objects.filter(o => o.userData.type === 'card');
-    const deckCards = allCards.filter(c => Math.hypot(c.position.x, c.position.z) < 1.5);
-    if (deckCards.length === 0) {
-      alert('가져올 카드가 덱에 없습니다!');
-      return;
-    }
-
-    if (numToDraw === null) {
-      const input = prompt('몇 장의 카드를 가져오시겠습니까?', '1');
-      numToDraw = parseInt(input, 10);
-      if (isNaN(numToDraw) || numToDraw < 1) return;
-    }
-
-    deckCards.sort((a, b) => b.position.y - a.position.y);
-    const selectedCards = deckCards.slice(0, numToDraw);
-
-    selectedCards.forEach((card, index) => {
-      let targetX = 0, targetZ = 0;
-      if (mySeat === 1) { targetX = (index - numToDraw / 2) * 0.8; targetZ = 3.5; }
-      else if (mySeat === 2) { targetX = (index - numToDraw / 2) * 0.8; targetZ = -3.5; }
-      else if (mySeat === 3) { targetX = -3.5; targetZ = (index - numToDraw / 2) * 0.8; }
-      else if (mySeat === 4) { targetX = 3.5; targetZ = (index - numToDraw / 2) * 0.8; }
-
-      card.position.set(targetX, 0.28, targetZ);
-      updateHandVisibility(card);
-      sendMoveData(card);
-    });
-
-    updateStacking();
   }
 
   spawnFullDeck(false);
@@ -579,7 +582,7 @@
     camBtn.classList.toggle('active', isCamModeAlwaysOn);
   });
 
-  // 6. 영역 드래그 선택 및 그룹 조작
+  // 6. 터치 및 영역 선택 로직
   const raycaster = new THREE.Raycaster();
   const touch = new THREE.Vector2();
   let selectedObj = null;
@@ -734,7 +737,7 @@
         if (x >= minX && x <= maxX && y >= minY && y <= maxY) {
           selectedGroup.push(obj);
 
-          const outlineGeo = new THREE.BoxGeometry(1.24, 0.04, 1.84);
+          const outlineGeo = new THREE.BoxGeometry(0.94, 0.04, 1.39);
           const outlineMat = new THREE.MeshBasicMaterial({ color: 0x10b981, wireframe: true });
           const outlineMesh = new THREE.Mesh(outlineGeo, outlineMat);
           obj.add(outlineMesh);
@@ -774,7 +777,6 @@
     const seat = getSeatFromPosition(obj.position.x, obj.position.z);
     let isFlippedForOthers = obj.userData.isFlipped;
 
-    // 만약 카드가 누군가의 손패 안에 있다면 다른 사람에게는 항상 뒷면으로 전송
     if (obj.userData.type === 'card' && seat !== 0) {
       isFlippedForOthers = true;
     }
@@ -830,7 +832,7 @@
     if (isLocal) broadcastData({ type: 'roll', id: dice.userData.id, targetRot: { x: rotX, y: rotY, z: rotZ } });
   }
 
-  // 7. PeerJS 1:N (방장-참가자) 다중 네트워크 연결
+  // 7. PeerJS 1:N 연결
   function generateShortId() {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     let result = '';
