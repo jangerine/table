@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>테이블탑 시뮬레이터</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #0f141d;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            color: #ffffff;
+        }
+
+        /* 3D Canvas Context */
+        #viewport {
+            width: 100vw;
+            height: 100vh;
+            display: block;
+            touch-action: none;
+        }
+
+        /* UI Overlays Header Elements */
+        .top-bar {
+            position: absolute;
+            top: 16px;
+            left: 16px;
+            right: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .left-controls {
+            display: flex;
+            gap: 10px;
+            pointer-events: auto;
+        }
+
+        .right-controls {
+            pointer-events: auto;
+        }
+
+        .btn {
+            border: none;
+            border-radius: 12px;
+            padding: 10px 18px;
+            font-size: 14px;
+            font-weight: 700;
+            color: #ffffff;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: transform 0.1s, filter 0.2s;
+        }
+
+        .btn:active {
+            transform: scale(0.95);
+        }
+
+        .btn-purple {
+            background: linear-gradient(135deg, #7c3aed, #6366f1);
+        }
+
+        .btn-orange {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+        }
+
+        .btn-red {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+        }
+
+        .btn-blue {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+        }
+
+        .btn-blue.active {
+            background: linear-gradient(135deg, #10b981, #059669);
+            box-shadow: 0 0 12px rgba(16, 185, 129, 0.5);
+        }
+
+        /* Bottom Info Box */
+        .bottom-info {
+            position: absolute;
+            bottom: 16px;
+            left: 16px;
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 10px 14px;
+            font-size: 12px;
+            color: #cbd5e1;
+            line-height: 1.6;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .bottom-info p {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* Props Modal Menu */
+        .modal {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 16px;
+            padding: 20px;
+            width: 320px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+            display: none;
+            z-index: 100;
+        }
+
+        .modal.active {
+            display: block;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .modal-title {
+            font-weight: 700;
+            font-size: 16px;
+        }
+
+        .close-btn {
+            background: transparent;
+            border: none;
+            color: #94a3b8;
+            font-size: 20px;
+            cursor: pointer;
+        }
+
+        .props-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+
+        .prop-item {
+            background: #334155;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 14px;
+            text-align: center;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .prop-item:hover {
+            background: #475569;
+        }
+
+        .prop-icon {
+            font-size: 24px;
+            margin-bottom: 6px;
+        }
+
+        .prop-name {
+            font-size: 13px;
+            font-weight: 600;
+        }
+    </style>
+    <!-- Three.js for 3D rendering and Cannon.js for physics -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body>
+
+    <!-- UI Overlay Top -->
+    <div class="top-bar">
+        <div class="left-controls">
+            <button class="btn btn-purple" id="btn-add-prop">🎮 소품 추가 메뉴</button>
+            <button class="btn btn-orange" id="btn-roll-dice">🎲 주사위 굴리기</button>
+            <button class="btn btn-red" id="btn-clear-table">판 비우기</button>
+        </div>
+        <div class="right-controls">
+            <button class="btn btn-blue" id="btn-toggle-camera">카메라 회전 모드</button>
+        </div>
+    </div>
+
+    <!-- UI Overlay Bottom Info -->
+    <div class="bottom-info">
+        <p>💡 <b>기물 이동 모드:</b> 젠가 / 주사위 / 카드 자유 드래그</p>
+        <p>🔄 <b>카드 더블 터치 / 클릭:</b> 공중 앞뒤 3D Flip 뒤집기</p>
+    </div>
+
+    <!-- Props Selection Modal -->
+    <div class="modal" id="props-modal">
+        <div class="modal-header">
+            <div class="modal-title">소품 선택</div>
+            <button class="close-btn" id="btn-close-modal">&times;</button>
+        </div>
+        <div class="props-grid">
+            <div class="prop-item" onclick="spawnProp('dice')">
+                <div class="prop-icon">🎲</div>
+                <div class="prop-name">주사위</div>
+            </div>
+            <div class="prop-item" onclick="spawnProp('card')">
+                <div class="prop-icon">🃏</div>
+                <div class="prop-name">플레잉 카드</div>
+            </div>
+            <div class="prop-item" onclick="spawnProp('jenga')">
+                <div class="prop-icon">🪵</div>
+                <div class="prop-name">젠가 블록</div>
+            </div>
+            <div class="prop-item" onclick="spawnProp('chip')">
+                <div class="prop-icon">⚪</div>
+                <div class="prop-name">게임 칩</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3D Canvas container -->
+    <div id="viewport"></div>
+
+    <script>
+        // Global Three.js & Physics Setup
+        let scene, camera, renderer, controls;
+        let world;
+        const objects = []; // { mesh, body, type }
+        
+        let raycaster = new THREE.Raycaster();
+        let mouse = new THREE.Vector2();
+        let isCameraRotateMode = false;
+
+        // Physics material
+        let defaultMaterial;
+
+        // Initialize 3D Engine
+        function init() {
+            const container = document.getElementById('viewport');
+
+            // 1. Scene
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0f141d);
+
+            // 2. Camera
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 18, 22);
+            camera.lookAt(0, 0, 0);
+
+            // 3. Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(renderer.domElement);
+
+            // 4. Orbit Controls
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.enabled = false; // Start in Drag/Move mode by default
+
+            // 5. Lighting
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            dirLight.position.set(15, 30, 20);
+            dirLight.castShadow = true;
+            dirLight.shadow.mapSize.width = 2048;
+            dirLight.shadow.mapSize.height = 2048;
+            scene.add(dirLight);
+
+            // 6. Physics World
+            world = new CANNON.World();
+            world.gravity.set(0, -25, 0);
+            world.broadphase = new CANNON.NaiveBroadphase();
+
+            defaultMaterial = new CANNON.Material("default");
+            const contactMaterial = new CANNON.ContactMaterial(
+                defaultMaterial, defaultMaterial, { friction: 0.4, restitution: 0.3 }
+            );
+            world.addContactMaterial(contactMaterial);
+
+            // 7. Table Surface (Visual + Physics)
+            createTable();
+
+            // Event Listeners
+            window.addEventListener('resize', onWindowResize);
+            setupInteractions();
+
+            // Spawn initial demo objects
+            spawnProp('card', new THREE.Vector3(-3, 1, 0));
+            spawnProp('dice', new THREE.Vector3(0, 2, 0));
+            spawnProp('jenga', new THREE.Vector3(3, 1, 0));
+
+            // Animation Loop
+            animate();
+        }
+
+        // Table Creation
+        function createTable() {
+            // Visual Table Mesh
+            const tableGeo = new THREE.BoxGeometry(22, 1, 16);
+            const tableMat = new THREE.MeshStandardMaterial({ 
+                color: 0x2d3a4e, 
+                roughness: 0.4,
+                metalness: 0.1
+            });
+            const tableMesh = new THREE.Mesh(tableGeo, tableMat);
+            tableMesh.position.y = -0.5;
+            tableMesh.receiveShadow = true;
+            scene.add(tableMesh);
+
+            // Table Physics Ground Plane
+            const groundShape = new CANNON.Box(new CANNON.Vec3(11, 0.5, 8));
+            const groundBody = new CANNON.Body({ mass: 0, material: defaultMaterial });
+            groundBody.addShape(groundShape);
+            groundBody.position.set(0, -0.5, 0);
+            world.addBody(groundBody);
+        }
+
+        // Object Spawner
+        function spawnProp(type, customPos = null) {
+            const spawnPos = customPos || new THREE.Vector3(
+                (Math.random() - 0.5) * 4,
+                5 + Math.random() * 2,
+                (Math.random() - 0.5) * 4
+            );
+
+            let mesh, body;
+
+            if (type === 'dice') {
+                const size = 1.2;
+                const geo = new THREE.BoxGeometry(size, size, size);
+                const mat = new THREE.MeshStandardMaterial({ color: 0xff4757, roughness: 0.2 });
+                mesh = new THREE.Mesh(geo, mat);
+
+                const shape = new CANNON.Box(new CANNON.Vec3(size/2, size/2, size/2));
+                body = new CANNON.Body({ mass: 1, material: defaultMaterial });
+                body.addShape(shape);
+
+            } else if (type === 'card') {
+                const geo = new THREE.BoxGeometry(2, 0.05, 3);
+                const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3 });
+                mesh = new THREE.Mesh(geo, mat);
+
+                const shape = new CANNON.Box(new CANNON.Vec3(1, 0.025, 1.5));
+                body = new CANNON.Body({ mass: 0.2, material: defaultMaterial });
+                body.addShape(shape);
+
+            } else if (type === 'jenga') {
+                const geo = new THREE.BoxGeometry(3, 0.8, 1);
+                const mat = new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.6 });
+                mesh = new THREE.Mesh(geo, mat);
+
+                const shape = new CANNON.Box(new CANNON.Vec3(1.5, 0.4, 0.5));
+                body = new CANNON.Body({ mass: 0.5, material: defaultMaterial });
+                body.addShape(shape);
+
+            } else if (type === 'chip') {
+                const geo = new THREE.CylinderGeometry(0.8, 0.8, 0.2, 32);
+                const mat = new THREE.MeshStandardMaterial({ color: 0x3b82f6 });
+                mesh = new THREE.Mesh(geo, mat);
+
+                const shape = new CANNON.Cylinder(0.8, 0.8, 0.2, 16);
+                body = new CANNON.Body({ mass: 0.3, material: defaultMaterial });
+                body.addShape(shape);
+            }
+
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            scene.add(mesh);
+
+            body.position.copy(spawnPos);
+            world.addBody(body);
+
+            objects.push({ mesh, body, type });
+        }
+
+        // Drag & Touch Drag Handling
+        let draggedObj = null;
+        let dragPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -1.5);
+        let planeIntersect = new THREE.Vector3();
+
+        function setupInteractions() {
+            const dom = renderer.domElement;
+
+            let lastClickTime = 0;
+
+            const onPointerDown = (e) => {
+                if (isCameraRotateMode) return;
+
+                const rect = dom.getBoundingClientRect();
+                mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+                mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+                raycaster.setFromCamera(mouse, camera);
+                const intersects = raycaster.intersectObjects(objects.map(o => o.mesh));
+
+                if (intersects.length > 0) {
+                    const hitMesh = intersects[0].object;
+                    const found = objects.find(o => o.mesh === hitMesh);
+
+                    // Check Double Click / Tap for Card Flip
+                    const currentTime = new Date().getTime();
+                    const clickLength = currentTime - lastClickTime;
+                    if (clickLength < 300 && clickLength > 0) {
+                        // Double click detected -> Flip object
+                        flipObject(found);
+                    } else {
+                        // Start Drag
+                        draggedObj = found;
+                        draggedObj.body.mass = 0; // Temp set static during drag
+                        draggedObj.body.velocity.set(0, 0, 0);
+                        draggedObj.body.angularVelocity.set(0, 0, 0);
+                    }
+                    lastClickTime = currentTime;
+                }
+            };
+
+            const onPointerMove = (e) => {
+                if (!draggedObj || isCameraRotateMode) return;
+
+                const rect = dom.getBoundingClientRect();
+                mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+                mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+                raycaster.setFromCamera(mouse, camera);
+                raycaster.ray.intersectPlane(dragPlane, planeIntersect);
+
+                if (planeIntersect) {
+                    draggedObj.body.position.x = planeIntersect.x;
+                    draggedObj.body.position.z = planeIntersect.z;
+                    draggedObj.body.position.y = 1.5; // Lift up slightly while dragging
+                }
+            };
+
+            const onPointerUp = () => {
+                if (draggedObj) {
+                    draggedObj.body.mass = draggedObj.type === 'card' ? 0.2 : 1.0;
+                    draggedObj.body.updateMassProperties();
+                    draggedObj.body.wakeUp();
+                    draggedObj = null;
+                }
+            };
+
+            dom.addEventListener('pointerdown', onPointerDown);
+            dom.addEventListener('pointermove', onPointerMove);
+            dom.addEventListener('pointerup', onPointerUp);
+        }
+
+        // Flip Card / Object
+        function flipObject(obj) {
+            if (!obj) return;
+            obj.body.position.y += 1.5; // Jump
+            obj.body.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 0, 1), Math.PI); // Flip 180 deg
+            obj.body.angularVelocity.set((Math.random()-0.5)*5, 0, (Math.random()-0.5)*5);
+        }
+
+        // Roll all dice
+        function rollDice() {
+            objects.filter(o => o.type === 'dice').forEach(d => {
+                d.body.position.y += 3;
+                d.body.velocity.set((Math.random()-0.5)*10, 10, (Math.random()-0.5)*10);
+                d.body.angularVelocity.set(Math.random()*20, Math.random()*20, Math.random()*20);
+            });
+        }
+
+        // Clear all props on table
+        function clearTable() {
+            objects.forEach(o => {
+                scene.remove(o.mesh);
+                world.remove(o.body);
+            });
+            objects.length = 0;
+        }
+
+        // Window resize adjustment
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // Main Physics & Render Loop
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // Step Physics World
+            world.step(1 / 60);
+
+            // Sync Visual Meshes with Physics Bodies
+            objects.forEach(obj => {
+                obj.mesh.position.copy(obj.body.position);
+                obj.mesh.quaternion.copy(obj.body.quaternion);
+            });
+
+            if (isCameraRotateMode) {
+                controls.update();
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        // UI Event Listeners Setup
+        document.getElementById('btn-add-prop').addEventListener('click', () => {
+            document.getElementById('props-modal').classList.add('active');
+        });
+
+        document.getElementById('btn-close-modal').addEventListener('click', () => {
+            document.getElementById('props-modal').classList.remove('active');
+        });
+
+        document.getElementById('btn-roll-dice').addEventListener('click', () => {
+            rollDice();
+        });
+
+        document.getElementById('btn-clear-table').addEventListener('click', () => {
+            clearTable();
+        });
+
+        const toggleCamBtn = document.getElementById('btn-toggle-camera');
+        toggleCamBtn.addEventListener('click', () => {
+            isCameraRotateMode = !isCameraRotateMode;
+            controls.enabled = isCameraRotateMode;
+            if (isCameraRotateMode) {
+                toggleCamBtn.classList.add('active');
+                toggleCamBtn.innerText = '🎯 기물 이동 모드';
+            } else {
+                toggleCamBtn.classList.remove('active');
+                toggleCamBtn.innerText = '카메라 회전 모드';
+            }
+        });
+
+        window.onload = init;
+    </script>
+</body>
+</html>
