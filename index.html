@@ -118,14 +118,13 @@
     </select>
     <span id="status" style="color:#f59e0b;">(대기중)</span>
   </div>
-  <div>✅ <b>수정 완료:</b> 핸드존 방향 기반 카드 축 정렬 완벽 적용 (옆으로 눕는 현상 해결)</div>
+  <div>✅ <b>수정 완료:</b> P3, P4 시점 본인 기준 카드 180도 반전 수정</div>
 </div>
 
 <script>
-  let mySeat = 3; // 기본 P3 시점
+  let mySeat = 3;
   const CARD_BASE_Y = 0.32;
 
-  // 1. Scene & Camera
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x0f172a);
 
@@ -161,7 +160,6 @@
   dirLight.castShadow = true;
   scene.add(dirLight);
 
-  // 2. 테이블 및 영역 텍스처
   function createWoodTexture() {
     const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 512;
     const ctx = canvas.getContext('2d');
@@ -179,26 +177,22 @@
 
     ctx.font = 'bold 28px sans-serif'; ctx.textAlign = 'center';
 
-    // P1 Zone (남 - 가로형)
     ctx.strokeStyle = 'rgba(96, 165, 250, 0.6)'; ctx.lineWidth = 6;
     ctx.strokeRect(150, 750, 724, 220);
     ctx.fillStyle = 'rgba(96, 165, 250, 0.8)';
     ctx.fillText('P1 HAND ZONE (남)', 512, 870);
 
-    // P2 Zone (북 - 가로형)
     ctx.strokeStyle = 'rgba(239, 68, 68, 0.6)';
     ctx.strokeRect(150, 54, 724, 220);
     ctx.fillStyle = 'rgba(239, 68, 68, 0.8)';
     ctx.fillText('P2 HAND ZONE (북)', 512, 170);
 
-    // P3 Zone (서 - 세로형)
     ctx.strokeStyle = 'rgba(16, 185, 129, 0.6)';
     ctx.strokeRect(54, 150, 220, 724);
     ctx.fillStyle = 'rgba(16, 185, 129, 0.8)';
     ctx.save(); ctx.translate(160, 512); ctx.rotate(-Math.PI/2);
     ctx.fillText('P3 HAND ZONE (서)', 0, 0); ctx.restore();
 
-    // P4 Zone (동 - 세로형)
     ctx.strokeStyle = 'rgba(245, 158, 11, 0.6)';
     ctx.strokeRect(750, 150, 220, 724);
     ctx.fillStyle = 'rgba(245, 158, 11, 0.8)';
@@ -232,7 +226,6 @@
   let selectedGroup = [];
   let objectIdCounter = 0;
 
-  // 3. 트럼프 카드 생성
   const suits = ['♠', '♥', '♦', '♣'];
   const values = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 
@@ -287,7 +280,7 @@
 
     const card = new THREE.Mesh(geo, materials);
     card.position.set(x, CARD_BASE_Y, z);
-    card.rotation.z = Math.PI; // 기본 뒷면
+    card.rotation.z = Math.PI;
     card.castShadow = true;
     card.userData = { id: id, type: 'card', suit: suit, value: value, isFlipped: true, isLocked: false, isAnimating: false };
     
@@ -318,23 +311,22 @@
     return dice;
   }
 
-  // 4. 영역 판별 및 각도 완벽 보정 로직
   function getSeatFromPosition(x, z) {
-    if (z > 2.8) return 1;       // P1 남
-    if (z < -2.8) return 2;      // P2 북
-    if (x < -2.8) return 3;      // P3 서
-    if (x > 2.8) return 4;       // P4 동
-    return 0;                    // 필드
+    if (z > 2.8) return 1;
+    if (z < -2.8) return 2;
+    if (x < -2.8) return 3;
+    if (x > 2.8) return 4;
+    return 0;
   }
 
-  // 핵심 수정: 각 핸드존 레이아웃 세로/가로에 맞게 축 정렬
+  // 핵심 보정: 각 좌석의 플레이어 본인 시선 기준 정면 설정
   function alignCardRotationBySeat(card) {
     const seat = getSeatFromPosition(card.position.x, card.position.z);
     
-    if (seat === 1) card.rotation.y = Math.PI / 2;       // P1 (남): 가로 구역에 정면 세로 정렬 (90도)
-    else if (seat === 2) card.rotation.y = -Math.PI / 2;  // P2 (북): 가로 구역에 정면 세로 정렬 (-90도)
-    else if (seat === 3) card.rotation.y = 0;             // P3 (서): 세로 구역에 정면 세로 정렬 (0도)
-    else if (seat === 4) card.rotation.y = Math.PI;       // P4 (동): 세로 구역에 정면 세로 정렬 (180도)
+    if (seat === 1) card.rotation.y = Math.PI / 2;       // P1 (남)
+    else if (seat === 2) card.rotation.y = -Math.PI / 2;  // P2 (북)
+    else if (seat === 3) card.rotation.y = Math.PI;       // P3 (서): 180도 정면
+    else if (seat === 4) card.rotation.y = 0;             // P4 (동): 0도 정면
   }
 
   function updateHandVisibility(card) {
@@ -529,7 +521,6 @@
 
   spawnFullDeck(false);
 
-  // UI 핸들러
   const propModal = document.getElementById('prop-modal');
   document.getElementById('prop-menu-btn').addEventListener('click', (e) => {
     e.stopPropagation();
@@ -587,7 +578,6 @@
     camBtn.classList.toggle('active', isCamModeAlwaysOn);
   });
 
-  // 5. 드래그 & 터치 상호작용
   const raycaster = new THREE.Raycaster();
   const touch = new THREE.Vector2();
   let selectedObj = null;
@@ -779,7 +769,6 @@
   window.addEventListener('mousemove', onTouchMove, false);
   window.addEventListener('mouseup', onTouchEnd, false);
 
-  // 6. 데이터 동기화
   function sendMoveData(obj) {
     const seat = getSeatFromPosition(obj.position.x, obj.position.z);
     
@@ -846,7 +835,6 @@
     if (isLocal) broadcastData({ type: 'roll', id: dice.userData.id, targetRot: { x: rotX, y: rotY, z: rotZ } });
   }
 
-  // 7. PeerJS 멀티플레이
   function generateShortId() {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     let result = '';
