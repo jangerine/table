@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Mobile Tabletop Simulator - Vertical Edge Cards</title>
+  <title>Mobile Tabletop Simulator - Card Slot Added</title>
   <style>
     * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
     body { margin: 0; overflow: hidden; touch-action: none; font-family: 'Pretendard', sans-serif; background-color: #0f172a; }
@@ -81,6 +81,7 @@
     <button class="ui-btn btn-purple" id="prop-menu-btn">🎮 소품</button>
     <button class="ui-btn btn-green" id="shuffle-btn">🔀 섞기(R)</button>
     <button class="ui-btn btn-teal" id="draw-btn">🎴 가져오기</button>
+    <button class="ui-btn btn-orange" id="add-slot-btn">🔲 슬롯 생성</button>
     <button class="ui-btn btn-purple" id="gather-btn">📥 모으기</button>
     <button class="ui-btn btn-purple" id="select-mode-btn">🟦 영역 선택 [OFF]</button>
     <button class="ui-btn btn-teal" id="spread-btn">↔️ 펼치기</button>
@@ -118,7 +119,7 @@
     </select>
     <span id="status" style="color:#f59e0b;">(대기중)</span>
   </div>
-  <div>✅ <b>독립 구획 완벽 분리:</b> 플레이어 영역 판정이 절대 중첩되지 않습니다.</div>
+  <div>✅ <b>카드 슬롯 기능 추가:</b> '슬롯 생성'을 눌러 카드를 순서대로 정렬할 수 있는 칸을 만듭니다.</div>
 </div>
 
 <script>
@@ -223,6 +224,7 @@
   scene.add(boardMatMesh);
 
   let objects = [];
+  let cardSlots = [];
   let selectedGroup = [];
   let objectIdCounter = 0;
 
@@ -285,6 +287,46 @@
 
   const cardBackTexture = createCardBackTexture();
 
+  // 🔥 [신규] 순서 카드 슬롯 생성 함수
+  function createSlotLine(count = 5, isLocal = true) {
+    cardSlots.forEach(slot => scene.remove(slot));
+    cardSlots = [];
+
+    const slotGeo = new THREE.PlaneGeometry(1.0, 1.45);
+    const spacing = 1.15;
+    const startX = -((count - 1) * spacing) / 2;
+
+    for (let i = 0; i < count; i++) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 128; canvas.height = 184;
+      const ctx = canvas.getContext('2d');
+      
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+      ctx.fillRect(0, 0, 128, 184);
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 6;
+      ctx.strokeRect(3, 3, 122, 178);
+      
+      ctx.fillStyle = '#38bdf8';
+      ctx.font = 'bold 42px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(i + 1, 64, 92);
+
+      const tex = new THREE.CanvasTexture(canvas);
+      const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0.85 });
+      const slotMesh = new THREE.Mesh(slotGeo, mat);
+      
+      slotMesh.rotation.x = -Math.PI / 2;
+      slotMesh.position.set(startX + i * spacing, 0.27, 2.0); // 중앙 하단 위치
+      
+      scene.add(slotMesh);
+      cardSlots.push(slotMesh);
+    }
+
+    if (isLocal) broadcastData({ type: 'create_slots', count: count });
+  }
+
   function createCard(x = 0, z = 0, isLocal = true, customSuit = null, customValue = null, customId = null) {
     const id = customId || ('card_' + (++objectIdCounter));
     if (objects.some(o => o.userData.id === id)) return;
@@ -342,7 +384,6 @@
     return dice;
   }
 
-  // 🔥 [수정] 상호 배타적 독립 구획 분발 알고리즘 (절대 영역 중첩 불가)
   function isPositionInSeatZone(x, z, seat) {
     if (seat === 1) return z > 4.2 && x >= -4.2 && x <= 4.2;
     if (seat === 2) return z < -4.2 && x >= -4.2 && x <= 4.2;
@@ -352,12 +393,12 @@
   }
 
   function getSeatFromPosition(x, z) {
-    if (isPositionInSeatZone(x, z, mySeat)) return mySeat; // 내 영역을 최우선 검사
+    if (isPositionInSeatZone(x, z, mySeat)) return mySeat;
     if (isPositionInSeatZone(x, z, 1)) return 1;
     if (isPositionInSeatZone(x, z, 2)) return 2;
     if (isPositionInSeatZone(x, z, 3)) return 3;
     if (isPositionInSeatZone(x, z, 4)) return 4;
-    return 0; // 경계 외부 중앙 필드
+    return 0;
   }
 
   function alignCardRotationBySeat(card) {
@@ -382,6 +423,20 @@
         card.userData.isFlipped = true;
       } else {
         card.rotation.z = card.userData.isFlipped ? Math.PI : 0;
+      }
+    }
+  }
+
+  // 🔥 [신규] 슬롯에 카드를 올려놓았을 때 스냅(자석) 끌어당김 로직
+  function snapCardToSlot(card) {
+    const SNAP_DISTANCE = 0.6;
+    for (let slot of cardSlots) {
+      const dist = Math.hypot(card.position.x - slot.position.x, card.position.z - slot.position.z);
+      if (dist < SNAP_DISTANCE) {
+        card.position.x = slot.position.x;
+        card.position.z = slot.position.z;
+        card.rotation.y = 0;
+        break;
       }
     }
   }
@@ -578,13 +633,23 @@
 
   document.getElementById('shuffle-btn').addEventListener('click', () => shuffleCards(true));
   document.getElementById('draw-btn').addEventListener('click', () => drawCards(true));
+  
+  // 🔥 슬롯 생성 버튼 클릭 이벤트
+  document.getElementById('add-slot-btn').addEventListener('click', () => {
+    const input = prompt('생성할 슬롯(순서 칸)의 개수를 입력하세요:', '5');
+    const count = parseInt(input, 10);
+    if (!isNaN(count) && count > 0) createSlotLine(count, true);
+  });
+
   document.getElementById('gather-btn').addEventListener('click', () => gatherCards(true));
   document.getElementById('spread-btn').addEventListener('click', () => spreadCards(true));
   document.getElementById('cut-btn').addEventListener('click', () => cutDeck(true));
 
   document.getElementById('clear-btn').addEventListener('click', () => {
     objects.forEach(obj => scene.remove(obj));
+    cardSlots.forEach(slot => scene.remove(slot));
     objects = [];
+    cardSlots = [];
     clearSelectionGroup();
     broadcastData({ type: 'clear' });
   });
@@ -805,6 +870,12 @@
       const lastPos = e.changedTouches ? e.changedTouches[0] : e;
       const dist = Math.hypot(lastPos.clientX - touchStartPos.x, lastPos.clientY - touchStartPos.y);
 
+      // 드래그 종료 시 슬롯 자석 스냅 체크
+      if (selectedObj.userData.type === 'card') {
+        snapCardToSlot(selectedObj);
+        sendMoveData(selectedObj);
+      }
+
       if (touchDuration < 300 && dist < 10) {
         if (isInspectMode && selectedObj.userData.type === 'card') {
           showCardPreview(selectedObj);
@@ -952,8 +1023,12 @@
   function handleNetworkData(data) {
     if (data.type === 'clear') {
       objects.forEach(obj => scene.remove(obj));
+      cardSlots.forEach(slot => scene.remove(slot));
       objects = [];
+      cardSlots = [];
       clearSelectionGroup();
+    } else if (data.type === 'create_slots') {
+      createSlotLine(data.count, false);
     } else if (data.type === 'reset_deck') {
       spawnFullDeck(false);
     } else if (data.type === 'spawn') {
