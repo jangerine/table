@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Mobile Tabletop Simulator - Perfect Card Rotation</title>
+  <title>Mobile Tabletop Simulator - Fixed Card Rotation</title>
   <style>
     * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
     body { margin: 0; overflow: hidden; touch-action: none; font-family: 'Pretendard', sans-serif; background-color: #0f172a; }
@@ -118,7 +118,7 @@
     </select>
     <span id="status" style="color:#f59e0b;">(대기중)</span>
   </div>
-  <div>✅ <b>수정 완료:</b> P3, P4 시점 본인 기준 카드 180도 반전 수정</div>
+  <div>✅ <b>카메라/카드 각도 일치 수정 완료:</b> 모든 좌석 시선 정면 바르게 표시</div>
 </div>
 
 <script>
@@ -130,6 +130,7 @@
 
   const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1000);
   
+  // 1. 플레이어 카메라 시선 고정
   function updateCameraPosition() {
     if (mySeat === 1) camera.position.set(0, 11, 9);
     else if (mySeat === 2) camera.position.set(0, 11, -9);
@@ -319,24 +320,25 @@
     return 0;
   }
 
-  // 핵심 보정: 각 좌석의 플레이어 본인 시선 기준 정면 설정
+  // 2. 각 좌석 본인 시선 기준 정면 Y축 방향 보정
   function alignCardRotationBySeat(card) {
     const seat = getSeatFromPosition(card.position.x, card.position.z);
     
-    if (seat === 1) card.rotation.y = Math.PI / 2;       // P1 (남)
-    else if (seat === 2) card.rotation.y = -Math.PI / 2;  // P2 (북)
-    else if (seat === 3) card.rotation.y = Math.PI;       // P3 (서): 180도 정면
-    else if (seat === 4) card.rotation.y = 0;             // P4 (동): 0도 정면
+    if (seat === 1) card.rotation.y = 0;              // P1 (남)
+    else if (seat === 2) card.rotation.y = Math.PI;   // P2 (북)
+    else if (seat === 3) card.rotation.y = -Math.PI / 2; // P3 (서)
+    else if (seat === 4) card.rotation.y = Math.PI / 2;  // P4 (동)
   }
 
+  // 3. 내 카드는 앞면, 상대방 카드는 뒷면 처리
   function updateHandVisibility(card) {
     const seat = getSeatFromPosition(card.position.x, card.position.z);
     
     if (seat === mySeat) {
-      card.rotation.z = 0;
+      card.rotation.z = 0;             // 내 카드는 글자가 보이게 (앞면)
       card.userData.isFlipped = false;
     } else if (seat !== 0) {
-      card.rotation.z = Math.PI;
+      card.rotation.z = Math.PI;        // 상대방 카드는 뒷면
       card.userData.isFlipped = true;
     } else {
       card.rotation.z = card.userData.isFlipped ? Math.PI : 0;
