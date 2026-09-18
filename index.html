@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Mobile Tabletop Simulator - Vertical Fixed Cards</title>
+  <title>Mobile Tabletop Simulator - Vertical Edge Cards</title>
   <style>
     * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
     body { margin: 0; overflow: hidden; touch-action: none; font-family: 'Pretendard', sans-serif; background-color: #0f172a; }
@@ -118,7 +118,7 @@
     </select>
     <span id="status" style="color:#f59e0b;">(대기중)</span>
   </div>
-  <div>✅ <b>카드 영역 판정 보정 완료:</b> 내 영역 위에서는 상대 영역과 걸쳐도 뒤집히지 않습니다.</div>
+  <div>✅ <b>테두리 배치 보정:</b> 카드가 각 모서리 영역 바깥 라인에 맞춰 정렬됩니다.</div>
 </div>
 
 <script>
@@ -131,10 +131,10 @@
   const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1000);
   
   function updateCameraPosition() {
-    if (mySeat === 1) camera.position.set(0, 11, 9);
-    else if (mySeat === 2) camera.position.set(0, 11, -9);
-    else if (mySeat === 3) camera.position.set(-9, 11, 0);
-    else if (mySeat === 4) camera.position.set(9, 11, 0);
+    if (mySeat === 1) camera.position.set(0, 11, 10);
+    else if (mySeat === 2) camera.position.set(0, 11, -10);
+    else if (mySeat === 3) camera.position.set(-10, 11, 0);
+    else if (mySeat === 4) camera.position.set(10, 11, 0);
   }
   updateCameraPosition();
 
@@ -173,30 +173,31 @@
     const canvas = document.createElement('canvas'); canvas.width = 1024; canvas.height = 1024;
     const ctx = canvas.getContext('2d');
     ctx.fillStyle = '#1b4d2e'; ctx.fillRect(0, 0, 1024, 1024);
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)'; ctx.lineWidth = 8; ctx.strokeRect(30, 30, 964, 964);
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)'; ctx.lineWidth = 8; ctx.strokeRect(20, 20, 984, 984);
 
-    ctx.font = 'bold 28px sans-serif'; ctx.textAlign = 'center';
+    ctx.font = 'bold 26px sans-serif'; ctx.textAlign = 'center';
 
-    ctx.strokeStyle = 'rgba(96, 165, 250, 0.6)'; ctx.lineWidth = 6;
-    ctx.strokeRect(150, 750, 724, 220);
+    // 모서리 바깥라인 손패 영역 표시
+    ctx.strokeStyle = 'rgba(96, 165, 250, 0.6)'; ctx.lineWidth = 4;
+    ctx.strokeRect(100, 850, 824, 140);
     ctx.fillStyle = 'rgba(96, 165, 250, 0.8)';
-    ctx.fillText('P1 HAND ZONE (남)', 512, 870);
+    ctx.fillText('P1 HAND ZONE (남)', 512, 920);
 
     ctx.strokeStyle = 'rgba(239, 68, 68, 0.6)';
-    ctx.strokeRect(150, 54, 724, 220);
+    ctx.strokeRect(100, 34, 824, 140);
     ctx.fillStyle = 'rgba(239, 68, 68, 0.8)';
-    ctx.fillText('P2 HAND ZONE (북)', 512, 170);
+    ctx.fillText('P2 HAND ZONE (북)', 512, 110);
 
     ctx.strokeStyle = 'rgba(16, 185, 129, 0.6)';
-    ctx.strokeRect(54, 150, 220, 724);
+    ctx.strokeRect(34, 100, 140, 824);
     ctx.fillStyle = 'rgba(16, 185, 129, 0.8)';
-    ctx.save(); ctx.translate(160, 512); ctx.rotate(-Math.PI/2);
+    ctx.save(); ctx.translate(100, 512); ctx.rotate(-Math.PI/2);
     ctx.fillText('P3 HAND ZONE (서)', 0, 0); ctx.restore();
 
     ctx.strokeStyle = 'rgba(245, 158, 11, 0.6)';
-    ctx.strokeRect(750, 150, 220, 724);
+    ctx.strokeRect(850, 100, 140, 824);
     ctx.fillStyle = 'rgba(245, 158, 11, 0.8)';
-    ctx.save(); ctx.translate(860, 512); ctx.rotate(Math.PI/2);
+    ctx.save(); ctx.translate(920, 512); ctx.rotate(Math.PI/2);
     ctx.fillText('P4 HAND ZONE (동)', 0, 0); ctx.restore();
 
     return new THREE.CanvasTexture(canvas);
@@ -322,12 +323,12 @@
     return dice;
   }
 
-  // 특정 위치가 해당 seat(자리)의 핸드 존에 속하는지 여부를 정확히 판단
+  // 모서리 바깥라인 손패 존의 범위 검사
   function isPositionInSeatZone(x, z, seat) {
-    if (seat === 1) return z > 2.8 && x >= -4.5 && x <= 4.5;
-    if (seat === 2) return z < -2.8 && x >= -4.5 && x <= 4.5;
-    if (seat === 3) return x < -2.8 && z >= -4.5 && z <= 4.5;
-    if (seat === 4) return x > 2.8 && z >= -4.5 && z <= 4.5;
+    if (seat === 1) return z > 4.5 && x >= -5.5 && x <= 5.5;
+    if (seat === 2) return z < -4.5 && x >= -5.5 && x <= 5.5;
+    if (seat === 3) return x < -4.5 && z >= -5.5 && z <= 5.5;
+    if (seat === 4) return x > 4.5 && z >= -5.5 && z <= 5.5;
     return false;
   }
 
@@ -336,35 +337,31 @@
     if (isPositionInSeatZone(x, z, 2)) return 2;
     if (isPositionInSeatZone(x, z, 3)) return 3;
     if (isPositionInSeatZone(x, z, 4)) return 4;
-    return 0; // 중앙 필드 영역
+    return 0; // 중앙 필드
   }
 
-  // 플레이어 시점별 카드 세로 직립 회전 정렬
+  // 플레이어 시점별 직립 정렬 각도 설정
   function alignCardRotationBySeat(card) {
     const seat = getSeatFromPosition(card.position.x, card.position.z);
     
-    if (seat === 1 || seat === 0) card.rotation.y = 0;              // 중앙 판 및 P1 (남)
+    if (seat === 1 || seat === 0) card.rotation.y = 0;              // 중앙 및 P1 (남)
     else if (seat === 2) card.rotation.y = Math.PI;                 // P2 (북)
     else if (seat === 3) card.rotation.y = Math.PI / 2;             // P3 (서)
     else if (seat === 4) card.rotation.y = -Math.PI / 2;            // P4 (동)
   }
 
-  // 내 영역 최우선 검사 보정이 적용된 카드 앞/뒷면 판정
   function updateHandVisibility(card) {
     const isInsideMyZone = isPositionInSeatZone(card.position.x, card.position.z, mySeat);
 
     if (isInsideMyZone) {
-      // 내 핸드 존 안인 경우: 무조건 앞면 공개
       card.rotation.z = 0;
       card.userData.isFlipped = false;
     } else {
       const seat = getSeatFromPosition(card.position.x, card.position.z);
       if (seat !== 0) {
-        // 내 영토가 아닌 타 플레이어 핸드 존인 경우: 무조건 뒤집힘(비공개)
         card.rotation.z = Math.PI;
         card.userData.isFlipped = true;
       } else {
-        // 중앙 테이블 필드인 경우: 원래 수동 뒤집기 상태 유지
         card.rotation.z = card.userData.isFlipped ? Math.PI : 0;
       }
     }
@@ -402,6 +399,7 @@
     if (isLocal) broadcastData({ type: 'reset_deck' });
   }
 
+  // 가져오기(Draw) 시 모서리에 카드가 차곡차곡 놓이도록 수정된 좌표 적용
   function drawCards(isLocal = true, numToDraw = null) {
     const allCards = objects.filter(o => o.userData.type === 'card');
     const deckCards = allCards.filter(c => Math.hypot(c.position.x, c.position.z) < 1.5);
@@ -420,16 +418,17 @@
     deckCards.sort((a, b) => b.position.y - a.position.y);
     const selectedCards = deckCards.slice(0, numToDraw);
 
-    const spacing = 0.55;
+    const spacing = 1.0; // 모서리에 세로로 일렬 정렬 시 간격
 
     selectedCards.forEach((card, index) => {
       let targetX = 0, targetZ = 0;
       const offset = (index - (numToDraw - 1) / 2) * spacing;
 
-      if (mySeat === 1) { targetX = offset; targetZ = 4.2; }
-      else if (mySeat === 2) { targetX = -offset; targetZ = -4.2; }
-      else if (mySeat === 3) { targetX = -4.2; targetZ = -offset; }
-      else if (mySeat === 4) { targetX = 4.2; targetZ = offset; }
+      // 각 플레이어별 모서리 배치 위치
+      if (mySeat === 1) { targetX = offset; targetZ = 5.6; }
+      else if (mySeat === 2) { targetX = -offset; targetZ = -5.6; }
+      else if (mySeat === 3) { targetX = -5.6; targetZ = -offset; }
+      else if (mySeat === 4) { targetX = 5.6; targetZ = offset; }
 
       card.position.set(targetX, CARD_BASE_Y, targetZ);
       alignCardRotationBySeat(card);
@@ -804,7 +803,6 @@
     const isInsideMyZone = isPositionInSeatZone(obj.position.x, obj.position.z, mySeat);
     let isFlippedForOthers = obj.userData.isFlipped;
     
-    // 내 zone 안에 있는 동안은 타인 전송 시 무조건 가림(true) 처리
     if (obj.userData.type === 'card') {
       if (isInsideMyZone) {
         isFlippedForOthers = true;
