@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Mobile Tabletop Simulator - Fixed Card Rotation</title>
+  <title>Mobile Tabletop Simulator - Vertical Fixed Cards</title>
   <style>
     * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
     body { margin: 0; overflow: hidden; touch-action: none; font-family: 'Pretendard', sans-serif; background-color: #0f172a; }
@@ -118,7 +118,7 @@
     </select>
     <span id="status" style="color:#f59e0b;">(대기중)</span>
   </div>
-  <div>✅ <b>90도 오프셋 수정 완료:</b> 카드가 세로 정방향으로 바르게 보임</div>
+  <div>✅ <b>카드 자체 세로 정렬 완성:</b> 모든 각도에서 세로 카드 세팅</div>
 </div>
 
 <script>
@@ -229,6 +229,7 @@
   const suits = ['♠', '♥', '♦', '♣'];
   const values = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 
+  // 카드 본래의 세로 비율 정밀 텍스처
   function createTrumpCardTexture(suit, value) {
     const canvas = document.createElement('canvas'); canvas.width = 256; canvas.height = 384;
     const ctx = canvas.getContext('2d');
@@ -242,7 +243,9 @@
     ctx.font = '80px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(suit, 128, 192);
 
-    return new THREE.CanvasTexture(canvas);
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.center.set(0.5, 0.5);
+    return texture;
   }
 
   function createCardBackTexture() {
@@ -256,7 +259,9 @@
         if ((i + j) % 32 === 0) ctx.fillRect(i, j, 16, 16);
       }
     }
-    return new THREE.CanvasTexture(canvas);
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.center.set(0.5, 0.5);
+    return texture;
   }
 
   const cardBackTexture = createCardBackTexture();
@@ -268,6 +273,7 @@
     const suit = customSuit || suits[Math.floor(Math.random() * suits.length)];
     const value = customValue || values[Math.floor(Math.random() * values.length)];
 
+    // X: 가로(0.9), Z: 세로(1.35)로 기본 축 설정
     const geo = new THREE.BoxGeometry(0.9, 0.02, 1.35);
     const materials = [
       new THREE.MeshStandardMaterial({ color: 0xdddddd }),
@@ -319,14 +325,14 @@
     return 0;
   }
 
-  // 90도 회전 오프셋 보정 적용
+  // 자기자신 기준 세로 직립 보정
   function alignCardRotationBySeat(card) {
     const seat = getSeatFromPosition(card.position.x, card.position.z);
     
-    if (seat === 1) card.rotation.y = Math.PI / 2;      // P1 (남)
-    else if (seat === 2) card.rotation.y = -Math.PI / 2; // P2 (북)
-    else if (seat === 3) card.rotation.y = 0;            // P3 (서)
-    else if (seat === 4) card.rotation.y = Math.PI;      // P4 (동)
+    if (seat === 1) card.rotation.y = 0;                // P1 (남): 세로 정면
+    else if (seat === 2) card.rotation.y = Math.PI;     // P2 (북): 세로 정면
+    else if (seat === 3) card.rotation.y = -Math.PI / 2; // P3 (서): 세로 정면
+    else if (seat === 4) card.rotation.y = Math.PI / 2;  // P4 (동): 세로 정면
   }
 
   function updateHandVisibility(card) {
@@ -935,4 +941,3 @@
 </script>
 </body>
 </html>
-
