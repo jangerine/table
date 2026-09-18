@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Mobile Tabletop Simulator</title>
+  <style>
+    body { margin: 0; overflow: hidden; touch-action: none; font-family: sans-serif; }
+    #ui { position: absolute; top: 10px; left: 10px; z-index: 100; background: rgba(0,0,0,0.6); color: white; padding: 10px; border-radius: 8px; font-size: 12px; }
+    input, button { font-size: 12px; margin: 2px; }
+    #controls { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 100; }
+    #controls button { padding: 8px 16px; font-weight: bold; background: #27ae60; color: white; border: none; border-radius: 4px; }
+  </style>
+  <!-- Three.js, OrbitControls, PeerJS 라이브러리 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+</head>
+<body>
+
+<div id="ui">
+  <div>내 ID: <span id="my-id">생성 중...</span></div>
+  <input type="text" id="join-id" placeholder="상대 ID 입력">
+  <button id="connect-btn">연결</button>
+  <div id="status">오프라인</div>
+</div>
+
+<div id="controls">
+  <button id="roll-btn">주사위 굴리기 🎲</button>
+</div>
+
+<script>
+  // 1. Scene 기본 설정
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x222222);
+
+  const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+  camera.position.set(0, 10, 8);
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  document.body.appendChild(renderer.domElement);
+
+  // 2. OrbitControls (카메라 확대/축소 및 회전) 설정
+  const controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;      // 부드러운 카메라 감속 효과
+  controls.dampingFactor = 0.05;
+  controls.maxPolarAngle = Math.PI / 2 - 0.05; // 카메라가 테이블 밑으로 들어가지 않도록 제한
+  controls.minDistance = 3;            // 핀치 줌 최대 확대 제한
+  controls.maxDistance = 20;           // 핀치 줌 최대 축소 제한
+  controls.target.set(0, 0, 0);
+
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+  scene.add(ambientLight);
+  const dirLight = new THREE.DirectionalLight(0xffffff, 0.4);
+  dirLight.position.set(5, 10, 5);
+  scene.add(dirLight);
+
+  // 테이블 생성
+  const tableGeo = new THREE.BoxGeometry(12, 0.2, 12);
+  const tableMat = new THREE.MeshStandardMaterial({ color: 0x0e6251 });
+  const table = new THREE.Mesh(tableGeo, tableMat);
+  table.position.y = -0.1;
+  scene.add(table);
+
+  const objects = [];
+
+  // 3. 카드 생성 함수
+  function createCard(id, x, z) {
+    const geo = new THREE.BoxGeometry(1.2, 0.02, 1.8);
+    const frontTex = createTextTexture('CARD');
+    const backTex = createTextTexture('🂠', '#b22222');
+
+    const materials = [
+      new THREE.MeshStandardMaterial({ color: 0xdddddd }),
+      new THREE.MeshStandardMaterial({ color: 0xdddddd }),
+      new THREE.MeshStandardMaterial({ map: frontTex }),
+      new THREE.MeshStandardMaterial({ map: backTex }),
+      new THREE.MeshStandardMaterial({ color: 0xdddddd }),
+      new THREE.MeshStandardMaterial({ color: 0xdddddd })
+    ];
+
+    const card = new THREE.Mesh(geo, materials);
+    card.position.set(x, 0.1, z);
+    card.userData = { id: id, type: 'card', isFlipped: false, isAnimating: false };
+    scene.add(card);
+    objects.push(card);
+    return card;
+  }
+
+  function createTextTexture(text, bgColor = '#ffffff') {
+    const canvas = document.createElement('canvas');
+    canvas.width = 128; canvas.height = 128;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(0, 0, 128, 128);
+    ctx.fillStyle = bgColor === '#ffffff' ? '#000000' : '#ffffff';
+    ctx.font = 'bold 40px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, 64, 64);
+    return new THREE.CanvasTexture(canvas);
+  }
+
+  // 4. 주사위 생성 함수
+  let diceMesh = null;
+  function createDice(id, x, z) {
+    const geo = new THREE.BoxGeometry(0.8, 0.8, 0.8);
+    const mat = new THREE.MeshStandardMaterial({ color: 0xf39c12 });
+    diceMesh = new THREE.Mesh(geo, mat);
+    diceMesh.position.set(x, 0.4, z);
+    diceMesh.userData = { id: id, type: 'dice', isRolling: false };
+    scene.add(diceMesh);
+    objects.push(diceMesh);
+  }
+
+  // 기본 기물 배치
+  createCard('card1', -1.5, 0);
+  createCard('card2', 0, 0);
+  createDice('dice1', 2, 0);
+
+  // 5. 모바일 터치 및 오브젝트 드래그 / OrbitControls 분리 제어
+  const raycaster = new THREE.Raycaster();
+  const touch = new THREE.Vector2();
+  let selectedObj = null;
+  const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+  let touchStartTime = 0;
+  let touchStartPos = { x: 0, y: 0 };
+
+  function getTouchPos(e) {
+    const t = e.touches ? e.touches[0] : e;
+    return {
+      x: (t.clientX / window.innerWidth) * 2 - 1,
+      y: -(t.clientY / window.innerHeight) * 2 + 1,
+      rawX: t.clientX,
+      rawY: t.clientY
+    };
+  }
+
+  function onTouchStart(e) {
+    // 두 손가락 이상 터치 시(핀치 줌 등) 카메라 컨트롤 활성화 후 오브젝트 드래그 중단
+    if (e.touches && e.touches.length > 1) {
+      selectedObj = null;
+      controls.enabled = true;
+      return;
+    }
+
+    const pos = getTouchPos(e);
+    touch.x = pos.x; touch.y = pos.y;
+    touchStartTime = Date.now();
+    touchStartPos = { x: pos.rawX, y: pos.rawY };
+
+    raycaster.setFromCamera(touch, camera);
+    const intersects = raycaster.intersectObjects(objects);
+
+    if (intersects.length > 0) {
+      // 기물을 터치한 경우 카메라 조작 비활성화 (기물 이동 우선)
+      selectedObj = intersects[0].object;
+      controls.enabled = false;
+    } else {
+      // 기물이 아닌 빈 곳을 터치한 경우 카메라 조작 활성화
+      selectedObj = null;
+      controls.enabled = true;
+    }
+  }
+
+  function onTouchMove(e) {
+    if (!selectedObj) return;
+
+    const pos = getTouchPos(e);
+    touch.x = pos.x; touch.y = pos.y;
+
+    raycaster.setFromCamera(touch, camera);
+    const target = new THREE.Vector3();
+    raycaster.ray.intersectPlane(plane, target);
+
+    selectedObj.position.x = target.x;
+    selectedObj.position.z = target.z;
+
+    sendData({ type: 'move', id: selectedObj.userData.id, x: target.x, z: target.z });
+  }
+
+  function onTouchEnd(e) {
+    if (selectedObj) {
+      const touchDuration = Date.now() - touchStartTime;
+      const lastPos = e.changedTouches ? e.changedTouches[0] : e;
+      const dist = Math.hypot(lastPos.clientX - touchStartPos.x, lastPos.clientY - touchStartPos.y);
+
+      // 짧은 탭 동작 처리
+      if (touchDuration < 300 && dist < 10) {
+        if (selectedObj.userData.type === 'card') {
+          flipCard(selectedObj, true);
+        } else if (selectedObj.userData.type === 'dice') {
+          rollDice(selectedObj, true);
+        }
+      }
+    }
+    selectedObj = null;
+    controls.enabled = true; // 터치 종료 시 카메라 조작 재활성화
+  }
+
+  window.addEventListener('touchstart', onTouchStart, { passive: false });
+  window.addEventListener('touchmove', onTouchMove, { passive: false });
+  window.addEventListener('touchend', onTouchEnd, false);
+  window.addEventListener('mousedown', onTouchStart, false);
+  window.addEventListener('mousemove', onTouchMove, false);
+  window.addEventListener('mouseup', onTouchEnd, false);
+
+  // 6. 카드 뒤집기 로직
+  function flipCard(card, isLocal = false) {
+    if (card.userData.isAnimating) return;
+    card.userData.isAnimating = true;
+
+    const targetRotZ = card.userData.isFlipped ? 0 : Math.PI;
+    const startRotZ = card.rotation.z;
+    let progress = 0;
+
+    function animateFlip() {
+      progress += 0.1;
+      card.rotation.z = THREE.MathUtils.lerp(startRotZ, targetRotZ, progress);
+      card.position.y = 0.1 + Math.sin(progress * Math.PI) * 0.5;
+
+      if (progress < 1) {
+        requestAnimationFrame(animateFlip);
+      } else {
+        card.rotation.z = targetRotZ;
+        card.position.y = 0.1;
+        card.userData.isFlipped = !card.userData.isFlipped;
+        card.userData.isAnimating = false;
+      }
+    }
+    animateFlip();
+
+    if (isLocal) sendData({ type: 'flip', id: card.userData.id });
+  }
+
+  // 7. 주사위 굴리기 로직
+  function rollDice(dice, isLocal = false, targetRot = null) {
+    if (dice.userData.isRolling) return;
+    dice.userData.isRolling = true;
+
+    const rotX = targetRot ? targetRot.x : Math.floor(Math.random() * 4) * (Math.PI / 2) + Math.PI * 4;
+    const rotY = targetRot ? targetRot.y : Math.floor(Math.random() * 4) * (Math.PI / 2) + Math.PI * 4;
+    const rotZ = targetRot ? targetRot.z : Math.floor(Math.random() * 4) * (Math.PI / 2) + Math.PI * 4;
+
+    const startRot = { x: dice.rotation.x, y: dice.rotation.y, z: dice.rotation.z };
+    let progress = 0;
+
+    function animateRoll() {
+      progress += 0.04;
+      dice.rotation.x = THREE.MathUtils.lerp(startRot.x, rotX, progress);
+      dice.rotation.y = THREE.MathUtils.lerp(startRot.y, rotY, progress);
+      dice.rotation.z = THREE.MathUtils.lerp(startRot.z, rotZ, progress);
+      dice.position.y = 0.4 + Math.abs(Math.sin(progress * Math.PI * 2)) * (1 - progress) * 2;
+
+      if (progress < 1) {
+        requestAnimationFrame(animateRoll);
+      } else {
+        dice.position.y = 0.4;
+        dice.userData.isRolling = false;
+      }
+    }
+    animateRoll();
+
+    if (isLocal) sendData({ type: 'roll', id: dice.userData.id, targetRot: { x: rotX, y: rotY, z: rotZ } });
+  }
+
+  document.getElementById('roll-btn').addEventListener('click', () => {
+    if (diceMesh) rollDice(diceMesh, true);
+  });
+
+  // 8. PeerJS 멀티플레이 통신
+  const peer = new Peer();
+  let conn = null;
+
+  peer.on('open', id => document.getElementById('my-id').innerText = id);
+  peer.on('connection', c => { conn = c; setupConnection(); });
+
+  document.getElementById('connect-btn').addEventListener('click', () => {
+    const targetId = document.getElementById('join-id').value;
+    if (targetId) { conn = peer.connect(targetId); setupConnection(); }
+  });
+
+  function setupConnection() {
+    document.getElementById('status').innerText = '연결됨!';
+    conn.on('data', data => {
+      const targetObj = objects.find(o => o.userData.id === data.id);
+      if (!targetObj) return;
+
+      if (data.type === 'move') {
+        targetObj.position.x = data.x;
+        targetObj.position.z = data.z;
+      } else if (data.type === 'flip') {
+        flipCard(targetObj, false);
+      } else if (data.type === 'roll') {
+        rollDice(targetObj, false, data.targetRot);
+      }
+    });
+  }
+
+  function sendData(data) {
+    if (conn && conn.open) conn.send(data);
+  }
+
+  // 9. 렌더링 루프 (OrbitControls 업데이트 적용)
+  function animate() {
+    requestAnimationFrame(animate);
+    controls.update(); // OrbitControls 각도/거리 감속 갱신
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+</script>
+</body>
+</html>
