@@ -86,9 +86,7 @@
     <button id="connect-btn">연결</button>
     <span id="status" style="color:#f59e0b;">(오프라인)</span>
   </div>
-  <div>🎴 <b>카드 섞기:</b> 덱에 쌓인 카드만 뒷면으로 섞입니다.</div>
-  <div>🕹️ <b>카드 펼치기:</b> 나눌 플레이어 수(묶음 수) 지정 가능</div>
-  <div>👆 <b>카드 탭/더블클릭:</b> 3D Flip 뒤집기</div>
+  <div>👁️ <b>손패 비공개 기능:</b> 아래쪽(Z > 2.5)에 놓인 카드는 나에게만 앞면으로 보이고 상대에겐 뒷면으로 보입니다!</div>
 </div>
 
 <script>
@@ -121,7 +119,7 @@
   dirLight.castShadow = true;
   scene.add(dirLight);
 
-  // 2. TTS 8각 보드판
+  // 2. TTS 8각 보드판 및 내 손패 영역 표시
   function createWoodTexture() {
     const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 512;
     const ctx = canvas.getContext('2d');
@@ -136,6 +134,11 @@
     const ctx = canvas.getContext('2d');
     ctx.fillStyle = '#1b4d2e'; ctx.fillRect(0, 0, 512, 512);
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)'; ctx.lineWidth = 6; ctx.strokeRect(20, 20, 472, 472);
+    // 내 손패 영역 가이드 라인
+    ctx.strokeStyle = 'rgba(96, 165, 250, 0.5)'; ctx.lineWidth = 4;
+    ctx.strokeRect(40, 360, 432, 120);
+    ctx.fillStyle = 'rgba(96, 165, 250, 0.7)'; ctx.font = '20px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('MY HAND ZONE (비공개 손패 영역)', 256, 425);
     return new THREE.CanvasTexture(canvas);
   }
 
@@ -222,6 +225,7 @@
     scene.add(card);
     objects.push(card);
 
+    updateHandVisibility(card);
     updateStacking();
 
     if (isLocal) sendData({ type: 'spawn', propType: 'card', id: id, x: x, z: z, suit: suit, value: value });
@@ -242,7 +246,17 @@
     return dice;
   }
 
-  // 4. 포개어 쌓기 (Stacking) 위치 계산
+  // 4. 내 손패 영역(HAND ZONE) 및 시점 처리
+  const HAND_ZONE_Z = 2.5; // 내 손패 구분 기준 Z 좌표
+
+  function updateHandVisibility(card) {
+    // 카드가 내 손패 영역(Z > 2.5)에 들어오면 내 화면에서만 앞면으로 자동 공개
+    if (card.position.z > HAND_ZONE_Z) {
+      card.rotation.z = 0; // 앞면
+      card.userData.isFlipped = false;
+    }
+  }
+
   function updateStacking() {
     const cards = objects.filter(o => o.userData.type === 'card' && !o.userData.isAnimating);
     const BASE_Y = 0.28;
@@ -262,7 +276,6 @@
     });
   }
 
-  // 52장 전체 덱 생성 함수
   function spawnFullDeck(isLocal = true) {
     objects.forEach(obj => scene.remove(obj));
     objects = [];
@@ -279,18 +292,14 @@
     if (isLocal) sendData({ type: 'reset_deck' });
   }
 
-  // 5. 카드 섞기 (Shuffle) 로직 - 덱 중심 부근(거리 1.5 이내) 카드들만 대상
+  // 5. 카드 섞기
   function shuffleCards(isLocal = true) {
     const allCards = objects.filter(o => o.userData.type === 'card');
     if (allCards.length === 0) return;
 
-    // 중앙 근처(x, z 반경 1.5)에 위치한 포개진 카드들만 선별
     const deckCards = allCards.filter(c => Math.hypot(c.position.x, c.position.z) < 1.5);
-    
-    // 포개진 카드가 없으면 무시
     if (deckCards.length === 0) return;
 
-    // 대상 카드 무작위 섞기 (Fisher-Yates)
     for (let i = deckCards.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [deckCards[i], deckCards[j]] = [deckCards[j], deckCards[i]];
@@ -301,7 +310,7 @@
 
     deckCards.forEach((card, index) => {
       card.userData.isAnimating = true;
-      card.userData.isFlipped = true; // 섞을 때 강제로 뒷면 상태로 지정
+      card.userData.isFlipped = true;
 
       const targetX = (Math.random() - 0.5) * 0.05;
       const targetZ = (Math.random() - 0.5) * 0.05;
@@ -310,14 +319,13 @@
       let progress = 0;
       const startX = card.position.x, startY = card.position.y, startZ = card.position.z;
       const startRotZ = card.rotation.z;
-      const targetRotZ = Math.PI; // 뒷면 회전 각도 (180도)
+      const targetRotZ = Math.PI;
 
       function animateShuffle() {
         progress += 0.08;
         card.position.x = THREE.MathUtils.lerp(startX, targetX, progress);
         card.position.z = THREE.MathUtils.lerp(startZ, targetZ, progress);
         card.position.y = THREE.MathUtils.lerp(startY, targetY, progress) + Math.sin(progress * Math.PI) * 1.5;
-        // 섞이면서 회전 각도도 뒷면(Math.PI)으로 복구
         card.rotation.z = THREE.MathUtils.lerp(startRotZ, targetRotZ, progress);
 
         if (progress < 1) {
@@ -334,7 +342,6 @@
     if (isLocal) sendData({ type: 'shuffle' });
   }
 
-  // 카드 나누기 / 펼치기 (Deal) - 인원 수 프롬프트 입력
   function dealCards(isLocal = true, numPiles = null) {
     const cards = objects.filter(o => o.userData.type === 'card');
     if (cards.length === 0) return;
@@ -356,12 +363,13 @@
       const targetY = 0.28 + stackLevel * 0.02;
 
       card.position.set(targetX, targetY, targetZ);
+      updateHandVisibility(card);
     });
 
     if (isLocal) sendData({ type: 'deal', numPiles: numPiles });
   }
 
-  // 6. 시작 시 52장 자동 생성
+  // 시작 시 52장 자동 생성
   spawnFullDeck(false);
 
   // UI 이벤트
@@ -396,7 +404,7 @@
     camBtn.classList.toggle('active', isCamModeAlwaysOn);
   });
 
-  // 7. 터치 조작 연동
+  // 6. 터치 조작 및 네트워크 데이터 송신
   const raycaster = new THREE.Raycaster();
   const touch = new THREE.Vector2();
   let selectedObj = null;
@@ -448,9 +456,12 @@
     selectedObj.position.x = target.x;
     selectedObj.position.z = target.z;
 
+    if (selectedObj.userData.type === 'card') {
+      updateHandVisibility(selectedObj);
+    }
     updateStacking();
 
-    sendData({ type: 'move', id: selectedObj.userData.id, x: target.x, z: target.z });
+    sendMoveData(selectedObj);
   }
 
   function onTouchEnd(e) {
@@ -476,7 +487,17 @@
   window.addEventListener('mousemove', onTouchMove, false);
   window.addEventListener('mouseup', onTouchEnd, false);
 
-  // 8. 카드 뒤집기 애니메이션
+  // 위치 이동 송신 (상대방에겐 내 손패 카드가 뒷면으로 송신되도록 처리)
+  function sendMoveData(obj) {
+    let isFlippedForPeer = obj.userData.isFlipped;
+    // 내가 손패 영역(Z > 2.5)으로 끌고 왔다면, 상대방에게는 뒷면(isFlipped = true) 상태로 전달
+    if (obj.userData.type === 'card' && obj.position.z > HAND_ZONE_Z) {
+      isFlippedForPeer = true;
+    }
+    sendData({ type: 'move', id: obj.userData.id, x: obj.position.x, z: obj.position.z, isFlipped: isFlippedForPeer });
+  }
+
+  // 7. 뒤집기 및 굴리기
   function flipCard(card, isLocal = false) {
     if (card.userData.isAnimating) return;
     card.userData.isAnimating = true;
@@ -524,7 +545,7 @@
     if (isLocal) sendData({ type: 'roll', id: dice.userData.id, targetRot: { x: rotX, y: rotY, z: rotZ } });
   }
 
-  // 9. PeerJS 동기화
+  // 8. PeerJS 동기화
   const peer = new Peer();
   let conn = null;
 
@@ -558,6 +579,11 @@
         if (data.type === 'move') {
           targetObj.position.x = data.x;
           targetObj.position.z = data.z;
+          // 수신받은 상대방 화면에서는 isFlipped 정보에 따라 뒤집힘 여부 결정
+          if (targetObj.userData.type === 'card' && data.isFlipped !== undefined) {
+            targetObj.userData.isFlipped = data.isFlipped;
+            targetObj.rotation.z = data.isFlipped ? Math.PI : 0;
+          }
           updateStacking();
         } else if (data.type === 'flip') flipCard(targetObj, false);
         else if (data.type === 'roll') rollDice(targetObj, false, data.targetRot);
