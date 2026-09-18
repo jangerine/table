@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Mobile Tabletop Simulator - Slot Stacking Fixed</title>
+  <title>Mobile Tabletop Simulator - Stacking Direction Fixed</title>
   <style>
     * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
     body { margin: 0; overflow: hidden; touch-action: none; font-family: 'Pretendard', sans-serif; background-color: #0f172a; }
@@ -119,7 +119,7 @@
     </select>
     <span id="status" style="color:#f59e0b;">(대기중)</span>
   </div>
-  <div>✅ <b>슬롯 쌓기 보정 완료:</b> 슬롯 위에 놓인 카드들이 정확히 차곡차곡 단차를 두고 위로 쌓입니다.</div>
+  <div>✅ <b>쌓임 방향 고침:</b> 카드가 아래로 파묻히지 않고 무조건 **기존 카드 위로 쌓이도록** 고쳐졌습니다.</div>
 </div>
 
 <script>
@@ -354,7 +354,7 @@
     card.position.set(x, CARD_BASE_Y, z);
     card.rotation.z = Math.PI;
     card.castShadow = true;
-    card.userData = { id: id, type: 'card', suit: suit, value: value, isFlipped: true, isLocked: false, isAnimating: false };
+    card.userData = { id: id, type: 'card', suit: suit, value: value, isFlipped: true, isLocked: false, isAnimating: false, lastMovedTime: Date.now() };
     
     scene.add(card);
     objects.push(card);
@@ -426,12 +426,12 @@
     }
   }
 
-  // 🔥 [수정] 슬롯 스냅 및 쌓기 로직 보정
   function snapCardsToSlots(movedCards) {
     const SNAP_DISTANCE = 0.8;
     const cardsToSnap = Array.isArray(movedCards) ? movedCards : [movedCards];
 
     cardsToSnap.forEach(card => {
+      card.userData.lastMovedTime = Date.now(); // 가장 마지막에 놓은 시간을 기록
       const sortedSlots = [...cardSlots].sort((a, b) => {
         const distA = Math.hypot(card.position.x - a.position.x, card.position.z - a.position.z);
         const distB = Math.hypot(card.position.x - b.position.x, card.position.z - b.position.z);
@@ -441,7 +441,6 @@
       for (let slot of sortedSlots) {
         const dist = Math.hypot(card.position.x - slot.position.x, card.position.z - slot.position.z);
         if (dist < SNAP_DISTANCE) {
-          // 슬롯 중심에 안착시키기
           card.position.x = slot.position.x;
           card.position.z = slot.position.z;
           card.rotation.y = 0;
@@ -451,29 +450,28 @@
       sendMoveData(card);
     });
 
-    updateStacking(); // 스냅 후 즉시 레이어 쌓기 적용
+    updateStacking();
   }
 
-  // 🔥 [수정] 카드 쌓임 판정 기준거리 확장(0.6 -> 0.8)으로 슬롯 위에서 쌓이도록 보정
+  // 🔥 [핵심 수정] 먼저 놓인 카드부터 아래에 두고, 새로 놓인 카드가 무조건 위로 높이(+0.02)를 쌓도록 보정
   function updateStacking() {
     const cards = objects.filter(o => o.userData.type === 'card' && !o.userData.isAnimating);
     const LAYER_HEIGHT = 0.02;
 
-    // Y 좌표 기준 오름차순 정렬하여 낮은 것부터 계산
-    cards.sort((a, b) => a.position.y - b.position.y);
+    // 카드가 놓인 시간(lastMovedTime) 기준 오름차순 정렬 (먼저 놓인 카드가 아래)
+    cards.sort((a, b) => (a.userData.lastMovedTime || 0) - (b.userData.lastMovedTime || 0));
 
-    cards.forEach((card) => {
-      let stackLevel = 0;
-      cards.forEach(other => {
-        if (card !== other) {
-          const dist = Math.hypot(card.position.x - other.position.x, card.position.z - other.position.z);
-          // 슬롯 및 일반 정렬 시 거리 0.8 범위 내 카드들을 쌓임으로 인정
-          if (dist < 0.8 && other.position.y < card.position.y) {
-            stackLevel++;
-          }
+    // 같은 위치에 있는 그룹별로 순서대로 차곡차곡 위로 쌓기
+    cards.forEach((card, index) => {
+      let stackIndex = 0;
+      for (let i = 0; i < index; i++) {
+        const other = cards[i];
+        const dist = Math.hypot(card.position.x - other.position.x, card.position.z - other.position.z);
+        if (dist < 0.8) {
+          stackIndex++;
         }
-      });
-      card.position.y = CARD_BASE_Y + stackLevel * LAYER_HEIGHT;
+      }
+      card.position.y = CARD_BASE_Y + stackIndex * LAYER_HEIGHT;
     });
   }
 
@@ -520,6 +518,7 @@
       else if (mySeat === 3) { targetX = -5.6; targetZ = -offset; }
       else if (mySeat === 4) { targetX = 5.6; targetZ = offset; }
 
+      card.userData.lastMovedTime = Date.now() + index;
       card.position.set(targetX, CARD_BASE_Y, targetZ);
       alignCardRotationBySeat(card);
       updateHandVisibility(card);
@@ -543,8 +542,10 @@
     const targetCards = objects.filter(o => o.userData.type === 'card' && getSeatFromPosition(o.position.x, o.position.z) === 0);
     if (targetCards.length === 0) return;
 
+    const now = Date.now();
     targetCards.forEach((card, i) => {
-      card.position.set(0, CARD_BASE_Y + i * 0.02, 0);
+      card.userData.lastMovedTime = now + i;
+      card.position.set(0, CARD_BASE_Y, 0);
       alignCardRotationBySeat(card);
       card.rotation.z = Math.PI;
       card.userData.isFlipped = true;
@@ -560,7 +561,9 @@
     if (deckCards.length === 0) return;
 
     const startX = -((deckCards.length - 1) * 0.2) / 2;
+    const now = Date.now();
     deckCards.forEach((card, i) => {
+      card.userData.lastMovedTime = now + i;
       card.position.set(startX + i * 0.2, CARD_BASE_Y, 0);
       alignCardRotationBySeat(card);
       sendMoveData(card);
@@ -580,8 +583,10 @@
     deckCards.sort((a, b) => b.position.y - a.position.y);
     const cutCards = deckCards.slice(0, cutCount);
 
+    const now = Date.now();
     cutCards.forEach((card, i) => {
-      card.position.set(1.8, CARD_BASE_Y + i * 0.02, 0);
+      card.userData.lastMovedTime = now + i;
+      card.position.set(1.8, CARD_BASE_Y, 0);
       alignCardRotationBySeat(card);
       sendMoveData(card);
     });
@@ -600,10 +605,12 @@
     }
 
     const LAYER_HEIGHT = 0.02;
+    const now = Date.now();
 
     deckCards.forEach((card, index) => {
       card.userData.isAnimating = true;
       card.userData.isFlipped = true;
+      card.userData.lastMovedTime = now + index;
 
       const targetX = (Math.random() - 0.5) * 0.05;
       const targetZ = (Math.random() - 0.5) * 0.05;
