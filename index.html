@@ -5,11 +5,56 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>Mobile Tabletop Simulator</title>
   <style>
-    body { margin: 0; overflow: hidden; touch-action: none; font-family: sans-serif; background-color: #111; }
-    #ui { position: absolute; top: 10px; left: 10px; z-index: 100; background: rgba(0,0,0,0.7); color: white; padding: 10px; border-radius: 8px; font-size: 12px; }
-    input, button { font-size: 12px; margin: 2px; }
-    #controls { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 100; }
-    #controls button { padding: 8px 16px; font-weight: bold; background: #27ae60; color: white; border: none; border-radius: 4px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+    * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
+    body { margin: 0; overflow: hidden; touch-action: none; font-family: 'Pretendard', sans-serif; background-color: #0f172a; }
+
+    /* 상단 네비게이션 bar */
+    #top-bar {
+      position: absolute; top: 0; left: 0; width: 100%; height: 60px;
+      padding: 10px 16px; display: flex; justify-content: space-between; align-items: center;
+      z-index: 100; pointer-events: none;
+    }
+    .btn-group-left, .btn-group-right { display: flex; gap: 8px; pointer-events: auto; }
+
+    /* 버튼 공통 스타일 */
+    .ui-btn {
+      padding: 8px 14px; font-size: 13px; font-weight: 700; color: white;
+      border: none; border-radius: 12px; cursor: pointer;
+      display: flex; align-items: center; gap: 6px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.3); transition: all 0.2s ease;
+    }
+    .ui-btn:active { transform: scale(0.95); }
+
+    .btn-purple { background: linear-gradient(135deg, #8b5cf6, #7c3aed); }
+    .btn-orange { background: linear-gradient(135deg, #f59e0b, #d97706); }
+    .btn-red { background: linear-gradient(135deg, #ef4444, #dc2626); }
+    .btn-blue { background: linear-gradient(135deg, #3b82f6, #2563eb); }
+    .btn-blue.active { background: linear-gradient(135deg, #1d4ed8, #1e40af); ring: 2px solid #60a5fa; }
+
+    /* 좌측 하단 멀티 연결 UI 및 조작 안내 카드 */
+    #bottom-info {
+      position: absolute; bottom: 16px; left: 16px; z-index: 100;
+      background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px;
+      padding: 12px 16px; color: #e2e8f0; font-size: 12px; line-height: 1.6;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.4); max-width: 320px;
+    }
+    #peer-ui { margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    #peer-ui input { width: 90px; padding: 4px 8px; font-size: 11px; border-radius: 6px; border: 1px solid #475569; background: #1e293b; color: white; }
+    #peer-ui button { padding: 4px 8px; font-size: 11px; border-radius: 6px; border: none; background: #10b981; color: white; font-weight: bold; }
+
+    /* 소품 추가 레이어 (모달) */
+    #prop-modal {
+      position: absolute; top: 70px; left: 16px; z-index: 200;
+      background: rgba(30, 41, 59, 0.95); backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 12px;
+      display: none; flex-direction: column; gap: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+    }
+    #prop-modal button {
+      padding: 8px 12px; font-size: 12px; font-weight: bold; color: white;
+      background: #334155; border: 1px solid #475569; border-radius: 8px; text-align: left;
+    }
+    #prop-modal button:hover { background: #475569; }
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -17,21 +62,40 @@
 </head>
 <body>
 
-<div id="ui">
-  <div>내 ID: <span id="my-id">생성 중...</span></div>
-  <input type="text" id="join-id" placeholder="상대 ID 입력">
-  <button id="connect-btn">연결</button>
-  <div id="status">오프라인</div>
+<!-- 상단 UI 네비게이션 -->
+<div id="top-bar">
+  <div class="btn-group-left">
+    <button class="ui-btn btn-purple" id="prop-menu-btn">🎮 소품 추가 메뉴</button>
+    <button class="ui-btn btn-orange" id="roll-btn">🎲 주사위 굴리기</button>
+    <button class="ui-btn btn-red" id="clear-btn">판 비우기</button>
+  </div>
+  <div class="btn-group-right">
+    <button class="ui-btn btn-blue" id="cam-mode-btn">카메라 회전 모드</button>
+  </div>
 </div>
 
-<div id="controls">
-  <button id="roll-btn">주사위 굴리기 🎲</button>
+<!-- 소품 추가 모달 -->
+<div id="prop-modal">
+  <button id="add-card-btn">🃏 카드 추가하기</button>
+  <button id="add-dice-btn">🎲 주사위 추가하기</button>
+</div>
+
+<!-- 하단 정보 패널 -->
+<div id="bottom-info">
+  <div id="peer-ui">
+    <span>내 ID: <strong id="my-id" style="color:#60a5fa;">생성 중...</strong></span> | 
+    <input type="text" id="join-id" placeholder="상대 ID">
+    <button id="connect-btn">연결</button>
+    <span id="status" style="color:#f59e0b;">(오프라인)</span>
+  </div>
+  <div>🕹️ <b>기물 이동 모드:</b> 젠가/주사위/카드 자유 드래그</div>
+  <div>👆 <b>카드 더블 터치 / 클릭:</b> 공중 앞뒤 3D Flip 뒤집기</div>
 </div>
 
 <script>
-  // 1. Scene 및 카메라 설정
+  // 1. Three.js 기본 Scene 및 카메라 설정
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x1a1a1a);
+  scene.background = new THREE.Color(0x0f172a);
 
   const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1000);
   camera.position.set(0, 11, 9);
@@ -43,7 +107,7 @@
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   document.body.appendChild(renderer.domElement);
 
-  // 2. OrbitControls (카메라 확대/축소 및 회전)
+  // 2. OrbitControls
   const controls = new THREE.OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.05;
@@ -55,24 +119,19 @@
   // 조명 설정
   const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
   scene.add(ambientLight);
-
   const dirLight = new THREE.DirectionalLight(0xffffff, 0.7);
   dirLight.position.set(6, 12, 6);
   dirLight.castShadow = true;
-  dirLight.shadow.mapSize.width = 1024;
-  dirLight.shadow.mapSize.height = 1024;
   scene.add(dirLight);
 
-  // 3. TTS 동적 텍스처 생성 함수 (원목 & 펠트 매트)
+  // 3. TTS 8각 원목 보드판 생성
   function createWoodTexture() {
     const canvas = document.createElement('canvas');
     canvas.width = 512; canvas.height = 512;
     const ctx = canvas.getContext('2d');
     ctx.fillStyle = '#5c3a21'; ctx.fillRect(0, 0, 512, 512);
     ctx.fillStyle = '#4a2e19';
-    for (let i = 0; i < 50; i++) {
-      ctx.fillRect(0, i * 10, 512, 3 + Math.random() * 2);
-    }
+    for (let i = 0; i < 50; i++) ctx.fillRect(0, i * 10, 512, 3 + Math.random() * 2);
     return new THREE.CanvasTexture(canvas);
   }
 
@@ -80,22 +139,13 @@
     const canvas = document.createElement('canvas');
     canvas.width = 512; canvas.height = 512;
     const ctx = canvas.getContext('2d');
-    // 초록색 펠트 베이스
     ctx.fillStyle = '#1b4d2e'; ctx.fillRect(0, 0, 512, 512);
-    // 내각 테두리 흰색 라인 (TTS 전형적 디자인)
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
-    ctx.lineWidth = 6;
-    ctx.strokeRect(20, 20, 472, 472);
-    ctx.lineWidth = 2;
-    ctx.strokeRect(28, 28, 456, 456);
+    ctx.lineWidth = 6; ctx.strokeRect(20, 20, 472, 472);
+    ctx.lineWidth = 2; ctx.strokeRect(28, 28, 456, 456);
     return new THREE.CanvasTexture(canvas);
   }
 
-  // 4. TTS 보드/테이블 구조물 생성 (팔각형 원목 테두리 + 펠트 상판)
-  const woodTexture = createWoodTexture();
-  const feltTexture = createFeltMatTexture();
-
-  // (1) 원목 베이스 테이블
   const tableShape = new THREE.Shape();
   const w = 6, h = 6, r = 1.2;
   tableShape.moveTo(-w + r, -h); tableShape.lineTo(w - r, -h);
@@ -104,48 +154,59 @@
   tableShape.lineTo(-w, h - r); tableShape.lineTo(-w, -h + r);
   tableShape.closePath();
 
-  const extrudeSettings = { depth: 0.3, bevelEnabled: true, bevelSegments: 2, steps: 1, bevelSize: 0.1, bevelThickness: 0.1 };
-  const tableGeo = new THREE.ExtrudeGeometry(tableShape, extrudeSettings);
+  const tableGeo = new THREE.ExtrudeGeometry(tableShape, { depth: 0.3, bevelEnabled: true, bevelSegments: 2, steps: 1, bevelSize: 0.1, bevelThickness: 0.1 });
   tableGeo.rotateX(Math.PI / 2);
-  const tableMat = new THREE.MeshStandardMaterial({ map: woodTexture, roughness: 0.6 });
-  const tableMesh = new THREE.Mesh(tableGeo, tableMat);
+  const tableMesh = new THREE.Mesh(tableGeo, new THREE.MeshStandardMaterial({ map: createWoodTexture(), roughness: 0.6 }));
   tableMesh.position.y = -0.15;
   tableMesh.receiveShadow = true;
   scene.add(tableMesh);
 
-  // (2) 중앙 펠트 플레이 매트 (TTS 스타일)
   const matGeo = new THREE.PlaneGeometry(10.5, 10.5);
-  const matMaterial = new THREE.MeshStandardMaterial({ map: feltTexture, roughness: 0.8 });
-  const boardMatMesh = new THREE.Mesh(matGeo, matMaterial);
+  const boardMatMesh = new THREE.Mesh(matGeo, new THREE.MeshStandardMaterial({ map: createFeltMatTexture(), roughness: 0.8 }));
   boardMatMesh.rotation.x = -Math.PI / 2;
   boardMatMesh.position.y = 0.26;
   boardMatMesh.receiveShadow = true;
   scene.add(boardMatMesh);
 
-  const objects = [];
+  let objects = [];
+  let objectIdCounter = 0;
 
-  // 5. 카드 & 주사위 생성
-  function createCard(id, x, z) {
+  // 4. 오브젝트 생성 로직
+  function createCard(x = (Math.random() - 0.5) * 4, z = (Math.random() - 0.5) * 4, isLocal = true) {
+    const id = 'card_' + (++objectIdCounter);
     const geo = new THREE.BoxGeometry(1.2, 0.02, 1.8);
-    const frontTex = createTextTexture('CARD');
-    const backTex = createTextTexture('🂠', '#b22222');
-
     const materials = [
       new THREE.MeshStandardMaterial({ color: 0xdddddd }),
       new THREE.MeshStandardMaterial({ color: 0xdddddd }),
-      new THREE.MeshStandardMaterial({ map: frontTex }),
-      new THREE.MeshStandardMaterial({ map: backTex }),
+      new THREE.MeshStandardMaterial({ map: createTextTexture('CARD') }),
+      new THREE.MeshStandardMaterial({ map: createTextTexture('🂠', '#b22222') }),
       new THREE.MeshStandardMaterial({ color: 0xdddddd }),
       new THREE.MeshStandardMaterial({ color: 0xdddddd })
     ];
-
     const card = new THREE.Mesh(geo, materials);
     card.position.set(x, 0.28, z);
     card.castShadow = true;
     card.userData = { id: id, type: 'card', isFlipped: false, isAnimating: false };
     scene.add(card);
     objects.push(card);
+
+    if (isLocal) sendData({ type: 'spawn', propType: 'card', id: id, x: x, z: z });
     return card;
+  }
+
+  function createDice(x = (Math.random() - 0.5) * 4, z = (Math.random() - 0.5) * 4, isLocal = true) {
+    const id = 'dice_' + (++objectIdCounter);
+    const geo = new THREE.BoxGeometry(0.8, 0.8, 0.8);
+    const mat = new THREE.MeshStandardMaterial({ color: 0xe74c3c, roughness: 0.3 });
+    const dice = new THREE.Mesh(geo, mat);
+    dice.position.set(x, 0.66, z);
+    dice.castShadow = true;
+    dice.userData = { id: id, type: 'dice', isRolling: false };
+    scene.add(dice);
+    objects.push(dice);
+
+    if (isLocal) sendData({ type: 'spawn', propType: 'dice', id: id, x: x, z: z });
+    return dice;
   }
 
   function createTextTexture(text, bgColor = '#ffffff') {
@@ -160,45 +221,59 @@
     return new THREE.CanvasTexture(canvas);
   }
 
-  let diceMesh = null;
-  function createDice(id, x, z) {
-    const geo = new THREE.BoxGeometry(0.8, 0.8, 0.8);
-    const mat = new THREE.MeshStandardMaterial({ color: 0xe74c3c, roughness: 0.3 });
-    diceMesh = new THREE.Mesh(geo, mat);
-    diceMesh.position.set(x, 0.66, z);
-    diceMesh.castShadow = true;
-    diceMesh.userData = { id: id, type: 'dice', isRolling: false };
-    scene.add(diceMesh);
-    objects.push(diceMesh);
-  }
+  // 초기 기물 배치
+  createCard(-1.5, 0, false);
+  createDice(1.5, 0, false);
 
-  // 기본 배치
-  createCard('card1', -2, 0);
-  createCard('card2', 0, 0);
-  createDice('dice1', 2, 0);
+  // 5. UI 버튼 이벤트 구현
+  const propModal = document.getElementById('prop-modal');
+  document.getElementById('prop-menu-btn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    propModal.style.display = (propModal.style.display === 'flex') ? 'none' : 'flex';
+  });
+  document.addEventListener('click', () => { propModal.style.display = 'none'; });
 
-  // 6. 터치 및 드래그 조작 연동
+  document.getElementById('add-card-btn').addEventListener('click', () => createCard());
+  document.getElementById('add-dice-btn').addEventListener('click', () => createDice());
+
+  // 판 비우기
+  document.getElementById('clear-btn').addEventListener('click', () => {
+    objects.forEach(obj => scene.remove(obj));
+    objects = [];
+    sendData({ type: 'clear' });
+  });
+
+  // 주사위 전부 굴리기
+  document.getElementById('roll-btn').addEventListener('click', () => {
+    objects.filter(o => o.userData.type === 'dice').forEach(d => rollDice(d, true));
+  });
+
+  // 카메라 회전 모드 토글
+  let isCamModeAlwaysOn = false;
+  const camBtn = document.getElementById('cam-mode-btn');
+  camBtn.addEventListener('click', () => {
+    isCamModeAlwaysOn = !isCamModeAlwaysOn;
+    camBtn.classList.toggle('active', isCamModeAlwaysOn);
+  });
+
+  // 6. 터치 및 조작 연동
   const raycaster = new THREE.Raycaster();
   const touch = new THREE.Vector2();
   let selectedObj = null;
-  const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -0.26); // 보드 매트 수평 높이에 고정
+  const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -0.26);
   let touchStartTime = 0;
   let touchStartPos = { x: 0, y: 0 };
 
   function getTouchPos(e) {
     const t = e.touches ? e.touches[0] : e;
-    return {
-      x: (t.clientX / window.innerWidth) * 2 - 1,
-      y: -(t.clientY / window.innerHeight) * 2 + 1,
-      rawX: t.clientX, rawY: t.clientY
-    };
+    return { x: (t.clientX / window.innerWidth) * 2 - 1, y: -(t.clientY / window.innerHeight) * 2 + 1, rawX: t.clientX, rawY: t.clientY };
   }
 
   function onTouchStart(e) {
-    if (e.touches && e.touches.length > 1) {
-      selectedObj = null;
-      controls.enabled = true;
-      return;
+    if (e.target.closest('#top-bar, #bottom-info, #prop-modal')) return;
+
+    if (isCamModeAlwaysOn || (e.touches && e.touches.length > 1)) {
+      selectedObj = null; controls.enabled = true; return;
     }
 
     const pos = getTouchPos(e);
@@ -220,7 +295,6 @@
 
   function onTouchMove(e) {
     if (!selectedObj) return;
-
     const pos = getTouchPos(e);
     touch.x = pos.x; touch.y = pos.y;
 
@@ -230,7 +304,6 @@
 
     selectedObj.position.x = target.x;
     selectedObj.position.z = target.z;
-
     sendData({ type: 'move', id: selectedObj.userData.id, x: target.x, z: target.z });
   }
 
@@ -241,11 +314,8 @@
       const dist = Math.hypot(lastPos.clientX - touchStartPos.x, lastPos.clientY - touchStartPos.y);
 
       if (touchDuration < 300 && dist < 10) {
-        if (selectedObj.userData.type === 'card') {
-          flipCard(selectedObj, true);
-        } else if (selectedObj.userData.type === 'dice') {
-          rollDice(selectedObj, true);
-        }
+        if (selectedObj.userData.type === 'card') flipCard(selectedObj, true);
+        else if (selectedObj.userData.type === 'dice') rollDice(selectedObj, true);
       }
     }
     selectedObj = null;
@@ -259,11 +329,10 @@
   window.addEventListener('mousemove', onTouchMove, false);
   window.addEventListener('mouseup', onTouchEnd, false);
 
-  // 7. 카드 뒤집기 애니메이션
+  // 7. 뒤집기 및 굴리기 로직
   function flipCard(card, isLocal = false) {
     if (card.userData.isAnimating) return;
     card.userData.isAnimating = true;
-
     const targetRotZ = card.userData.isFlipped ? 0 : Math.PI;
     const startRotZ = card.rotation.z;
     let progress = 0;
@@ -272,30 +341,23 @@
       progress += 0.1;
       card.rotation.z = THREE.MathUtils.lerp(startRotZ, targetRotZ, progress);
       card.position.y = 0.28 + Math.sin(progress * Math.PI) * 0.5;
-
-      if (progress < 1) {
-        requestAnimationFrame(animateFlip);
-      } else {
-        card.rotation.z = targetRotZ;
-        card.position.y = 0.28;
+      if (progress < 1) requestAnimationFrame(animateFlip);
+      else {
+        card.rotation.z = targetRotZ; card.position.y = 0.28;
         card.userData.isFlipped = !card.userData.isFlipped;
         card.userData.isAnimating = false;
       }
     }
     animateFlip();
-
     if (isLocal) sendData({ type: 'flip', id: card.userData.id });
   }
 
-  // 8. 주사위 굴리기 애니메이션
   function rollDice(dice, isLocal = false, targetRot = null) {
     if (dice.userData.isRolling) return;
     dice.userData.isRolling = true;
-
     const rotX = targetRot ? targetRot.x : Math.floor(Math.random() * 4) * (Math.PI / 2) + Math.PI * 4;
     const rotY = targetRot ? targetRot.y : Math.floor(Math.random() * 4) * (Math.PI / 2) + Math.PI * 4;
     const rotZ = targetRot ? targetRot.z : Math.floor(Math.random() * 4) * (Math.PI / 2) + Math.PI * 4;
-
     const startRot = { x: dice.rotation.x, y: dice.rotation.y, z: dice.rotation.z };
     let progress = 0;
 
@@ -305,24 +367,14 @@
       dice.rotation.y = THREE.MathUtils.lerp(startRot.y, rotY, progress);
       dice.rotation.z = THREE.MathUtils.lerp(startRot.z, rotZ, progress);
       dice.position.y = 0.66 + Math.abs(Math.sin(progress * Math.PI * 2)) * (1 - progress) * 2;
-
-      if (progress < 1) {
-        requestAnimationFrame(animateRoll);
-      } else {
-        dice.position.y = 0.66;
-        dice.userData.isRolling = false;
-      }
+      if (progress < 1) requestAnimationFrame(animateRoll);
+      else { dice.position.y = 0.66; dice.userData.isRolling = false; }
     }
     animateRoll();
-
     if (isLocal) sendData({ type: 'roll', id: dice.userData.id, targetRot: { x: rotX, y: rotY, z: rotZ } });
   }
 
-  document.getElementById('roll-btn').addEventListener('click', () => {
-    if (diceMesh) rollDice(diceMesh, true);
-  });
-
-  // 9. PeerJS 멀티플레이 통신
+  // 8. PeerJS 멀티플레이 통신
   const peer = new Peer();
   let conn = null;
 
@@ -335,27 +387,28 @@
   });
 
   function setupConnection() {
-    document.getElementById('status').innerText = '연결됨!';
+    document.getElementById('status').innerText = '(연결됨!)';
+    document.getElementById('status').style.color = '#10b981';
     conn.on('data', data => {
-      const targetObj = objects.find(o => o.userData.id === data.id);
-      if (!targetObj) return;
-
-      if (data.type === 'move') {
-        targetObj.position.x = data.x;
-        targetObj.position.z = data.z;
-      } else if (data.type === 'flip') {
-        flipCard(targetObj, false);
-      } else if (data.type === 'roll') {
-        rollDice(targetObj, false, data.targetRot);
+      if (data.type === 'clear') {
+        objects.forEach(obj => scene.remove(obj));
+        objects = [];
+      } else if (data.type === 'spawn') {
+        if (data.propType === 'card') createCard(data.x, data.z, false);
+        else if (data.propType === 'dice') createDice(data.x, data.z, false);
+      } else {
+        const targetObj = objects.find(o => o.userData.id === data.id);
+        if (!targetObj) return;
+        if (data.type === 'move') { targetObj.position.x = data.x; targetObj.position.z = data.z; }
+        else if (data.type === 'flip') flipCard(targetObj, false);
+        else if (data.type === 'roll') rollDice(targetObj, false, data.targetRot);
       }
     });
   }
 
-  function sendData(data) {
-    if (conn && conn.open) conn.send(data);
-  }
+  function sendData(data) { if (conn && conn.open) conn.send(data); }
 
-  // 10. 루프 & 리사이즈
+  // 9. 렌더링 루프
   function animate() {
     requestAnimationFrame(animate);
     controls.update();
