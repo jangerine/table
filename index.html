@@ -87,7 +87,7 @@
     <button id="connect-btn">연결</button>
     <span id="status" style="color:#f59e0b;">(오프라인)</span>
   </div>
-  <div>👁️ <b>손패 비공개 기능:</b> 아래쪽(Z > 2.5)에 놓인 카드는 나에게만 앞면으로 보이고 상대에겐 뒷면으로 보입니다!</div>
+  <div>👁️ <b>손패 자동 줄바꿈:</b> 카드를 많이 뽑으면 손패 영역 안에서 자동으로 2줄, 3줄로 나누어 정렬됩니다.</div>
 </div>
 
 <script>
@@ -136,9 +136,9 @@
     ctx.fillStyle = '#1b4d2e'; ctx.fillRect(0, 0, 512, 512);
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)'; ctx.lineWidth = 6; ctx.strokeRect(20, 20, 472, 472);
     ctx.strokeStyle = 'rgba(96, 165, 250, 0.5)'; ctx.lineWidth = 4;
-    ctx.strokeRect(40, 360, 432, 120);
+    ctx.strokeRect(40, 310, 432, 170);
     ctx.fillStyle = 'rgba(96, 165, 250, 0.7)'; ctx.font = '20px sans-serif'; ctx.textAlign = 'center';
-    ctx.fillText('MY HAND ZONE (비공개 손패 영역)', 256, 425);
+    ctx.fillText('MY HAND ZONE (비공개 손패 영역)', 256, 400);
     return new THREE.CanvasTexture(canvas);
   }
 
@@ -220,7 +220,7 @@
     card.position.set(x, 0.28, z);
     card.rotation.z = Math.PI;
     card.castShadow = true;
-    card.userData = { id: id, type: 'card', suit: suit, value: value, isFlipped: true, isAnimating: false };
+    card.userData = { id: id, type: 'card', suit: suit, value: value, isFlipped: true, isAnimating: false, isMovedToHand: false };
     
     scene.add(card);
     objects.push(card);
@@ -246,13 +246,16 @@
     return dice;
   }
 
-  // 4. 내 손패 영역(HAND ZONE) 및 시점 처리
+  // 4. 내 손패 영역(HAND ZONE) 및 회전 처리
   const HAND_ZONE_Z = 2.5;
 
   function updateHandVisibility(card) {
-    if (card.position.z > HAND_ZONE_Z) {
+    if (card.position.z > HAND_ZONE_Z && !card.userData.isMovedToHand) {
       card.rotation.z = 0;
       card.userData.isFlipped = false;
+      card.userData.isMovedToHand = true;
+    } else if (card.position.z <= HAND_ZONE_Z) {
+      card.userData.isMovedToHand = false;
     }
   }
 
@@ -310,6 +313,7 @@
     deckCards.forEach((card, index) => {
       card.userData.isAnimating = true;
       card.userData.isFlipped = true;
+      card.userData.isMovedToHand = false;
 
       const targetX = (Math.random() - 0.5) * 0.05;
       const targetZ = (Math.random() - 0.5) * 0.05;
@@ -341,6 +345,7 @@
     if (isLocal) sendData({ type: 'shuffle' });
   }
 
+  // 손패 자동 줄바꿈 정렬 함수 (한 줄에 최대 6장씩 배치)
   function drawCards(isLocal = true, numToDraw = null) {
     const allCards = objects.filter(o => o.userData.type === 'card');
     const deckCards = allCards.filter(c => Math.hypot(c.position.x, c.position.z) < 1.5);
@@ -358,13 +363,24 @@
     deckCards.sort((a, b) => b.position.y - a.position.y);
     const selectedCards = deckCards.slice(0, numToDraw);
 
-    const myCurrentHand = allCards.filter(c => c.position.z > HAND_ZONE_Z);
-    let startHandIndex = myCurrentHand.length;
+    // 기존 손패 카드들와 새로 뽑을 카드를 포함해 전체 다시 재정렬
+    const existingHand = allCards.filter(c => c.position.z > HAND_ZONE_Z && !selectedCards.includes(c));
+    const fullHand = [...existingHand, ...selectedCards];
 
-    selectedCards.forEach((card, i) => {
-      const handIndex = startHandIndex + i;
-      const targetX = -3 + (handIndex * 0.9);
-      const targetZ = 3.5;
+    const CARDS_PER_ROW = 6;  // 한 줄에 배치할 카드 수
+    const CARD_SPACING_X = 0.8; // 카드 가로 간격
+    const ROW_SPACING_Z = 0.9;  // 줄간격 (Z축)
+
+    fullHand.forEach((card, index) => {
+      const rowIndex = Math.floor(index / CARDS_PER_ROW); // 몇 번째 줄인지
+      const colIndex = index % CARDS_PER_ROW;             // 줄 내에서 몇 번째 칼럼인지
+
+      // 각 줄마다 가로 중앙 정렬
+      const currentCardsInRow = Math.min(CARDS_PER_ROW, fullHand.length - (rowIndex * CARDS_PER_ROW));
+      const startX = -((currentCardsInRow - 1) * CARD_SPACING_X) / 2;
+
+      const targetX = startX + (colIndex * CARD_SPACING_X);
+      const targetZ = 3.0 + (rowIndex * ROW_SPACING_Z); // 줄바꿈 시 Z축 아래로 배치
 
       card.position.set(targetX, 0.28, targetZ);
       updateHandVisibility(card);
@@ -436,7 +452,7 @@
     camBtn.classList.toggle('active', isCamModeAlwaysOn);
   });
 
-  // 6. 터치 조작 및 네트워크 데이터 송신
+  // 6. 터치 조작 및 이동 송신
   const raycaster = new THREE.Raycaster();
   const touch = new THREE.Vector2();
   let selectedObj = null;
@@ -546,6 +562,7 @@
         card.userData.isFlipped = !card.userData.isFlipped;
         card.userData.isAnimating = false;
         updateStacking();
+        sendMoveData(card);
       }
     }
     animateFlip();
@@ -574,7 +591,7 @@
     if (isLocal) sendData({ type: 'roll', id: dice.userData.id, targetRot: { x: rotX, y: rotY, z: rotZ } });
   }
 
-  // 7. 4자리 짧은 ID 생성 및 PeerJS 동기화
+  // 7. PeerJS 연결
   function generateShortId() {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     let result = '';
