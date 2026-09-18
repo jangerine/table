@@ -39,7 +39,7 @@
       box-shadow: 0 10px 25px rgba(0,0,0,0.4); max-width: 340px;
     }
     #peer-ui { margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-    #peer-ui input { width: 90px; padding: 4px 8px; font-size: 11px; border-radius: 6px; border: 1px solid #475569; background: #1e293b; color: white; }
+    #peer-ui input { width: 90px; padding: 4px 8px; font-size: 11px; border-radius: 6px; border: 1px solid #475569; background: #1e293b; color: white; text-transform: uppercase; }
     #peer-ui button { padding: 4px 8px; font-size: 11px; border-radius: 6px; border: none; background: #10b981; color: white; font-weight: bold; }
 
     #prop-modal {
@@ -83,7 +83,7 @@
 <div id="bottom-info">
   <div id="peer-ui">
     <span>내 ID: <strong id="my-id" style="color:#60a5fa;">생성 중...</strong></span> | 
-    <input type="text" id="join-id" placeholder="상대 ID">
+    <input type="text" id="join-id" placeholder="4자리 ID">
     <button id="connect-btn">연결</button>
     <span id="status" style="color:#f59e0b;">(오프라인)</span>
   </div>
@@ -120,7 +120,7 @@
   dirLight.castShadow = true;
   scene.add(dirLight);
 
-  // 2. TTS 8각 보드판 및 내 손패 영역 표시
+  // 2. TTS 8각 보드판
   function createWoodTexture() {
     const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 512;
     const ctx = canvas.getContext('2d');
@@ -218,7 +218,7 @@
 
     const card = new THREE.Mesh(geo, materials);
     card.position.set(x, 0.28, z);
-    card.rotation.z = Math.PI; // 기본 뒷면
+    card.rotation.z = Math.PI;
     card.castShadow = true;
     card.userData = { id: id, type: 'card', suit: suit, value: value, isFlipped: true, isAnimating: false };
     
@@ -251,7 +251,7 @@
 
   function updateHandVisibility(card) {
     if (card.position.z > HAND_ZONE_Z) {
-      card.rotation.z = 0; // 내 손패 영역에서는 나에게 앞면으로 보임
+      card.rotation.z = 0;
       card.userData.isFlipped = false;
     }
   }
@@ -341,7 +341,6 @@
     if (isLocal) sendData({ type: 'shuffle' });
   }
 
-  // 원하는 개수만큼 덱에서 카드를 가져오는 기능
   function drawCards(isLocal = true, numToDraw = null) {
     const allCards = objects.filter(o => o.userData.type === 'card');
     const deckCards = allCards.filter(c => Math.hypot(c.position.x, c.position.z) < 1.5);
@@ -356,17 +355,14 @@
       if (isNaN(numToDraw) || numToDraw < 1) return;
     }
 
-    // 덱 위쪽에 쌓인 카드부터 수량만큼 선택
     deckCards.sort((a, b) => b.position.y - a.position.y);
     const selectedCards = deckCards.slice(0, numToDraw);
 
-    // 내 기존 손패 개수 확인 후 가로로 차례대로 나열
     const myCurrentHand = allCards.filter(c => c.position.z > HAND_ZONE_Z);
     let startHandIndex = myCurrentHand.length;
 
     selectedCards.forEach((card, i) => {
       const handIndex = startHandIndex + i;
-      // 내 손패 위치 지정 (X축으로 펼쳐서 나열)
       const targetX = -3 + (handIndex * 0.9);
       const targetZ = 3.5;
 
@@ -405,7 +401,6 @@
     if (isLocal) sendData({ type: 'deal', numPiles: numPiles });
   }
 
-  // 시작 시 52장 자동 생성
   spawnFullDeck(false);
 
   // UI 이벤트
@@ -527,12 +522,11 @@
   function sendMoveData(obj) {
     let isFlippedForPeer = obj.userData.isFlipped;
     if (obj.userData.type === 'card' && obj.position.z > HAND_ZONE_Z) {
-      isFlippedForPeer = true; // 상대방에겐 손패 카드가 뒷면으로 송신됨
+      isFlippedForPeer = true;
     }
     sendData({ type: 'move', id: obj.userData.id, x: obj.position.x, z: obj.position.z, isFlipped: isFlippedForPeer });
   }
 
-  // 7. 뒤집기 및 굴리기
   function flipCard(card, isLocal = false) {
     if (card.userData.isAnimating) return;
     card.userData.isAnimating = true;
@@ -580,15 +574,25 @@
     if (isLocal) sendData({ type: 'roll', id: dice.userData.id, targetRot: { x: rotX, y: rotY, z: rotZ } });
   }
 
-  // 8. PeerJS 동기화
-  const peer = new Peer();
+  // 7. 4자리 짧은 ID 생성 및 PeerJS 동기화
+  function generateShortId() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let result = '';
+    for (let i = 0; i < 4; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+  }
+
+  const shortId = generateShortId();
+  const peer = new Peer(shortId);
   let conn = null;
 
   peer.on('open', id => document.getElementById('my-id').innerText = id);
   peer.on('connection', c => { conn = c; setupConnection(); });
 
   document.getElementById('connect-btn').addEventListener('click', () => {
-    const targetId = document.getElementById('join-id').value;
+    const targetId = document.getElementById('join-id').value.toUpperCase().trim();
     if (targetId) { conn = peer.connect(targetId); setupConnection(); }
   });
 
