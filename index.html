@@ -118,7 +118,7 @@
     </select>
     <span id="status" style="color:#f59e0b;">(대기중)</span>
   </div>
-  <div>✅ <b>모으기 로직 수정:</b> 플레이어 영토 바깥의 카드만 처음 위치(중앙)로 모입니다.</div>
+  <div>✅ <b>독립 구획 완벽 분리:</b> 플레이어 영역 판정이 절대 중첩되지 않습니다.</div>
 </div>
 
 <script>
@@ -178,23 +178,23 @@
     ctx.font = 'bold 26px sans-serif'; ctx.textAlign = 'center';
 
     ctx.strokeStyle = 'rgba(96, 165, 250, 0.6)'; ctx.lineWidth = 4;
-    ctx.strokeRect(100, 850, 824, 140);
+    ctx.strokeRect(180, 850, 664, 140);
     ctx.fillStyle = 'rgba(96, 165, 250, 0.8)';
     ctx.fillText('P1 HAND ZONE (남)', 512, 920);
 
     ctx.strokeStyle = 'rgba(239, 68, 68, 0.6)';
-    ctx.strokeRect(100, 34, 824, 140);
+    ctx.strokeRect(180, 34, 664, 140);
     ctx.fillStyle = 'rgba(239, 68, 68, 0.8)';
     ctx.fillText('P2 HAND ZONE (북)', 512, 110);
 
     ctx.strokeStyle = 'rgba(16, 185, 129, 0.6)';
-    ctx.strokeRect(34, 100, 140, 824);
+    ctx.strokeRect(34, 180, 140, 664);
     ctx.fillStyle = 'rgba(16, 185, 129, 0.8)';
     ctx.save(); ctx.translate(100, 512); ctx.rotate(-Math.PI/2);
     ctx.fillText('P3 HAND ZONE (서)', 0, 0); ctx.restore();
 
     ctx.strokeStyle = 'rgba(245, 158, 11, 0.6)';
-    ctx.strokeRect(850, 100, 140, 824);
+    ctx.strokeRect(850, 180, 140, 664);
     ctx.fillStyle = 'rgba(245, 158, 11, 0.8)';
     ctx.save(); ctx.translate(920, 512); ctx.rotate(Math.PI/2);
     ctx.fillText('P4 HAND ZONE (동)', 0, 0); ctx.restore();
@@ -342,20 +342,22 @@
     return dice;
   }
 
+  // 🔥 [수정] 상호 배타적 독립 구획 분발 알고리즘 (절대 영역 중첩 불가)
   function isPositionInSeatZone(x, z, seat) {
-    if (seat === 1) return z > 4.5 && x >= -5.5 && x <= 5.5;
-    if (seat === 2) return z < -4.5 && x >= -5.5 && x <= 5.5;
-    if (seat === 3) return x < -4.5 && z >= -5.5 && z <= 5.5;
-    if (seat === 4) return x > 4.5 && z >= -5.5 && z <= 5.5;
+    if (seat === 1) return z > 4.2 && x >= -4.2 && x <= 4.2;
+    if (seat === 2) return z < -4.2 && x >= -4.2 && x <= 4.2;
+    if (seat === 3) return x < -4.2 && z >= -4.2 && z <= 4.2;
+    if (seat === 4) return x > 4.2 && z >= -4.2 && z <= 4.2;
     return false;
   }
 
   function getSeatFromPosition(x, z) {
+    if (isPositionInSeatZone(x, z, mySeat)) return mySeat; // 내 영역을 최우선 검사
     if (isPositionInSeatZone(x, z, 1)) return 1;
     if (isPositionInSeatZone(x, z, 2)) return 2;
     if (isPositionInSeatZone(x, z, 3)) return 3;
     if (isPositionInSeatZone(x, z, 4)) return 4;
-    return 0;
+    return 0; // 경계 외부 중앙 필드
   }
 
   function alignCardRotationBySeat(card) {
@@ -464,9 +466,7 @@
     selectedGroup = [];
   }
 
-  // 🔥 [수정] 모으기 로직: 각 플레이어 영역에 없는 모든 카드를 중앙 원점(0, 0)으로 모음
   function gatherCards(isLocal = true) {
-    // 1~4번 모든 플레이어 영역에 속하지 않은 카드만 필터링
     const targetCards = objects.filter(o => o.userData.type === 'card' && getSeatFromPosition(o.position.x, o.position.z) === 0);
     if (targetCards.length === 0) return;
 
