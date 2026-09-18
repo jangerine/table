@@ -118,7 +118,7 @@
     </select>
     <span id="status" style="color:#f59e0b;">(대기중)</span>
   </div>
-  <div>✅ <b>카드 자체 세로 정렬 완성:</b> 모든 각도에서 세로 카드 세팅</div>
+  <div>✅ <b>카드 세로 정렬 보정 완료:</b> 카드가 항상 똑바로 세로로 보입니다.</div>
 </div>
 
 <script>
@@ -229,7 +229,6 @@
   const suits = ['♠', '♥', '♦', '♣'];
   const values = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 
-  // 카드 본래의 세로 비율 정밀 텍스처
   function createTrumpCardTexture(suit, value) {
     const canvas = document.createElement('canvas'); canvas.width = 256; canvas.height = 384;
     const ctx = canvas.getContext('2d');
@@ -273,13 +272,20 @@
     const suit = customSuit || suits[Math.floor(Math.random() * suits.length)];
     const value = customValue || values[Math.floor(Math.random() * values.length)];
 
-    // X: 가로(0.9), Z: 세로(1.35)로 기본 축 설정
+    // BoxGeometry(가로, 두께, 세로)
     const geo = new THREE.BoxGeometry(0.9, 0.02, 1.35);
+
+    const frontTex = createTrumpCardTexture(suit, value);
+    const backTex = cardBackTexture.clone();
+
+    frontTex.center.set(0.5, 0.5);
+    backTex.center.set(0.5, 0.5);
+
     const materials = [
       new THREE.MeshStandardMaterial({ color: 0xdddddd }),
       new THREE.MeshStandardMaterial({ color: 0xdddddd }),
-      new THREE.MeshStandardMaterial({ map: createTrumpCardTexture(suit, value) }),
-      new THREE.MeshStandardMaterial({ map: cardBackTexture }),
+      new THREE.MeshStandardMaterial({ map: frontTex }),
+      new THREE.MeshStandardMaterial({ map: backTex }),
       new THREE.MeshStandardMaterial({ color: 0xdddddd }),
       new THREE.MeshStandardMaterial({ color: 0xdddddd })
     ];
@@ -325,14 +331,14 @@
     return 0;
   }
 
-  // 자기자신 기준 세로 직립 보정
+  // 플레이어 시점별 카드 세로 직립 회전 정렬
   function alignCardRotationBySeat(card) {
     const seat = getSeatFromPosition(card.position.x, card.position.z);
     
-    if (seat === 1) card.rotation.y = 0;                // P1 (남): 세로 정면
-    else if (seat === 2) card.rotation.y = Math.PI;     // P2 (북): 세로 정면
-    else if (seat === 3) card.rotation.y = -Math.PI / 2; // P3 (서): 세로 정면
-    else if (seat === 4) card.rotation.y = Math.PI / 2;  // P4 (동): 세로 정면
+    if (seat === 1 || seat === 0) card.rotation.y = 0;              // 중앙 판 및 P1 (남)
+    else if (seat === 2) card.rotation.y = Math.PI;                 // P2 (북)
+    else if (seat === 3) card.rotation.y = Math.PI / 2;             // P3 (서)
+    else if (seat === 4) card.rotation.y = -Math.PI / 2;            // P4 (동)
   }
 
   function updateHandVisibility(card) {
@@ -438,7 +444,8 @@
 
     movingCards.forEach((card, i) => {
       card.position.set(0, CARD_BASE_Y + i * 0.02, 0);
-      card.rotation.set(0, 0, Math.PI);
+      alignCardRotationBySeat(card);
+      card.rotation.z = Math.PI;
       card.userData.isFlipped = true;
       sendMoveData(card);
     });
@@ -454,6 +461,7 @@
     const startX = -((deckCards.length - 1) * 0.2) / 2;
     deckCards.forEach((card, i) => {
       card.position.set(startX + i * 0.2, CARD_BASE_Y, 0);
+      alignCardRotationBySeat(card);
       sendMoveData(card);
     });
     updateStacking();
@@ -473,6 +481,7 @@
 
     cutCards.forEach((card, i) => {
       card.position.set(1.8, CARD_BASE_Y + i * 0.02, 0);
+      alignCardRotationBySeat(card);
       sendMoveData(card);
     });
     updateStacking();
@@ -515,7 +524,8 @@
           requestAnimationFrame(animateShuffle);
         } else {
           card.position.set(targetX, targetY, targetZ);
-          card.rotation.set(0, 0, targetRotZ);
+          alignCardRotationBySeat(card);
+          card.rotation.z = targetRotZ;
           card.userData.isAnimating = false;
         }
       }
