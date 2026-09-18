@@ -119,11 +119,14 @@
     </select>
     <span id="status" style="color:#f59e0b;">(대기중)</span>
   </div>
-  <div>👥 <b>TTS 스타일 배치 적용:</b> 좌석 방향별 카드 정면 회전(Y축) 및 간격 정렬 완료.</div>
+  <div>✨ <b>수정 완료:</b> Z-Fighting(겹침 그래픽 깨짐) 및 좌석별 플레이어 시선 자동 정렬 적용</div>
 </div>
 
 <script>
   let mySeat = 1;
+
+  // BASE Y높이 조절로 레이어 그래픽 깨짐(Z-Fighting) 방지
+  const CARD_BASE_Y = 0.32;
 
   // 1. Scene 설정
   const scene = new THREE.Scene();
@@ -286,7 +289,7 @@
     ];
 
     const card = new THREE.Mesh(geo, materials);
-    card.position.set(x, 0.28, z);
+    card.position.set(x, CARD_BASE_Y, z);
     card.rotation.z = Math.PI;
     card.castShadow = true;
     card.userData = { id: id, type: 'card', suit: suit, value: value, isFlipped: true, isLocked: false, isAnimating: false };
@@ -323,7 +326,7 @@
     if (z < -2.8) return 2;      // P2 북
     if (x < -2.8) return 3;      // P3 서
     if (x > 2.8) return 4;       // P4 동
-    return 0;                    // 중앙 공유 영역
+    return 0;                    // 중앙 공유 영역 (필드)
   }
 
   function updateHandVisibility(card) {
@@ -335,12 +338,13 @@
     } else if (seat !== 0) {
       card.rotation.z = Math.PI;
       card.userData.isFlipped = true;
+    } else {
+      card.rotation.z = card.userData.isFlipped ? Math.PI : 0;
     }
   }
 
   function updateStacking() {
     const cards = objects.filter(o => o.userData.type === 'card' && !o.userData.isAnimating);
-    const BASE_Y = 0.28;
     const LAYER_HEIGHT = 0.02;
 
     cards.forEach(card => {
@@ -353,7 +357,7 @@
           }
         }
       });
-      card.position.y = BASE_Y + stackLevel * LAYER_HEIGHT;
+      card.position.y = CARD_BASE_Y + stackLevel * LAYER_HEIGHT;
     });
   }
 
@@ -371,7 +375,6 @@
     if (isLocal) broadcastData({ type: 'reset_deck' });
   }
 
-  // 5. TTS 스타일 Y축 정면 회전이 적용된 카드 가져오기(Draw)
   function drawCards(isLocal = true, numToDraw = null) {
     const allCards = objects.filter(o => o.userData.type === 'card');
     const deckCards = allCards.filter(c => Math.hypot(c.position.x, c.position.z) < 1.5);
@@ -397,6 +400,7 @@
       let targetRotY = 0;
       const offset = (index - (numToDraw - 1) / 2) * spacing;
 
+      // 시선 각도 보정 적용: 본인 시점에 카드가 정방향으로 서 있도록 계산
       if (mySeat === 1) { 
         targetX = offset; targetZ = 4.2; targetRotY = 0; 
       } else if (mySeat === 2) { 
@@ -407,7 +411,7 @@
         targetX = 4.2; targetZ = offset; targetRotY = Math.PI / 2; 
       }
 
-      card.position.set(targetX, 0.28, targetZ);
+      card.position.set(targetX, CARD_BASE_Y, targetZ);
       card.rotation.y = targetRotY;
 
       updateHandVisibility(card);
@@ -431,18 +435,12 @@
     const tableCards = objects.filter(o => o.userData.type === 'card' && getSeatFromPosition(o.position.x, o.position.z) === 0);
     if (tableCards.length === 0) return;
 
-    const existingDeck = tableCards.filter(o => Math.hypot(o.position.x, o.position.z) < 1.0);
     const movingCards = tableCards.filter(o => Math.hypot(o.position.x, o.position.z) >= 1.0);
 
     if (movingCards.length === 0) return;
 
-    existingDeck.forEach(card => {
-      card.position.y += movingCards.length * 0.02;
-      sendMoveData(card);
-    });
-
     movingCards.forEach((card, i) => {
-      card.position.set(0, 0.28 + i * 0.02, 0);
+      card.position.set(0, CARD_BASE_Y + i * 0.02, 0);
       card.rotation.set(0, 0, Math.PI);
       card.userData.isFlipped = true;
       sendMoveData(card);
@@ -458,7 +456,7 @@
 
     const startX = -((deckCards.length - 1) * 0.2) / 2;
     deckCards.forEach((card, i) => {
-      card.position.set(startX + i * 0.2, 0.28, 0);
+      card.position.set(startX + i * 0.2, CARD_BASE_Y, 0);
       sendMoveData(card);
     });
     updateStacking();
@@ -477,7 +475,7 @@
     const cutCards = deckCards.slice(0, cutCount);
 
     cutCards.forEach((card, i) => {
-      card.position.set(1.8, 0.28 + i * 0.02, 0);
+      card.position.set(1.8, CARD_BASE_Y + i * 0.02, 0);
       sendMoveData(card);
     });
     updateStacking();
@@ -494,7 +492,6 @@
       [deckCards[i], deckCards[j]] = [deckCards[j], deckCards[i]];
     }
 
-    const BASE_Y = 0.28;
     const LAYER_HEIGHT = 0.02;
 
     deckCards.forEach((card, index) => {
@@ -503,7 +500,7 @@
 
       const targetX = (Math.random() - 0.5) * 0.05;
       const targetZ = (Math.random() - 0.5) * 0.05;
-      const targetY = BASE_Y + index * LAYER_HEIGHT;
+      const targetY = CARD_BASE_Y + index * LAYER_HEIGHT;
 
       let progress = 0;
       const startX = card.position.x, startY = card.position.y, startZ = card.position.z;
@@ -588,12 +585,12 @@
     camBtn.classList.toggle('active', isCamModeAlwaysOn);
   });
 
-  // 6. 터치 및 영역 선택 로직
+  // 5. 터치 및 영역 선택 로직
   const raycaster = new THREE.Raycaster();
   const touch = new THREE.Vector2();
   let selectedObj = null;
   let groupDragOffsets = [];
-  const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -0.26);
+  const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -CARD_BASE_Y);
   
   let touchStartTime = 0;
   let touchStartPos = { x: 0, y: 0 };
@@ -779,11 +776,12 @@
   window.addEventListener('mousemove', onTouchMove, false);
   window.addEventListener('mouseup', onTouchEnd, false);
 
+  // 6. 카드 이동 전송
   function sendMoveData(obj) {
     const seat = getSeatFromPosition(obj.position.x, obj.position.z);
+    
     let isFlippedForOthers = obj.userData.isFlipped;
-
-    if (obj.userData.type === 'card' && seat !== 0) {
+    if (obj.userData.type === 'card' && seat !== 0 && seat !== mySeat) {
       isFlippedForOthers = true;
     }
 
@@ -808,7 +806,7 @@
     function animateFlip() {
       progress += 0.1;
       card.rotation.z = THREE.MathUtils.lerp(startRotZ, targetRotZ, progress);
-      card.position.y = 0.28 + Math.sin(progress * Math.PI) * 0.5;
+      card.position.y = CARD_BASE_Y + Math.sin(progress * Math.PI) * 0.5;
 
       if (progress < 1) requestAnimationFrame(animateFlip);
       else {
@@ -922,6 +920,7 @@
         targetObj.position.z = data.z;
         if (data.rotY !== undefined) targetObj.rotation.y = data.rotY;
         if (targetObj.userData.type === 'card' && data.isFlipped !== undefined) {
+          targetObj.userData.isFlipped = data.isFlipped;
           updateHandVisibility(targetObj);
         }
         updateStacking();
