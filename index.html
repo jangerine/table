@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Mobile Tabletop Simulator - Ultra Large 8 Players Board</title>
+  <title>Mobile Tabletop Simulator - Standard Board Optimized 8P Zones</title>
   <style>
     * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
     body { margin: 0; overflow: hidden; touch-action: none; font-family: 'Pretendard', sans-serif; background-color: #0f172a; }
@@ -204,7 +204,7 @@
     </select>
     <span id="status" style="color:#f59e0b;">(대기중)</span>
   </div>
-  <div>🧁 <b>초대형 8인 보드:</b> 50x50 매트로 8명 손패와 중앙 영역이 절대 겹치지 않습니다!</div>
+  <div>🧁 <b>보드 크기 복원 완료:</b> 보드판은 원래 크기로 돌리고, 플레이어 구역을 테두리 끝으로 펼쳐 안 겹치게 했습니다!</div>
 </div>
 
 <div id="chat-container">
@@ -214,7 +214,7 @@
   </div>
   <div id="chat-body">
     <div id="chat-messages">
-      <div class="chat-msg system">초대형 8인 테이블탑 시뮬레이터에 오신 것을 환영합니다!</div>
+      <div class="chat-msg system">8인 플레이어 공간 최적화 보드에 오신 것을 환영합니다!</div>
     </div>
     <div id="chat-input-box">
       <input type="text" id="chat-input" placeholder="메시지 입력..." maxlength="100">
@@ -232,20 +232,20 @@
 
   const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1000);
 
-  // 초대형 보드판에 맞춘 8방향 시점 카메라 배치 (반지름 R=19.0 대응)
+  // 기본 보드판 규격(20.0x20.0)에 최적화된 시점
   const seatCameraPositions = {
-    1: { x: 0, y: 38, z: 38 },
-    2: { x: -27, y: 38, z: 27 },
-    3: { x: -38, y: 38, z: 0 },
-    4: { x: -27, y: 38, z: -27 },
-    5: { x: 0, y: 38, z: -38 },
-    6: { x: 27, y: 38, z: -27 },
-    7: { x: 38, y: 38, z: 0 },
-    8: { x: 27, y: 38, z: 27 }
+    1: { x: 0, y: 19, z: 18 },
+    2: { x: -13, y: 19, z: 13 },
+    3: { x: -18, y: 19, z: 0 },
+    4: { x: -13, y: 19, z: -13 },
+    5: { x: 0, y: 19, z: -18 },
+    6: { x: 13, y: 19, z: -13 },
+    7: { x: 18, y: 19, z: 0 },
+    8: { x: 13, y: 19, z: 13 }
   };
 
-  // 8명 각각의 독립 구역 중심 좌표 (반지름 R=19.0)
-  const R_SEAT = 19.0;
+  // 플레이어 칸 구역 중심점 (외각 테두리 한계선 R=8.6 적용으로 구역 간 중첩 전면 제거)
+  const R_SEAT = 8.6;
   const SEAT_CENTERS = {
     1: { x: 0, z: R_SEAT, angle: 0 },
     2: { x: -R_SEAT * 0.7071, z: R_SEAT * 0.7071, angle: Math.PI / 4 },
@@ -274,14 +274,14 @@
   controls.enableDamping = true;
   controls.dampingFactor = 0.05;
   controls.maxPolarAngle = Math.PI / 2 - 0.05;
-  controls.minDistance = 6;
-  controls.maxDistance = 90; // 초대형 맵 시야확보용
+  controls.minDistance = 4;
+  controls.maxDistance = 50;
   controls.target.set(0, 0.2, 0);
 
   const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
   scene.add(ambientLight);
   const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
-  dirLight.position.set(20, 45, 20);
+  dirLight.position.set(10, 20, 10);
   dirLight.castShadow = true;
   scene.add(dirLight);
 
@@ -294,17 +294,17 @@
     return new THREE.CanvasTexture(canvas);
   }
 
-  // 50.0 x 50.0 초대형 그린 매트 생성
+  // 원래 보드 매트 규격(20.0 x 20.0)에 맞춘 8인 구역 표시 매트
   function createFeltMatTexture8P() {
     const canvas = document.createElement('canvas'); canvas.width = 2048; canvas.height = 2048;
     const ctx = canvas.getContext('2d');
     ctx.fillStyle = '#1b4d2e'; ctx.fillRect(0, 0, 2048, 2048);
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)'; ctx.lineWidth = 12; ctx.strokeRect(30, 30, 1988, 1988);
 
-    ctx.font = 'bold 36px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = 'bold 32px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillStyle = 'rgba(255, 255, 255, 0.85)'; ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)'; ctx.lineWidth = 4;
 
-    const mapCoord = (val) => ((val + 25.0) / 50.0) * 2048;
+    const mapCoord = (val) => ((val + 10.0) / 20.0) * 2048;
 
     const zones = [
       { name: "P1 (남)", seat: 1 },
@@ -321,7 +321,7 @@
       const center = SEAT_CENTERS[z.seat];
       const cx = mapCoord(center.x);
       const cy = mapCoord(center.z);
-      const w = 440; const h = 200;
+      const w = 480; const h = 170; // 겹치지 않도록 구역 세로 비율 슬림하게 조정
 
       ctx.save();
       ctx.translate(cx, cy);
@@ -334,9 +334,9 @@
     return new THREE.CanvasTexture(canvas);
   }
 
-  // 원목 테이블 크기 대폭 확장 (w=26.0, h=26.0)
+  // 원래 규격 3D 테이블 (w=11.0, h=11.0)
   const tableShape = new THREE.Shape();
-  const w = 26.0, h = 26.0, r = 3.5;
+  const w = 11.0, h = 11.0, r = 1.8;
   tableShape.moveTo(-w + r, -h); tableShape.lineTo(w - r, -h);
   tableShape.lineTo(w, -h + r); tableShape.lineTo(w, h - r);
   tableShape.lineTo(w - r, h); tableShape.lineTo(-w + r, h);
@@ -349,8 +349,8 @@
   tableMesh.position.y = -0.15;
   scene.add(tableMesh);
 
-  // 50.0 x 50.0 대형 보드 매트
-  const matGeo = new THREE.PlaneGeometry(50.0, 50.0);
+  // 원래 크기 매트 (20.0 x 20.0)
+  const matGeo = new THREE.PlaneGeometry(20.0, 20.0);
   const boardMatMesh = new THREE.Mesh(matGeo, new THREE.MeshStandardMaterial({ map: createFeltMatTexture8P(), roughness: 0.8 }));
   boardMatMesh.rotation.x = -Math.PI / 2;
   boardMatMesh.position.y = 0.26;
@@ -526,8 +526,8 @@
     cardSlots.forEach(slot => scene.remove(slot));
     cardSlots = [];
 
-    const slotGeo = new THREE.PlaneGeometry(1.2, 1.75);
-    const spacing = 1.4;
+    const slotGeo = new THREE.PlaneGeometry(1.0, 1.45);
+    const spacing = 1.15;
     const startX = -((count - 1) * spacing) / 2;
 
     for (let i = 0; i < count; i++) {
@@ -542,7 +542,7 @@
       const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0.85 });
       const slotMesh = new THREE.Mesh(slotGeo, mat);
       slotMesh.rotation.x = -Math.PI / 2;
-      slotMesh.position.set(startX + i * spacing, 0.27, 3.0);
+      slotMesh.position.set(startX + i * spacing, 0.27, 2.0);
       scene.add(slotMesh);
       cardSlots.push(slotMesh);
     }
@@ -625,13 +625,13 @@
     return card;
   }
 
-  // 넓은 보드판 공간에 맞춰 8인 독립 손패 구역 배치
+  // 외곽 가장자리에 겹침 없이 손패 배치
   function startMuffinTimeGame(isLocal = true) {
     objects.forEach(obj => scene.remove(obj));
     objects = [];
     clearSelectionGroup();
 
-    addChatMessage('시스템', '🧁 50x50 초대형 8인 보드 세팅 완료! 카드를 나누어 드립니다.', false, true);
+    addChatMessage('시스템', '🧁 8인 최적화 머핀타임 세팅 완료! 테두리 외곽 손패 구역으로 배치됩니다.', false, true);
 
     let fullDeck = [];
     for (let i = 0; i < 8; i++) { fullDeck = fullDeck.concat(muffinCardDB); }
@@ -647,8 +647,8 @@
       for (let i = 0; i < 3; i++) {
         if (cardIdx < cards.length) {
           const card = cards[cardIdx++];
-          const dx = (i - 1) * 1.1 * Math.cos(center.angle);
-          const dz = (i - 1) * 1.1 * Math.sin(center.angle);
+          const dx = (i - 1) * 0.95 * Math.cos(center.angle);
+          const dz = (i - 1) * 0.95 * Math.sin(center.angle);
           card.position.set(center.x + dx, CARD_BASE_Y, center.z + dz);
           alignCardRotationBySeat(card);
           updateHandVisibility(card);
@@ -662,13 +662,13 @@
     if (isLocal) broadcastData({ type: 'muffin_start' });
   }
 
-  function createDice(x = (Math.random() - 0.5) * 6, z = (Math.random() - 0.5) * 6, isLocal = true, customId = null) {
+  function createDice(x = (Math.random() - 0.5) * 4, z = (Math.random() - 0.5) * 4, isLocal = true, customId = null) {
     const id = customId || ('dice_' + (++objectIdCounter));
     if (objects.some(o => o.userData.id === id)) return;
 
-    const geo = new THREE.BoxGeometry(0.8, 0.8, 0.8);
+    const geo = new THREE.BoxGeometry(0.7, 0.7, 0.7);
     const dice = new THREE.Mesh(geo, diceMaterials);
-    dice.position.set(x, 0.66, z);
+    dice.position.set(x, 0.61, z);
     dice.castShadow = true;
     dice.userData = { id: id, type: 'dice', isRolling: false, isLocked: false };
     scene.add(dice);
@@ -679,12 +679,12 @@
     return dice;
   }
 
-  // 넉넉해진 초대형 보드판에 맞춘 거리 기반 비공개 핸드존 판정 (반지름 4.8 이내)
+  // 겹침이 절대 일어날 수 없는 구역 기반 판정 (반지름 2.2 이내)
   function isPositionInSeatZone(x, z, seat) {
     const center = SEAT_CENTERS[seat];
     if (!center) return false;
     const dist = Math.hypot(x - center.x, z - center.z);
-    return dist <= 4.8;
+    return dist <= 2.2;
   }
 
   function getSeatFromPosition(x, z) {
@@ -718,7 +718,7 @@
   }
 
   function snapCardsToSlots(movedCards) {
-    const SNAP_DISTANCE = 1.0;
+    const SNAP_DISTANCE = 0.8;
     const cardsToSnap = Array.isArray(movedCards) ? movedCards : [movedCards];
 
     cardsToSnap.forEach((card, idx) => {
@@ -823,14 +823,14 @@
   }
 
   function spreadCards(isLocal = true) {
-    const deckCards = objects.filter(o => o.userData.type === 'card' && Math.hypot(o.position.x, o.position.z) < 2.5);
+    const deckCards = objects.filter(o => o.userData.type === 'card' && Math.hypot(o.position.x, o.position.z) < 1.5);
     if (deckCards.length === 0) return;
 
-    const startX = -((deckCards.length - 1) * 0.25) / 2;
+    const startX = -((deckCards.length - 1) * 0.2) / 2;
     const now = Date.now();
     deckCards.forEach((card, i) => {
       card.userData.lastMovedTime = now + i;
-      card.position.set(startX + i * 0.25, CARD_BASE_Y, 0);
+      card.position.set(startX + i * 0.2, CARD_BASE_Y, 0);
       alignCardRotationBySeat(card);
       sendMoveData(card);
     });
@@ -839,7 +839,7 @@
   }
 
   function cutDeck(isLocal = true) {
-    const deckCards = objects.filter(o => o.userData.type === 'card' && Math.hypot(o.position.x, o.position.z) < 2.5);
+    const deckCards = objects.filter(o => o.userData.type === 'card' && Math.hypot(o.position.x, o.position.z) < 1.5);
     if (deckCards.length < 2) return;
 
     const input = prompt(`몇 장의 카드를 떼어내시겠습니까? (최대 ${deckCards.length - 1}장)`, '5');
@@ -852,7 +852,7 @@
     const now = Date.now();
     cutCards.forEach((card, i) => {
       card.userData.lastMovedTime = now + i;
-      card.position.set(2.5, CARD_BASE_Y, 0);
+      card.position.set(1.8, CARD_BASE_Y, 0);
       alignCardRotationBySeat(card);
       sendMoveData(card);
     });
@@ -862,7 +862,7 @@
 
   function shuffleCards(isLocal = true) {
     const allCards = objects.filter(o => o.userData.type === 'card');
-    const deckCards = allCards.filter(c => Math.hypot(c.position.x, c.position.z) < 2.5);
+    const deckCards = allCards.filter(c => Math.hypot(c.position.x, c.position.z) < 1.5);
     if (deckCards.length === 0) return;
 
     for (let i = deckCards.length - 1; i > 0; i--) {
@@ -1451,9 +1451,9 @@
       dice.rotation.x = THREE.MathUtils.lerp(startRot.x, rotX, progress);
       dice.rotation.y = THREE.MathUtils.lerp(startRot.y, rotY, progress);
       dice.rotation.z = THREE.MathUtils.lerp(startRot.z, rotZ, progress);
-      dice.position.y = 0.66 + Math.abs(Math.sin(progress * Math.PI * 2)) * (1 - progress) * 2;
+      dice.position.y = 0.61 + Math.abs(Math.sin(progress * Math.PI * 2)) * (1 - progress) * 2;
       if (progress < 1) requestAnimationFrame(animateRoll);
-      else { dice.position.y = 0.66; dice.userData.isRolling = false; }
+      else { dice.position.y = 0.61; dice.userData.isRolling = false; }
     }
     animateRoll();
     if (isLocal) broadcastData({ type: 'roll', id: dice.userData.id, targetRot: { x: rotX, y: rotY, z: rotZ } });
