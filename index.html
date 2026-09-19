@@ -294,6 +294,7 @@
     return new THREE.CanvasTexture(canvas);
   }
 
+  /* 보드판의 파란색 원 오버레이 테두리를 깔끔한 내부 사각형 가이드라인 영역으로 변경 */
   function createFeltMatTexture8P() {
     const canvas = document.createElement('canvas'); canvas.width = 2048; canvas.height = 2048;
     const ctx = canvas.getContext('2d');
@@ -321,7 +322,7 @@
       const cx = mapCoord(center.x);
       const cy = mapCoord(center.z);
       
-      const w = 980; const h = 180;
+      const w = 420; const h = 180;
 
       ctx.save();
       ctx.translate(cx, cy);
@@ -373,9 +374,7 @@
   const suits = ['♠', '♥', '♦', '♣'];
   const values = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 
-  // 머핀타임 전체 공식 카드 데이터베이스 (80종 이상의 핵심/확장 카드 전체 목록)
   const muffinCardDB = [
-    // --- ACTION CARDS (핑크) ---
     { title: "Gotta Go Fast!", type: "action", color: "#ec4899", desc: "덱에서 즉시 카드를 2장 뽑습니다." },
     { title: "Mine Turtle", type: "action", color: "#ec4899", desc: "지뢰 거북이! 모든 플레이어는 보유 카드의 절반을 버립니다." },
     { title: "Do the Flop!", type: "action", color: "#ec4899", desc: "모두 엎드려! 카드를 가장 늦게 내거나 반응하지 못한 플레이어는 카드 2장을 버립니다." },
@@ -407,7 +406,6 @@
     { title: "Space Turtle", type: "action", color: "#ec4899", desc: "우주 거북이! 모든 트랩 카드가 무효화되어 파괴됩니다." },
     { title: "Magic Hat", type: "action", color: "#ec4899", desc: "모든 플레이어는 무작위 카드를 1장씩 가운데 내놓고 섞어서 다시 나눕니다." },
 
-    // --- COUNTER CARDS (파랑) ---
     { title: "NO!", type: "counter", color: "#3b82f6", desc: "상대방이 발동한 액션이나 효과를 완전히 무효화합니다." },
     { title: "Reflect!", type: "counter", color: "#3b82f6", desc: "나를 향한 공격 효과를 원래 낸 플레이어에게 그대로 반사합니다." },
     { title: "Bye Bye!", type: "counter", color: "#3b82f6", desc: "상대방이 내 카드를 버리게 만들려고 할 때 이를 방어합니다." },
@@ -424,7 +422,6 @@
     { title: "Bouncer", type: "counter", color: "#3b82f6", desc: "상대가 머핀 타임을 외치는 순간 무효화시킵니다." },
     { title: "Emergency Brake", type: "counter", color: "#3b82f6", desc: "상대의 추가 턴/연속 플레이 효과를 즉시 중지시킵니다." },
 
-    // --- TRAP CARDS (주황) ---
     { title: "It's a Trap!", type: "trap", color: "#f59e0b", desc: "[트랩] 누군가 카드를 뽑을 때 그 카드를 빼앗고 1장 더 뽑습니다." },
     { title: "Exploding Kitten", type: "trap", color: "#f59e0b", desc: "[트랩] 내 카드가 공격받을 때 발동! 공격한 사람은 카드 2장을 버립니다." },
     { title: "Slippery Floor", type: "trap", color: "#f59e0b", desc: "[트랩] 누군가 머핀 타임을 외칠 때 카드를 2장 뺏어 외침을 취소시킵니다." },
@@ -441,14 +438,12 @@
     { title: "False Door", type: "trap", color: "#f59e0b", desc: "[트랩] 버려진 카드를 가져가려는 상대의 행동을 막고 내가 가져옵니다." },
     { title: "Sticky Glue", type: "trap", color: "#f59e0b", desc: "[트랩] 상대 손패의 카드 1장을 이번 라운드 동안 사용할 수 없게 만듭니다." },
 
-    // --- SPECIAL / RAINBOW CARDS (보라/조커) ---
     { title: "Rainbow Muffin", type: "rainbow", color: "#8b5cf6", desc: "[조커] 어떤 카드 위에도 내거나 대용할 수 있는 머핀 타임 조커 카드." },
     { title: "Golden Muffin", type: "rainbow", color: "#8b5cf6", desc: "[조커] 이 카드를 가지고 있는 동안 승리 조건 카드가 10장에서 8장으로 줄어듭니다." },
     { title: "Unicorn Blessing", type: "rainbow", color: "#8b5cf6", desc: "[조커] 원하는 종류(액션/카운터/트랩)로 선언하여 즉시 발동할 수 있습니다." },
     { title: "Cosmic Muffin", type: "rainbow", color: "#8b5cf6", desc: "[조커] 모든 플레이어의 트랩 카드를 내 손패로 모두 수집합니다." }
   ];
 
-  // 텍스처 재사용 캐시 (메모리 절감)
   const textureCache = {};
 
   function createTrumpCardTexture(suit, value) {
@@ -705,8 +700,7 @@
 
     addChatMessage('시스템', '🧁 머핀타임 풀 커스텀 8인 게임 시작! 80여 종 이상의 카드 중에서 덱이 무작위 세팅됩니다.', false, true);
 
-    // 전체 카드를 무작위로 섞어서 중앙 덱 세팅
-    let fullDeck = [...muffinCardDB, ...muffinCardDB]; // 2벌 혼합하여 약 120장 이상의 대형 덱 구성
+    let fullDeck = [...muffinCardDB, ...muffinCardDB];
     fullDeck.sort(() => Math.random() - 0.5);
 
     fullDeck.forEach((cardData) => { createMuffinCard(0, 0, false, cardData); });
@@ -753,6 +747,7 @@
     return dice;
   }
 
+  /* 각 플레이어 구역 판단 범위를 정확한 보드 내부 직사각형 크기로 보정 */
   function isPositionInSeatZone(x, z, seat) {
     const center = SEAT_CENTERS[seat];
     if (!center) return false;
@@ -762,9 +757,9 @@
     const dz = Math.abs(z - center.z);
 
     if (isHorizontalSide) {
-      return dx <= 4.75 && dz <= 1.25;
+      return dx <= 2.15 && dz <= 0.9;
     } else {
-      return dz <= 4.75 && dx <= 1.25;
+      return dz <= 2.15 && dx <= 0.9;
     }
   }
 
