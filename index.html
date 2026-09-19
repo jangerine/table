@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Mobile Tabletop Simulator - Full Sandbox & Muffin Time Edition</title>
+  <title>Mobile Tabletop Simulator - 8 Players Muffin Time Edition</title>
   <style>
     * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
     body { margin: 0; overflow: hidden; touch-action: none; font-family: 'Pretendard', sans-serif; background-color: #0f172a; }
@@ -69,7 +69,7 @@
       background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(8px);
       border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px;
       padding: 10px 14px; color: #e2e8f0; font-size: 11px; line-height: 1.5;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.4); max-width: 420px; pointer-events: auto;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.4); max-width: 440px; pointer-events: auto;
     }
     #peer-ui { margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
     #peer-ui input { width: 80px; padding: 4px 6px; font-size: 11px; border-radius: 6px; border: 1px solid #475569; background: #1e293b; color: white; text-transform: uppercase; }
@@ -173,7 +173,7 @@
 <div id="dynamic-action-bar"></div>
 
 <div id="prop-modal">
-  <button class="btn-muffin-modal" id="muffin-start-btn">🧁 머핀타임 전체 세팅</button>
+  <button class="btn-muffin-modal" id="muffin-start-btn">🧁 머핀타임 8인 전체 세팅</button>
   <button id="add-muffin-card-btn">🧁 머핀타임 카드 1장</button>
   <button id="add-card-btn">🃏 무작위 트럼프 카드 1장</button>
   <button id="add-deck-btn">🎴 52장 전체 트럼프 덱</button>
@@ -194,13 +194,17 @@
     <button id="connect-btn">참가</button>
     <select id="player-seat-select">
       <option value="1">P1 (남)</option>
-      <option value="2">P2 (북)</option>
+      <option value="2">P2 (남서)</option>
       <option value="3" selected>P3 (서)</option>
-      <option value="4">P4 (동)</option>
+      <option value="4">P4 (북서)</option>
+      <option value="5">P5 (북)</option>
+      <option value="6">P6 (북동)</option>
+      <option value="7">P7 (동)</option>
+      <option value="8">P8 (남동)</option>
     </select>
     <span id="status" style="color:#f59e0b;">(대기중)</span>
   </div>
-  <div>🎮 <b>자유 샌드박스 모드:</b> 소품 메뉴에서 머핀타임 세팅을 불러와 손으로 자유롭게 플레이해보세요!</div>
+  <div>🧁 <b>최대 8인 지원:</b> 최대 8명의 플레이어가 동시에 참여 가능한 테이블탑 시뮬레이터입니다!</div>
 </div>
 
 <div id="chat-container">
@@ -210,7 +214,7 @@
   </div>
   <div id="chat-body">
     <div id="chat-messages">
-      <div class="chat-msg system">테이블탑 시뮬레이터 샌드박스에 오신 것을 환영합니다!</div>
+      <div class="chat-msg system">8인용 테이블탑 시뮬레이터 샌드박스에 오신 것을 환영합니다!</div>
     </div>
     <div id="chat-input-box">
       <input type="text" id="chat-input" placeholder="메시지 입력..." maxlength="100">
@@ -226,14 +230,24 @@
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x0f172a);
 
+  // 8인 대형 매트를 위해 카메라 시야각 및 조망 거리 확대
   const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1000);
-  camera.position.set(-15, 16, 0);
+
+  // P1~P8 좌석별 3D 카메라 위치 배치 (8방향 좌표 계산)
+  const seatCameraPositions = {
+    1: { x: 0, y: 18, z: 17 },     // 남
+    2: { x: -12, y: 18, z: 12 },   // 남서
+    3: { x: -17, y: 18, z: 0 },    // 서
+    4: { x: -12, y: 18, z: -12 },  // 북서
+    5: { x: 0, y: 18, z: -17 },    // 북
+    6: { x: 12, y: 18, z: -12 },   // 북동
+    7: { x: 17, y: 18, z: 0 },     // 동
+    8: { x: 12, y: 18, z: 12 }     // 남동
+  };
 
   function updateCameraPosition() {
-    if (mySeat === 1) camera.position.set(0, 16, 15);
-    else if (mySeat === 2) camera.position.set(0, 16, -15);
-    else if (mySeat === 3) camera.position.set(-15, 16, 0);
-    else if (mySeat === 4) camera.position.set(15, 16, 0);
+    const pos = seatCameraPositions[mySeat] || seatCameraPositions[1];
+    camera.position.set(pos.x, pos.y, pos.z);
   }
   updateCameraPosition();
 
@@ -249,7 +263,7 @@
   controls.dampingFactor = 0.05;
   controls.maxPolarAngle = Math.PI / 2 - 0.05;
   controls.minDistance = 4;
-  controls.maxDistance = 35;
+  controls.maxDistance = 45; // 8인 조망을 고려한 최대 거리 확장
   controls.target.set(0, 0.2, 0);
 
   const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
@@ -268,35 +282,35 @@
     return new THREE.CanvasTexture(canvas);
   }
 
-  function createFeltMatTexture4P() {
+  // 8인 전용 패브릭 매트 텍스처 (P1~P8 핸드존 레이아웃)
+  function createFeltMatTexture8P() {
     const canvas = document.createElement('canvas'); canvas.width = 2048; canvas.height = 2048;
     const ctx = canvas.getContext('2d');
     ctx.fillStyle = '#1b4d2e'; ctx.fillRect(0, 0, 2048, 2048);
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)'; ctx.lineWidth = 12; ctx.strokeRect(30, 30, 1988, 1988);
 
-    ctx.font = 'bold 48px sans-serif'; ctx.textAlign = 'center';
+    ctx.font = 'bold 36px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.75)'; ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)'; ctx.lineWidth = 4;
 
-    ctx.strokeStyle = 'rgba(96, 165, 250, 0.6)'; ctx.lineWidth = 6;
-    ctx.strokeRect(360, 1720, 1328, 260);
-    ctx.fillStyle = 'rgba(96, 165, 250, 0.8)';
-    ctx.fillText('P1 HAND ZONE (남)', 1024, 1860);
+    const zones = [
+      { name: "P1 (남)", x: 1024, y: 1850, angle: 0, w: 700, h: 200 },
+      { name: "P2 (남서)", x: 380, y: 1668, angle: Math.PI / 4, w: 700, h: 200 },
+      { name: "P3 (서)", x: 200, y: 1024, angle: Math.PI / 2, w: 700, h: 200 },
+      { name: "P4 (북서)", x: 380, y: 380, angle: (3 * Math.PI) / 4, w: 700, h: 200 },
+      { name: "P5 (북)", x: 1024, y: 200, angle: Math.PI, w: 700, h: 200 },
+      { name: "P6 (북동)", x: 1668, y: 380, angle: (-3 * Math.PI) / 4, w: 700, h: 200 },
+      { name: "P7 (동)", x: 1848, y: 1024, angle: -Math.PI / 2, w: 700, h: 200 },
+      { name: "P8 (남동)", x: 1668, y: 1668, angle: -Math.PI / 4, w: 700, h: 200 }
+    ];
 
-    ctx.strokeStyle = 'rgba(239, 68, 68, 0.6)';
-    ctx.strokeRect(360, 68, 1328, 260);
-    ctx.fillStyle = 'rgba(239, 68, 68, 0.8)';
-    ctx.fillText('P2 HAND ZONE (북)', 1024, 210);
-
-    ctx.strokeStyle = 'rgba(16, 185, 129, 0.6)';
-    ctx.strokeRect(68, 360, 260, 1328);
-    ctx.fillStyle = 'rgba(16, 185, 129, 0.8)';
-    ctx.save(); ctx.translate(200, 1024); ctx.rotate(-Math.PI/2);
-    ctx.fillText('P3 HAND ZONE (서)', 0, 0); ctx.restore();
-
-    ctx.strokeStyle = 'rgba(245, 158, 11, 0.6)';
-    ctx.strokeRect(1720, 360, 260, 1328);
-    ctx.fillStyle = 'rgba(245, 158, 11, 0.8)';
-    ctx.save(); ctx.translate(1848, 1024); ctx.rotate(Math.PI/2);
-    ctx.fillText('P4 HAND ZONE (동)', 0, 0); ctx.restore();
+    zones.forEach(z => {
+      ctx.save();
+      ctx.translate(z.x, z.y);
+      ctx.rotate(z.angle);
+      ctx.strokeRect(-z.w / 2, -z.h / 2, z.w, z.h);
+      ctx.fillText(z.name, 0, 0);
+      ctx.restore();
+    });
 
     return new THREE.CanvasTexture(canvas);
   }
@@ -316,7 +330,7 @@
   scene.add(tableMesh);
 
   const matGeo = new THREE.PlaneGeometry(20.0, 20.0);
-  const boardMatMesh = new THREE.Mesh(matGeo, new THREE.MeshStandardMaterial({ map: createFeltMatTexture4P(), roughness: 0.8 }));
+  const boardMatMesh = new THREE.Mesh(matGeo, new THREE.MeshStandardMaterial({ map: createFeltMatTexture8P(), roughness: 0.8 }));
   boardMatMesh.rotation.x = -Math.PI / 2;
   boardMatMesh.position.y = 0.26;
   scene.add(boardMatMesh);
@@ -590,24 +604,29 @@
     return card;
   }
 
+  // 8인용 머핀 타임 자동 분배 세팅
   function startMuffinTimeGame(isLocal = true) {
     objects.forEach(obj => scene.remove(obj));
     objects = [];
     clearSelectionGroup();
 
-    addChatMessage('시스템', '🧁 머핀 타임 200장 규모 덱 배치 완료! 각 핸드존으로 카드를 자유롭게 나누어 플레이하세요.', false, true);
+    addChatMessage('시스템', '🧁 머핀 타임 8인용 덱 세팅 완료! P1~P8 핸드존으로 초기 3장씩 배치합니다.', false, true);
 
     let fullDeck = [];
-    for (let i = 0; i < 6; i++) { fullDeck = fullDeck.concat(muffinCardDB); }
+    for (let i = 0; i < 8; i++) { fullDeck = fullDeck.concat(muffinCardDB); }
     fullDeck.sort(() => Math.random() - 0.5);
 
     fullDeck.forEach((cardData) => { createMuffinCard(0, 0, false, cardData); });
 
     const seatZones = [
       { seat: 1, x: 0, z: 8.0 },
-      { seat: 2, x: 0, z: -8.0 },
+      { seat: 2, x: -6.0, z: 6.0 },
       { seat: 3, x: -8.0, z: 0 },
-      { seat: 4, x: 8.0, z: 0 }
+      { seat: 4, x: -6.0, z: -6.0 },
+      { seat: 5, x: 0, z: -8.0 },
+      { seat: 6, x: 6.0, z: -6.0 },
+      { seat: 7, x: 8.0, z: 0 },
+      { seat: 8, x: 6.0, z: 6.0 }
     ];
 
     const cards = objects.filter(o => o.userData.type === 'card');
@@ -617,7 +636,7 @@
       for (let i = 0; i < 3; i++) {
         if (cardIdx < cards.length) {
           const card = cards[cardIdx++];
-          card.position.set(zone.x + (i - 1) * 1.1, CARD_BASE_Y, zone.z);
+          card.position.set(zone.x + (i - 1) * 0.9, CARD_BASE_Y, zone.z);
           alignCardRotationBySeat(card);
           updateHandVisibility(card);
         }
@@ -647,29 +666,31 @@
     return dice;
   }
 
+  // 8인 좌석 구역 범위 판정 로직
   function isPositionInSeatZone(x, z, seat) {
-    if (seat === 1) return z > 6.8 && x >= -6.8 && x <= 6.8;
-    if (seat === 2) return z < -6.8 && x >= -6.8 && x <= 6.8;
-    if (seat === 3) return x < -6.8 && z >= -6.8 && z <= 6.8;
-    if (seat === 4) return x > 6.8 && z >= -6.8 && z <= 6.8;
+    const R = 5.2;
+    if (seat === 1) return z > R && x >= -R && x <= R;
+    if (seat === 2) return x < -3.5 && z > 3.5;
+    if (seat === 3) return x < -R && z >= -R && z <= R;
+    if (seat === 4) return x < -3.5 && z < -3.5;
+    if (seat === 5) return z < -R && x >= -R && x <= R;
+    if (seat === 6) return x > 3.5 && z < -3.5;
+    if (seat === 7) return x > R && z >= -R && z <= R;
+    if (seat === 8) return x > 3.5 && z > 3.5;
     return false;
   }
 
   function getSeatFromPosition(x, z) {
-    if (isPositionInSeatZone(x, z, mySeat)) return mySeat;
-    if (isPositionInSeatZone(x, z, 1)) return 1;
-    if (isPositionInSeatZone(x, z, 2)) return 2;
-    if (isPositionInSeatZone(x, z, 3)) return 3;
-    if (isPositionInSeatZone(x, z, 4)) return 4;
+    for (let s = 1; s <= 8; s++) {
+      if (isPositionInSeatZone(x, z, s)) return s;
+    }
     return 0;
   }
 
   function alignCardRotationBySeat(card) {
     const seat = getSeatFromPosition(card.position.x, card.position.z);
-    if (seat === 1 || seat === 0) card.rotation.y = 0;
-    else if (seat === 2) card.rotation.y = Math.PI;
-    else if (seat === 3) card.rotation.y = Math.PI / 2;
-    else if (seat === 4) card.rotation.y = -Math.PI / 2;
+    const angles = { 1: 0, 2: Math.PI / 4, 3: Math.PI / 2, 4: (3 * Math.PI) / 4, 5: Math.PI, 6: (-3 * Math.PI) / 4, 7: -Math.PI / 2, 8: -Math.PI / 4 };
+    card.rotation.y = angles[seat] || 0;
   }
 
   function updateHandVisibility(card) {
