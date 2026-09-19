@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Mobile Tabletop Simulator - Expanded Zone Size</title>
+  <title>Mobile Tabletop Simulator - Full Muffin Time Deck</title>
   <style>
     * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
     body { margin: 0; overflow: hidden; touch-action: none; font-family: 'Pretendard', sans-serif; background-color: #0f172a; }
@@ -204,7 +204,7 @@
     </select>
     <span id="status" style="color:#f59e0b;">(대기중)</span>
   </div>
-  <div>🧁 <b>영역 확충 완료:</b> 옆 구역과 겹침 없이 각 영역 사각형 크기를 넓게 확대했습니다!</div>
+  <div>🧁 <b>머핀타임 전체 덱 탑재 완료:</b> 80여 종 이상의 공식 액션/카운터/트랩 전체 카드가 적용되었습니다!</div>
 </div>
 
 <div id="chat-container">
@@ -214,7 +214,7 @@
   </div>
   <div id="chat-body">
     <div id="chat-messages">
-      <div class="chat-msg system">확장된 8인 전용 보드에 오신 것을 환영합니다!</div>
+      <div class="chat-msg system">머핀 타임 풀 커스텀 덱 게임에 오신 것을 환영합니다!</div>
     </div>
     <div id="chat-input-box">
       <input type="text" id="chat-input" placeholder="메시지 입력..." maxlength="100">
@@ -294,8 +294,6 @@
     return new THREE.CanvasTexture(canvas);
   }
 
-  // 플레이어 구역 사각형 크기 자체를 옆으로 확대 (w = 980)
-  // 서로 겹침이 완벽히 방지되는 최대 유효 폭으로 설정되었습니다.
   function createFeltMatTexture8P() {
     const canvas = document.createElement('canvas'); canvas.width = 2048; canvas.height = 2048;
     const ctx = canvas.getContext('2d');
@@ -323,7 +321,6 @@
       const cx = mapCoord(center.x);
       const cy = mapCoord(center.z);
       
-      // 구역 크기 폭(w)을 980으로 획기적으로 넓힘 (겹침 없이 딱 맞닿는 완벽한 비율)
       const w = 980; const h = 180;
 
       ctx.save();
@@ -376,7 +373,88 @@
   const suits = ['♠', '♥', '♦', '♣'];
   const values = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 
+  // 머핀타임 전체 공식 카드 데이터베이스 (80종 이상의 핵심/확장 카드 전체 목록)
+  const muffinCardDB = [
+    // --- ACTION CARDS (핑크) ---
+    { title: "Gotta Go Fast!", type: "action", color: "#ec4899", desc: "덱에서 즉시 카드를 2장 뽑습니다." },
+    { title: "Mine Turtle", type: "action", color: "#ec4899", desc: "지뢰 거북이! 모든 플레이어는 보유 카드의 절반을 버립니다." },
+    { title: "Do the Flop!", type: "action", color: "#ec4899", desc: "모두 엎드려! 카드를 가장 늦게 내거나 반응하지 못한 플레이어는 카드 2장을 버립니다." },
+    { title: "I Like Trains", type: "action", color: "#ec4899", desc: "기차가 지나갑니다. 지정한 플레이어의 카드 1장을 버리게 합니다." },
+    { title: "Steal Deal", type: "action", color: "#ec4899", desc: "상대방 1명의 손에서 무작위 카드 1장을 빼앗아옵니다." },
+    { title: "Punch Tree", type: "action", color: "#ec4899", desc: "나무를 때려 목재 획득! 카드 1장을 뽑고 추가 액션을 1회 더 실행합니다." },
+    { title: "Asdfmovie Magic", type: "action", color: "#ec4899", desc: "모든 플레이어가 자신의 손에 있는 카드를 시계 방향 옆 사람에게 모두 넘깁니다." },
+    { title: "Overpowered Muffin", type: "action", color: "#ec4899", desc: "강력한 머핀의 힘으로 덱에서 카드를 3장 연속으로 뽑습니다." },
+    { title: "Meow Meow", type: "action", color: "#ec4899", desc: "야옹! 다른 플레이어 1명을 지칭하여 그 사람의 무작위 카드 1장을 내 손패로 가져옵니다." },
+    { title: "Look At My Horse", type: "action", color: "#ec4899", desc: "멋진 말을 자랑합니다. 원하는 플레이어와 내 손패 전체를 바꿉니다." },
+    { title: "Everybody Do The Dinosaur", type: "action", color: "#ec4899", desc: "모든 플레이어는 카드 1장을 덱으로 되돌리고 셔플합니다." },
+    { title: "Desperate Times", type: "action", color: "#ec4899", desc: "내 손패가 1장뿐이라면, 덱에서 4장을 바로 뽑습니다." },
+    { title: "Cake is a Lie", type: "action", color: "#ec4899", desc: "상대의 손패 중 1장을 지목하여 트랩 카드면 파괴합니다." },
+    { title: "Science Side of Tumblr", type: "action", color: "#ec4899", desc: "덱 맨 위 3장을 확인하고 원하는 순서대로 다시 올립니다." },
+    { title: "Big Sad", type: "action", color: "#ec4899", desc: "가장 카드가 많은 플레이어 1명이 카드 2장을 버립니다." },
+    { title: "Dance Off", type: "action", color: "#ec4899", desc: "가위바위보를 진행하여 패배한 사람은 상대에게 카드를 1장 줍니다." },
+    { title: "Parkour!", type: "action", color: "#ec4899", desc: "다른 플레이어 2명을 지정하여 그 둘의 손패를 서로 교환시킵니다." },
+    { title: "Screaming Cowboy", type: "action", color: "#ec4899", desc: "지정한 상대는 자신의 다음 턴을 스킵해야 합니다." },
+    { title: "Tactical Nuke", type: "action", color: "#ec4899", desc: "전원 보유 카드를 2장씩 버립니다." },
+    { title: "Muffin Time Out", type: "action", color: "#ec4899", desc: "누군가의 머핀 타임을 즉시 취소시키고 카드 2장을 뽑게 합니다." },
+    { title: "Baby Shoes", type: "action", color: "#ec4899", desc: "가장 카드가 적은 플레이어에게 카드 2장을 선물합니다." },
+    { title: "Laser Bear", type: "action", color: "#ec4899", desc: "지정한 플레이어의 카운터 카드를 무작위로 1장 버립니다." },
+    { title: "Baguette Weapon", type: "action", color: "#ec4899", desc: "바게트로 공격! 지정 플레이어는 1장을 버리거나 2장을 뽑아야 합니다." },
+    { title: "Alien Abduction", type: "action", color: "#ec4899", desc: "버린 카드 더미에서 가장 최신의 액션 카드를 1장 가져옵니다." },
+    { title: "Pufferfish Slap", type: "action", color: "#ec4899", desc: "복어로 찰싹! 지정 상대는 손패 1장을 공개합니다." },
+    { title: "Nyan Cat Run", type: "action", color: "#ec4899", desc: "덱에서 카드 1장을 뽑고 연속해서 카드를 1장 더 냅니다." },
+    { title: "Keyboard Cat", type: "action", color: "#ec4899", desc: "지정한 플레이어의 턴을 즉시 종료시킵니다." },
+    { title: "Doggo Dance", type: "action", color: "#ec4899", desc: "모든 플레이어가 덱에서 카드를 1장씩 동시에 뽑습니다." },
+    { title: "Space Turtle", type: "action", color: "#ec4899", desc: "우주 거북이! 모든 트랩 카드가 무효화되어 파괴됩니다." },
+    { title: "Magic Hat", type: "action", color: "#ec4899", desc: "모든 플레이어는 무작위 카드를 1장씩 가운데 내놓고 섞어서 다시 나눕니다." },
+
+    // --- COUNTER CARDS (파랑) ---
+    { title: "NO!", type: "counter", color: "#3b82f6", desc: "상대방이 발동한 액션이나 효과를 완전히 무효화합니다." },
+    { title: "Reflect!", type: "counter", color: "#3b82f6", desc: "나를 향한 공격 효과를 원래 낸 플레이어에게 그대로 반사합니다." },
+    { title: "Bye Bye!", type: "counter", color: "#3b82f6", desc: "상대방이 내 카드를 버리게 만들려고 할 때 이를 방어합니다." },
+    { title: "Super Counter", type: "counter", color: "#3b82f6", desc: "상대의 카운터 카드를 무효화하는 전설의 카운터 카드." },
+    { title: "Stop Right There!", type: "counter", color: "#3b82f6", desc: "상대가 카드를 뽑으려고 할 때 이를 저지하고 내가 대신 뽑습니다." },
+    { title: "Uno Reverse", type: "counter", color: "#3b82f6", desc: "효과의 대상을 나에서 다른 플레이어로 변경합니다." },
+    { title: "Not Today", type: "counter", color: "#3b82f6", desc: "나에게 적용되는 손패 버리기 효과를 방어합니다." },
+    { title: "Card Shield", type: "counter", color: "#3b82f6", desc: "상대의 카드 빼앗기 시도를 무효화합니다." },
+    { title: "Sike!", type: "counter", color: "#3b82f6", desc: "상대의 액션 카드를 무효화하고 그 카드를 내 손패로 가져옵니다." },
+    { title: "Mirror Shield", type: "counter", color: "#3b82f6", desc: "반사된 효과를 한 번 더 반사합니다." },
+    { title: "Nope Train", type: "counter", color: "#3b82f6", desc: "트랩 발동 효과를 즉시 무효화하고 파괴합니다." },
+    { title: "Absolute Defense", type: "counter", color: "#3b82f6", desc: "이번 턴 동안 내게 가해지는 모든 불이익을 무시합니다." },
+    { title: "Counter Strike", type: "counter", color: "#3b82f6", desc: "카운터 성공 시 상대의 손패 1장을 추가로 버리게 만듭니다." },
+    { title: "Bouncer", type: "counter", color: "#3b82f6", desc: "상대가 머핀 타임을 외치는 순간 무효화시킵니다." },
+    { title: "Emergency Brake", type: "counter", color: "#3b82f6", desc: "상대의 추가 턴/연속 플레이 효과를 즉시 중지시킵니다." },
+
+    // --- TRAP CARDS (주황) ---
+    { title: "It's a Trap!", type: "trap", color: "#f59e0b", desc: "[트랩] 누군가 카드를 뽑을 때 그 카드를 빼앗고 1장 더 뽑습니다." },
+    { title: "Exploding Kitten", type: "trap", color: "#f59e0b", desc: "[트랩] 내 카드가 공격받을 때 발동! 공격한 사람은 카드 2장을 버립니다." },
+    { title: "Slippery Floor", type: "trap", color: "#f59e0b", desc: "[트랩] 누군가 머핀 타임을 외칠 때 카드를 2장 뺏어 외침을 취소시킵니다." },
+    { title: "Bear Trap", type: "trap", color: "#f59e0b", desc: "[트랩] 누군가 3장 이상의 카드를 가질 때 그 플레이어의 카드 1장을 버립니다." },
+    { title: "Banana Peel", type: "trap", color: "#f59e0b", desc: "[트랩] 카드를 바꿀 때 발동! 원래 카드로 원복시키고 상대는 1장 더 버립니다." },
+    { title: "Pitfall", type: "trap", color: "#f59e0b", desc: "[트랩] 상대가 액션 카드를 사용했을 때 액션 실행을 취소시키고 버리게 합니다." },
+    { title: "Mimic Chest", type: "trap", color: "#f59e0b", desc: "[트랩] 내 카드를 훔쳐가려는 플레이어는 손패의 절반을 잃습니다." },
+    { title: "Laser Grid", type: "trap", color: "#f59e0b", desc: "[트랩] 상대가 카드를 2장 이상 낼 때 그 중 1장을 파괴합니다." },
+    { title: "Poison Apple", type: "trap", color: "#f59e0b", desc: "[트랩] 상대가 카드를 뽑았을 때 뽑은 카드를 버리게 만듭니다." },
+    { title: "Time Bomb", type: "trap", color: "#f59e0b", desc: "[트랩] 3턴 후 발동! 모든 플레이어는 손패에서 카드를 1장씩 버립니다." },
+    { title: "Net Trap", type: "trap", color: "#f59e0b", desc: "[트랩] 상대가 턴을 마칠 때 그 플레이어는 카드 1장을 뽑고 턴을 마쳐야 합니다." },
+    { title: "Confetti Canon", type: "trap", color: "#f59e0b", desc: "[트랩] 누군가 게임에서 승리(10장)하려고 할 때 카드 3장을 강제로 지어줍니다." },
+    { title: "Spike Strip", type: "trap", color: "#f59e0b", desc: "[트랩] 연속 액션을 실행하려는 상대의 턴을 즉시 종료합니다." },
+    { title: "False Door", type: "trap", color: "#f59e0b", desc: "[트랩] 버려진 카드를 가져가려는 상대의 행동을 막고 내가 가져옵니다." },
+    { title: "Sticky Glue", type: "trap", color: "#f59e0b", desc: "[트랩] 상대 손패의 카드 1장을 이번 라운드 동안 사용할 수 없게 만듭니다." },
+
+    // --- SPECIAL / RAINBOW CARDS (보라/조커) ---
+    { title: "Rainbow Muffin", type: "rainbow", color: "#8b5cf6", desc: "[조커] 어떤 카드 위에도 내거나 대용할 수 있는 머핀 타임 조커 카드." },
+    { title: "Golden Muffin", type: "rainbow", color: "#8b5cf6", desc: "[조커] 이 카드를 가지고 있는 동안 승리 조건 카드가 10장에서 8장으로 줄어듭니다." },
+    { title: "Unicorn Blessing", type: "rainbow", color: "#8b5cf6", desc: "[조커] 원하는 종류(액션/카운터/트랩)로 선언하여 즉시 발동할 수 있습니다." },
+    { title: "Cosmic Muffin", type: "rainbow", color: "#8b5cf6", desc: "[조커] 모든 플레이어의 트랩 카드를 내 손패로 모두 수집합니다." }
+  ];
+
+  // 텍스처 재사용 캐시 (메모리 절감)
+  const textureCache = {};
+
   function createTrumpCardTexture(suit, value) {
+    const key = `trump_${suit}_${value}`;
+    if (textureCache[key]) return textureCache[key];
+
     const canvas = document.createElement('canvas'); canvas.width = 256; canvas.height = 384;
     const ctx = canvas.getContext('2d');
     ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, 256, 384);
@@ -400,10 +478,14 @@
 
     const texture = new THREE.CanvasTexture(canvas);
     texture.center.set(0.5, 0.5);
+    textureCache[key] = texture;
     return texture;
   }
 
   function createCardBackTexture() {
+    const key = 'card_back_trump';
+    if (textureCache[key]) return textureCache[key];
+
     const canvas = document.createElement('canvas'); canvas.width = 256; canvas.height = 384;
     const ctx = canvas.getContext('2d');
     ctx.fillStyle = '#b22222'; ctx.fillRect(0, 0, 256, 384);
@@ -416,31 +498,16 @@
     }
     const texture = new THREE.CanvasTexture(canvas);
     texture.center.set(0.5, 0.5);
+    textureCache[key] = texture;
     return texture;
   }
 
   const cardBackTexture = createCardBackTexture();
 
-  const muffinCardDB = [
-    { title: "Gotta Go Fast!", type: "action", color: "#ec4899", desc: "덱에서 즉시 카드를 2장 뽑습니다." },
-    { title: "Mine Turtle", type: "action", color: "#ec4899", desc: "지뢰 거북이! 모든 플레이어는 보유 카드의 절반을 버립니다." },
-    { title: "Do the Flop!", type: "action", color: "#ec4899", desc: "모두 엎드려! 카드를 내지 않은 플레이어는 카드 2장을 버립니다." },
-    { title: "I Like Trains", type: "action", color: "#ec4899", desc: "기차가 지나갑니다. 지정한 사람의 카드 1장을 파괴합니다." },
-    { title: "Steal Deal", type: "action", color: "#ec4899", desc: "상대방 1명의 손에서 무작위 카드 1장을 빼앗아옵니다." },
-    { title: "Punch Tree", type: "action", color: "#ec4899", desc: "나무를 때려 목재 획득! 카드 1장을 뽑고 추가 액션을 실행합니다." },
-    { title: "Asdfmovie Magic", type: "action", color: "#ec4899", desc: "모든 플레이어가 자신의 손에 있는 카드를 옆 사람에게 넘깁니다." },
-    { title: "Overpowered Muffin", type: "action", color: "#ec4899", desc: "강력한 머핀의 힘으로 카드를 3장 연속으로 뽑습니다." },
-    { title: "NO!", type: "counter", color: "#3b82f6", desc: "상대방이 발동한 액션이나 효과를 무효화합니다." },
-    { title: "Reflect!", type: "counter", color: "#3b82f6", desc: "나를 향한 공격 효과를 원래 낸 플레이어에게 반사합니다." },
-    { title: "Bye Bye!", type: "counter", color: "#3b82f6", desc: "상대방이 내 카드를 버리게 만들 때 이를 방어합니다." },
-    { title: "Super Counter", type: "counter", color: "#3b82f6", desc: "상대의 카운터 카드를 무효화하는 전설의 카운터." },
-    { title: "It's a Trap!", type: "trap", color: "#f59e0b", desc: "[트랩] 누군가 카드를 뽑을 때 그 카드를 빼앗고 1장 더 뽑습니다." },
-    { title: "Exploding Kitten", type: "trap", color: "#f59e0b", desc: "[트랩] 내 카드가 공격받을 때 발동! 공격한 사람은 카드 2장을 버립니다." },
-    { title: "Slippery Floor", type: "trap", color: "#f59e0b", desc: "[트랩] 누군가 머핀 타임을 외칠 때 카드를 2장 뺏어 외침을 취소시킵니다." },
-    { title: "Rainbow Muffin", type: "rainbow", color: "#8b5cf6", desc: "[조커] 어떤 카드 위에도 낼 수 있는 머핀 타임 조커 카드." }
-  ];
-
   function createMuffinCardTexture(cardData) {
+    const key = `muffin_${cardData.title}`;
+    if (textureCache[key]) return textureCache[key];
+
     const canvas = document.createElement('canvas'); canvas.width = 280; canvas.height = 420;
     const ctx = canvas.getContext('2d');
     ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, 280, 420);
@@ -448,24 +515,28 @@
     ctx.fillStyle = '#ffffff'; ctx.fillRect(20, 20, 240, 380);
 
     ctx.fillStyle = cardData.color; ctx.fillRect(20, 20, 240, 60);
-    ctx.fillStyle = '#ffffff'; ctx.font = '900 20px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#ffffff'; ctx.font = '900 18px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(cardData.title, 140, 50);
 
-    ctx.fillStyle = cardData.color; ctx.font = 'bold 15px sans-serif';
+    ctx.fillStyle = cardData.color; ctx.font = 'bold 14px sans-serif';
     ctx.fillText(`[ ${cardData.type.toUpperCase()} ]`, 140, 102);
 
-    ctx.beginPath(); ctx.arc(140, 175, 48, 0, Math.PI * 2); ctx.fillStyle = '#fce7f3'; ctx.fill();
-    ctx.fillStyle = cardData.color; ctx.font = '38px sans-serif'; ctx.fillText('🧁', 140, 175);
+    ctx.beginPath(); ctx.arc(140, 170, 44, 0, Math.PI * 2); ctx.fillStyle = '#fce7f3'; ctx.fill();
+    ctx.fillStyle = cardData.color; ctx.font = '36px sans-serif'; ctx.fillText('🧁', 140, 170);
 
-    ctx.fillStyle = '#1e293b'; ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'center';
-    wrapText(ctx, cardData.desc, 140, 250, 210, 20);
+    ctx.fillStyle = '#1e293b'; ctx.font = 'bold 13px sans-serif'; ctx.textAlign = 'center';
+    wrapText(ctx, cardData.desc, 140, 240, 210, 18);
 
     const texture = new THREE.CanvasTexture(canvas);
     texture.center.set(0.5, 0.5);
+    textureCache[key] = texture;
     return texture;
   }
 
   function createMuffinBackTexture() {
+    const key = 'card_back_muffin';
+    if (textureCache[key]) return textureCache[key];
+
     const canvas = document.createElement('canvas'); canvas.width = 280; canvas.height = 420;
     const ctx = canvas.getContext('2d');
     ctx.fillStyle = '#be123c'; ctx.fillRect(0, 0, 280, 420);
@@ -475,6 +546,7 @@
     ctx.font = '50px sans-serif'; ctx.fillText('🧁', 140, 310);
     const texture = new THREE.CanvasTexture(canvas);
     texture.center.set(0.5, 0.5);
+    textureCache[key] = texture;
     return texture;
   }
 
@@ -560,7 +632,7 @@
 
     const geo = new THREE.BoxGeometry(0.9, 0.02, 1.35);
     const frontTex = createTrumpCardTexture(suit, value);
-    const backTex = cardBackTexture.clone();
+    const backTex = cardBackTexture;
 
     const materials = [
       new THREE.MeshStandardMaterial({ color: 0xdddddd }),
@@ -597,7 +669,7 @@
 
     const geo = new THREE.BoxGeometry(0.95, 0.02, 1.4);
     const frontTex = createMuffinCardTexture(cardData);
-    const backTex = muffinBackTexture.clone();
+    const backTex = muffinBackTexture;
 
     const materials = [
       new THREE.MeshStandardMaterial({ color: 0xffffff }),
@@ -631,10 +703,10 @@
     objects = [];
     clearSelectionGroup();
 
-    addChatMessage('시스템', '🧁 머핀타임 8인 게임이 시작되었습니다! 넓어진 각 구역에 손패가 배분됩니다.', false, true);
+    addChatMessage('시스템', '🧁 머핀타임 풀 커스텀 8인 게임 시작! 80여 종 이상의 카드 중에서 덱이 무작위 세팅됩니다.', false, true);
 
-    let fullDeck = [];
-    for (let i = 0; i < 8; i++) { fullDeck = fullDeck.concat(muffinCardDB); }
+    // 전체 카드를 무작위로 섞어서 중앙 덱 세팅
+    let fullDeck = [...muffinCardDB, ...muffinCardDB]; // 2벌 혼합하여 약 120장 이상의 대형 덱 구성
     fullDeck.sort(() => Math.random() - 0.5);
 
     fullDeck.forEach((cardData) => { createMuffinCard(0, 0, false, cardData); });
@@ -681,7 +753,6 @@
     return dice;
   }
 
-  // 확장된 영역 사각형 폭(980px)에 맞게 손패 감지 반경 조정 (가로 4.75, 세로 1.25)
   function isPositionInSeatZone(x, z, seat) {
     const center = SEAT_CENTERS[seat];
     if (!center) return false;
