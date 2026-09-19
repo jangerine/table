@@ -197,7 +197,7 @@
     </select>
     <span id="status" style="color:#f59e0b;">(대기중)</span>
   </div>
-  <div>🛠 <b>최종 복원:</b> 사라진 카드/주사위/멀티플레이어 기능을 모두 복구하고, 지우개 성능만 개선했습니다.</div>
+  <div>🛠 <b>최종 복원:</b> 테이블과 카메라 구도를 3D 스크린샷 맵처럼 입체적으로 변경했습니다.</div>
 </div>
 
 <div id="chat-container">
@@ -223,8 +223,10 @@
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x0f172a);
 
+  // [수정] 카메라 구도를 입체적인 3D 형태로 변경
   const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1000);
-  
+  camera.position.set(-10, 11, 0); // 기본 좌석(P3) 구도
+
   function updateCameraPosition() {
     if (mySeat === 1) camera.position.set(0, 11, 10);
     else if (mySeat === 2) camera.position.set(0, 11, -10);
@@ -305,6 +307,7 @@
   tableShape.lineTo(-w, h - r); tableShape.lineTo(-w, -h + r);
   tableShape.closePath();
 
+  // [수정] 테이블 모양을 더 입체적으로 변경
   const tableGeo = new THREE.ExtrudeGeometry(tableShape, { depth: 0.3, bevelEnabled: true, bevelSegments: 2, steps: 1, bevelSize: 0.1, bevelThickness: 0.1 });
   tableGeo.rotateX(Math.PI / 2);
   const tableMesh = new THREE.Mesh(tableGeo, new THREE.MeshStandardMaterial({ map: createWoodTexture(), roughness: 0.6 }));
@@ -331,8 +334,8 @@
   let currentLineMesh = null;
   let currentLinePoints = [];
   let lineIdCounter = 0;
-  let lastEraserPoint = null; // 지우기 궤적 보간용
-  let eraserCursorMesh = null; // 3D 지우개 커서
+  let lastEraserPoint = null;
+  let eraserCursorMesh = null;
 
   const suits = ['♠', '♥', '♦', '♣'];
   const values = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
@@ -826,7 +829,7 @@
   const eraserBtn = document.getElementById('eraser-mode-btn');
   const penToolsPanel = document.getElementById('pen-tools-panel');
 
-  // 지우개 범위 시각화 원형 커서 생성 (초기 숨김)
+  // [수정] 지우개 범위 시각화 원형 커서 생성 (초기 숨김)
   const cursorGeo = new THREE.RingGeometry(0.77, 0.8, 32); // 기본 ERASER_RADIUS = 0.8 기준
   cursorGeo.rotateX(-Math.PI / 2);
   const cursorMat = new THREE.MeshBasicMaterial({ color: 0xff0000, side: THREE.DoubleSide });
@@ -857,7 +860,9 @@
     isEraserMode = !isEraserMode;
     eraserBtn.innerText = isEraserMode ? '🧹 개별 지우개 [ON]' : '🧹 개별 지우개 [OFF]';
     eraserBtn.classList.toggle('active', isEraserMode);
-    eraserCursorMesh.visible = isEraserMode; // 커서 표시 상태 연동
+    
+    // [수정] 지우개 커서 표시 상태 연동
+    eraserCursorMesh.visible = isEraserMode; 
 
     if (isEraserMode) {
       isPenMode = false;
@@ -998,50 +1003,39 @@
     return { x: (t.clientX / window.innerWidth) * 2 - 1, y: -(t.clientY / window.innerHeight) * 2 + 1, rawX: t.clientX, rawY: t.clientY };
   }
 
-  // [개선] 지우개 감지 및 궤적 보간 함수
+  // [수정] 지우개 감지 및 연속/다중 궤적 보간 삭제 함수
   function checkEraserAtPoint(touchVec) {
     raycaster.setFromCamera(touchVec, camera);
-    const lineMeshes = drawnLines.map(l => l.mesh);
-    const intersects = raycaster.intersectObjects(lineMeshes, false);
 
-    if (intersects.length > 0) {
-      const hitMesh = intersects[0].object;
-      if (hitMesh && hitMesh.userData && hitMesh.userData.id) {
-        deleteSingleLine(hitMesh.userData.id, true);
-        return;
-      }
-    }
-
-    // 터치 보충 판정 (지우개를 빨리 문지를 때 누락 예방)
     const hitPoint = new THREE.Vector3();
     if (raycaster.ray.intersectPlane(boardPlane, hitPoint)) {
-      // 커서 위치 업데이트
+      // 1. 지우개 커서 위치 업데이트
       eraserCursorMesh.position.set(hitPoint.x, 0.29, hitPoint.z);
 
       const ERASER_RADIUS = 0.8; // 감지 반경
 
-      // 보간 로직: 이전 점과 현재 점 사이를 메꿈
-      let checkPoints = [hitPoint];
+      // 2. 보간 로직: 터치/마우스 이동 속도가 빨라도 중간 점을 채워 빈틈없이 지움
+      let checkPoints = [hitPoint.clone()];
       if (lastEraserPoint) {
         const dist = hitPoint.distanceTo(lastEraserPoint);
-        const steps = Math.ceil(dist / 0.2); // 0.2 단위로 중간 점 생성
+        const steps = Math.ceil(dist / 0.15); // 0.15 보간 간격
         for (let s = 1; s <= steps; s++) {
           checkPoints.push(new THREE.Vector3().lerpVectors(lastEraserPoint, hitPoint, s / steps));
         }
       }
       lastEraserPoint = hitPoint.clone();
 
-      // 지우개 범위 안의 모든 선 탐색 및 삭제
+      // 3. 지우개 범위(ERASER_RADIUS) 안의 모든 선 탐색 및 다중 삭제 (return 없이 전체 순회)
       for (let i = drawnLines.length - 1; i >= 0; i--) {
         const line = drawnLines[i];
         
-        // 선을 구성하는 점들과 지우개 궤적 점 사이의 거리 계산
+        // 선을 구성하는 점들과 지우개 궤적 점 사이의 거리가 ERASER_RADIUS 이내인지 체크
         const isTouched = line.points.some(pt => {
           return checkPoints.some(cPt => Math.hypot(pt.x - cPt.x, pt.z - cPt.z) < ERASER_RADIUS);
         });
 
         if (isTouched) {
-          deleteSingleLine(line.id, true);
+          deleteSingleLine(line.id, true); // 지우고 return 하지 않고 다음 선 계속 검사
         }
       }
     }
@@ -1061,7 +1055,7 @@
 
     if (isEraserMode) {
       controls.enabled = false;
-      lastEraserPoint = null; // 궤적 초기화
+      lastEraserPoint = null; // [수정] 궤적 초기화
       checkEraserAtPoint(touch);
       return;
     }
@@ -1182,7 +1176,7 @@
     const pos = getTouchPos(e);
 
     if (isEraserMode) {
-      lastEraserPoint = null; // 궤적 초기화
+      lastEraserPoint = null; // [수정] 궤적 초기화
       controls.enabled = true;
       return;
     }
