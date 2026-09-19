@@ -1060,4 +1060,368 @@ return;
 }
 
 if (isSelectMode) {
-isBoxSelecti
+isBoxSelecti= true;
+controls.enabled = false;
+selectBox.style.left = pos.rawX + 'px';
+selectBox.style.top = pos.rawY + 'px';
+selectBox.style.width = '0px';
+selectBox.style.height = '0px';
+selectBox.style.display = 'block';
+return;
+}
+
+raycaster.setFromCamera(touch, camera);
+const intersects = raycaster.intersectObjects(objects);
+
+if (intersects.length > 0) {
+const hitObj = intersects[0].object;
+if (hitObj.userData.isLocked) { controls.enabled = true; return; }
+
+selectedObj = hitObj;
+selectedObj.userData.lastMovedTime = Date.now();
+
+if (selectedGroup.includes(selectedObj)) {
+groupDragOffsets = selectedGroup.map(obj => ({
+obj: obj,
+offsetX: obj.position.x - selectedObj.position.x,
+offsetZ: obj.position.z - selectedObj.position.z
+}));
+} else {
+clearSelectionGroup();
+groupDragOffsets = [{ obj: selectedObj, offsetX: 0, offsetZ: 0 }];
+}
+controls.enabled = false;
+} else {
+clearSelectionGroup();
+selectedObj = null;
+controls.enabled = true;
+}
+}
+
+function onTouchMove(e) {
+if (e.target.closest('#top-bar, #bottom-info, #prop-modal, #card-preview-modal, #dynamic-action-bar, #chat-container, #pen-tools-panel')) return;
+
+const pos = getTouchPos(e);
+
+if (isEraserMode) {
+touch.x = pos.x; touch.y = pos.y;
+checkEraserAtPoint(touch);
+return;
+}
+
+if (isPenMode && currentLineMesh) {
+touch.x = pos.x; touch.y = pos.y;
+raycaster.setFromCamera(touch, camera);
+const hitPoint = new THREE.Vector3();
+if (raycaster.ray.intersectPlane(boardPlane, hitPoint)) {
+const lastPt = currentLinePoints[currentLinePoints.length - 1];
+if (Math.hypot(hitPoint.x - lastPt.x, hitPoint.z - lastPt.z) > 0.08) {
+currentLinePoints.push({ x: hitPoint.x, z: hitPoint.z });
+scene.remove(currentLineMesh);
+currentLineMesh = createLineMesh(currentLinePoints, selectedPenColor, selectedPenRadius);
+if (currentLineMesh) scene.add(currentLineMesh);
+}
+}
+return;
+}
+
+if (isBoxSelecting) {
+const left = Math.min(touchStartPos.x, pos.rawX);
+const top = Math.min(touchStartPos.y, pos.rawY);
+const width = Math.abs(pos.rawX - touchStartPos.x);
+const height = Math.abs(pos.rawY - touchStartPos.y);
+
+selectBox.style.left = left + 'px';
+selectBox.style.top = top + 'px';
+selectBox.style.width = width + 'px';
+selectBox.style.height = height + 'px';
+return;
+}
+
+if (!selectedObj || selectedObj.userData.isLocked) return;
+
+touch.x = pos.x; touch.y = pos.y;
+raycaster.setFromCamera(touch, camera);
+const target = new THREE.Vector3();
+raycaster.ray.intersectPlane(plane, target);
+
+groupDragOffsets.forEach(item => {
+item.obj.position.x = target.x + item.offsetX;
+item.obj.position.z = target.z + item.offsetZ;
+
+if (item.obj.userData.type === 'card') {
+alignCardRotationBySeat(item.obj);
+updateHandVisibility(item.obj);
+}
+sendMoveData(item.obj);
+});
+
+updateStacking();
+}
+
+function onTouchEnd(e) {
+const pos = getTouchPos(e);
+
+if (isEraserMode) {
+lastEraserPoint = null;
+controls.enabled = true;
+return;
+}
+
+if (isPenMode && currentLineMesh) {
+scene.remove(currentLineMesh);
+if (currentLinePoints.length >= 2) {
+const lineObj = addRenderedLine(currentLinePoints, selectedPenColor, selectedPenRadius);
+if (lineObj) {
+broadcastData({
+type: 'draw_line',
+id: lineObj.id,
+points: currentLinePoints,
+color: selectedPenColor,
+radius: selectedPenRadius
+});
+}
+}
+currentLineMesh = null;
+currentLinePoints = [];
+controls.enabled = true;
+return;
+}
+
+if (isBoxSelecting) {
+isBoxSelecting = false;
+selectBox.style.display = 'none';
+controls.enabled = true;
+clearSelectionGroup();
+
+const minX = Math.min(touchStartPos.x, pos.rawX);
+const maxX = Math.max(touchStartPos.x, pos.rawX);
+const minY = Math.min(touchStartPos.y, pos.rawY);
+const maxY = Math.max(touchStartPos.y, pos.rawY);
+
+objects.forEach(obj => {
+const screenPos = obj.position.clone().project(camera);
+const x = (screenPos.x * 0.5 + 0.5) * window.innerWidth;
+const y = (-screenPos.y * 0.5 + 0.5) * window.innerHeight;
+
+if (x >= minX && x <= maxX && y >= minY && y <= maxY) {
+selectedGroup.push(obj);
+const outlineMesh = new THREE.Mesh(
+new THREE.BoxGeometry(0.94, 0.04, 1.39),
+new THREE.MeshBasicMaterial({ color: 0x10b981, wireframe: true })
+);
+obj.add(outlineMesh);
+obj.userData.outlineMesh = outlineMesh;
+}
+});
+return;
+}
+
+if (selectedObj && !selectedObj.userData.isLocked) {
+const touchDuration = Date.now() - touchStartTime;
+const lastPos = e.changedTouches ? e.changedTouches[0] : e;
+const dist = Math.hypot(lastPos.clientX - touchStartPos.x, lastPos.clientY - touchStartPos.y);
+
+if (selectedGroup.length > 0) {
+snapCardsToSlots(selectedGroup.filter(o => o.userData.type === 'card'));
+} else if (selectedObj.userData.type === 'card') {
+snapCardsToSlots(selectedObj);
+}
+
+if (touchDuration < 300 && dist < 10) {
+if (selectedObj.userData.type === 'card') flipCard(selectedObj, true);
+else if (selectedObj.userData.type === 'dice') rollDice(selectedObj, true);
+}
+
+updateStacking();
+}
+selectedObj = null;
+controls.enabled = true;
+}
+
+function getTouchPos(e) {
+const t = e.touches ? e.touches[0] : e;
+return { x: (t.clientX / window.innerWidth) * 2 - 1, y: -(t.clientY / window.innerHeight) * 2 + 1, rawX: t.clientX, rawY: t.clientY };
+}
+
+window.addEventListener('touchstart', onTouchStart, { passive: false });
+window.addEventListener('touchmove', onTouchMove, { passive: false });
+window.addEventListener('touchend', onTouchEnd, false);
+window.addEventListener('mousedown', onTouchStart, false);
+window.addEventListener('mousemove', onTouchMove, false);
+window.addEventListener('mouseup', onTouchEnd, false);
+
+function sendMoveData(obj) {
+const isInsideMyZone = isPositionInSeatZone(obj.position.x, obj.position.z, mySeat);
+let isFlippedForOthers = obj.userData.isFlipped;
+
+if (obj.userData.type === 'card') {
+if (isInsideMyZone) {
+isFlippedForOthers = true;
+} else {
+const seat = getSeatFromPosition(obj.position.x, obj.position.z);
+if (seat !== 0 && seat !== mySeat) isFlippedForOthers = true;
+}
+}
+
+broadcastData({
+type: 'move', id: obj.userData.id,
+x: obj.position.x, z: obj.position.z,
+rotY: obj.rotation.y, isFlipped: isFlippedForOthers
+});
+}
+
+function flipCard(card, isLocal = false) {
+if (card.userData.isAnimating) return;
+card.userData.isAnimating = true;
+
+const targetRotZ = card.userData.isFlipped ? 0 : Math.PI;
+const startRotZ = card.rotation.z;
+let progress = 0;
+
+function animateFlip() {
+progress += 0.1;
+card.rotation.z = THREE.MathUtils.lerp(startRotZ, targetRotZ, progress);
+card.position.y = CARD_BASE_Y + Math.sin(progress * Math.PI) * 0.5;
+
+if (progress < 1) requestAnimationFrame(animateFlip);
+else {
+card.rotation.z = targetRotZ;
+card.userData.isFlipped = !card.userData.isFlipped;
+card.userData.isAnimating = false;
+updateStacking();
+sendMoveData(card);
+}
+}
+animateFlip();
+if (isLocal) broadcastData({ type: 'flip', id: card.userData.id });
+}
+
+function rollDice(dice, isLocal = false, targetRot = null) {
+if (dice.userData.isRolling) return;
+dice.userData.isRolling = true;
+const rotX = targetRot ? targetRot.x : Math.floor(Math.random() * 4) * (Math.PI / 2) + Math.PI * 4;
+const rotY = targetRot ? targetRot.y : Math.floor(Math.random() * 4) * (Math.PI / 2) + Math.PI * 4;
+const rotZ = targetRot ? targetRot.z : Math.floor(Math.random() * 4) * (Math.PI / 2) + Math.PI * 4;
+const startRot = { x: dice.rotation.x, y: dice.rotation.y, z: dice.rotation.z };
+let progress = 0;
+
+function animateRoll() {
+progress += 0.04;
+dice.rotation.x = THREE.MathUtils.lerp(startRot.x, rotX, progress);
+dice.rotation.y = THREE.MathUtils.lerp(startRot.y, rotY, progress);
+dice.rotation.z = THREE.MathUtils.lerp(startRot.z, rotZ, progress);
+dice.position.y = 0.61 + Math.abs(Math.sin(progress * Math.PI * 2)) * (1 - progress) * 2;
+if (progress < 1) requestAnimationFrame(animateRoll);
+else { dice.position.y = 0.61; dice.userData.isRolling = false; }
+}
+animateRoll();
+if (isLocal) broadcastData({ type: 'roll', id: dice.userData.id, targetRot: { x: rotX, y: rotY, z: rotZ } });
+}
+
+function generateShortId() {
+const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+let result = '';
+for (let i = 0; i < 4; i++) result += chars.charAt(Math.floor(Math.random() * chars.length));
+return result;
+}
+
+const shortId = generateShortId();
+const peer = new Peer(shortId);
+const connections = [];
+
+peer.on('open', id => document.getElementById('my-id').innerText = id);
+peer.on('connection', conn => {
+connections.push(conn);
+setupConnection(conn);
+addChatMessage('시스템', '새 플레이어가 접속했습니다.', false, true);
+});
+
+document.getElementById('connect-btn').addEventListener('click', () => {
+const targetId = document.getElementById('join-id').value.toUpperCase().trim();
+if (targetId) {
+const conn = peer.connect(targetId);
+connections.push(conn);
+setupConnection(conn);
+}
+});
+
+function setupConnection(conn) {
+document.getElementById('status').innerText = (${connections.length}명 연결됨)`;
+document.getElementById('status').style.color = '#10b981';
+
+conn.on('data', data => handleNetworkData(data));
+conn.on('close', () => {
+const idx = connections.indexOf(conn);
+if (idx !== -1) connections.splice(idx, 1);
+document.getElementById('status').innerText = connections.length > 0 ? (${connections.length}명 연결됨)` : '(대기중)';
+addChatMessage('시스템', '플레이어 한 명이 퇴장했습니다.', false, true);
+});
+}
+
+function broadcastData(data) {
+connections.forEach(conn => { if (conn.open) conn.send(data); });
+}
+
+function handleNetworkData(data) {
+if (data.type === 'chat') {
+addChatMessage(data.sender, data.text, false);
+} else if (data.type === 'draw_line') {
+addRenderedLine(data.points, data.color, data.radius, data.id);
+} else if (data.type === 'delete_line') {
+deleteSingleLine(data.id, false);
+} else if (data.type === 'clear_lines') {
+clearAllLines(false);
+} else if (data.type === 'clear') {
+objects.forEach(obj => scene.remove(obj));
+cardSlots.forEach(slot => scene.remove(slot));
+objects = []; cardSlots = [];
+clearSelectionGroup();
+updateDynamicActionBar();
+} else if (data.type === 'create_slots') {
+createSlotLine(data.count, false);
+} else if (data.type === 'reset_deck') {
+spawnFullDeck(false);
+} else if (data.type === 'spawn') {
+if (data.propType === 'card') createCard(data.x, data.z, false, data.suit, data.value, data.id);
+else if (data.propType === 'dice') createDice(data.x, data.z, false, data.id);
+} else if (data.type === 'shuffle') {
+shuffleCards(false);
+} else if (data.type === 'gather') {
+gatherCards(false);
+} else if (data.type === 'spread') {
+spreadCards(false);
+} else if (data.type === 'cut') {
+cutDeck(false);
+} else {
+const targetObj = objects.find(o => o.userData.id === data.id);
+if (!targetObj) return;
+if (data.type === 'move') {
+targetObj.position.x = data.x;
+targetObj.position.z = data.z;
+if (data.rotY !== undefined) targetObj.rotation.y = data.rotY;
+if (targetObj.userData.type === 'card' && data.isFlipped !== undefined) {
+targetObj.userData.isFlipped = data.isFlipped;
+updateHandVisibility(targetObj);
+}
+updateStacking();
+} else if (data.type === 'flip') flipCard(targetObj, false);
+else if (data.type === 'roll') rollDice(targetObj, false, data.targetRot);
+}
+}
+
+function animate() {
+requestAnimationFrame(animate);
+controls.update();
+renderer.render(scene, camera);
+}
+animate();
+
+window.addEventListener('resize', () => {
+camera.aspect = window.innerWidth / window.innerHeight;
+camera.updateProjectionMatrix();
+renderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
+</body>
+</html>
