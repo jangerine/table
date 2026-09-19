@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Mobile Tabletop Simulator - Realtime Chat Added</title>
+  <title>Mobile Tabletop Simulator - Pen Feature Added</title>
   <style>
     * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
     body { margin: 0; overflow: hidden; touch-action: none; font-family: 'Pretendard', sans-serif; background-color: #0f172a; }
@@ -22,6 +22,7 @@
       box-shadow: 0 4px 10px rgba(0,0,0,0.3); transition: all 0.2s ease;
     }
     .ui-btn:active { transform: scale(0.95); }
+    .ui-btn.active { outline: 2px solid #ffffff; box-shadow: 0 0 12px rgba(255,255,255,0.6); }
 
     .btn-purple { background: linear-gradient(135deg, #8b5cf6, #7c3aed); }
     .btn-green { background: linear-gradient(135deg, #10b981, #059669); }
@@ -29,7 +30,7 @@
     .btn-orange { background: linear-gradient(135deg, #f59e0b, #d97706); }
     .btn-red { background: linear-gradient(135deg, #ef4444, #dc2626); }
     .btn-blue { background: linear-gradient(135deg, #3b82f6, #2563eb); }
-    .btn-gray { background: linear-gradient(135deg, #64748b, #475569); }
+    .btn-pink { background: linear-gradient(135deg, #ec4899, #db2777); }
 
     /* 판 위 소품 존재 시 자동 표시되는 동적 버튼 바 */
     #dynamic-action-bar {
@@ -53,7 +54,7 @@
     #peer-ui button { padding: 4px 8px; font-size: 11px; border-radius: 6px; border: none; background: #10b981; color: white; font-weight: bold; }
     #player-seat-select { padding: 3px 6px; font-size: 11px; border-radius: 6px; background: #334155; color: white; border: 1px solid #475569; }
 
-    /* 🔥 [신규] 우측 하단 구석 채팅창 스타일 */
+    /* 우측 하단 구석 채팅창 스타일 */
     #chat-container {
       position: absolute; bottom: 16px; right: 16px; z-index: 150;
       width: 260px; background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(10px);
@@ -132,6 +133,9 @@
     <button class="ui-btn btn-purple" id="prop-menu-btn">🎮 소품 추가</button>
     <button class="ui-btn btn-orange" id="add-slot-btn">🔲 슬롯 생성</button>
     <button class="ui-btn btn-purple" id="select-mode-btn">🟦 영역 선택 [OFF]</button>
+    <!-- 🔥 [신규] 펜 그리기 버튼 및 전체 지우기 버튼 -->
+    <button class="ui-btn btn-pink" id="pen-mode-btn">✏️ 펜 [OFF]</button>
+    <button class="ui-btn btn-red" id="clear-lines-btn">🧹 선 지우기</button>
   </div>
   <div class="btn-group-right">
     <button class="ui-btn btn-blue" id="cam-mode-btn">카메라 회전</button>
@@ -166,10 +170,10 @@
     </select>
     <span id="status" style="color:#f59e0b;">(대기중)</span>
   </div>
-  <div>✅ <b>실시간 채팅 기능 추가:</b> 오른쪽 아래 채팅창에서 접속자들과 대화할 수 있습니다.</div>
+  <div>✅ <b>실시간 펜 기능 추가:</b> 펜 모드를 켜고 보드판 위에 선을 그릴 수 있습니다.</div>
 </div>
 
-<!-- 🔥 [신규] 오른쪽 구석 접이식 실시간 채팅창 -->
+<!-- 오른쪽 구석 접이식 실시간 채팅창 -->
 <div id="chat-container">
   <div id="chat-header">
     <span>💬 실시간 채팅</span>
@@ -291,6 +295,17 @@
   let cardSlots = [];
   let selectedGroup = [];
   let objectIdCounter = 0;
+
+  // 🔥 [신규] 펜 그리기 관련 데이터 정의
+  let drawnLines = [];
+  let isPenMode = false;
+  let currentLineMesh = null;
+  let currentLinePoints = [];
+
+  const penColors = [0xef4444, 0x3b82f6, 0x10b981, 0xf59e0b, 0xffffff];
+  function getMyPenColor() {
+    return penColors[(mySeat - 1) % penColors.length];
+  }
 
   const suits = ['♠', '♥', '♦', '♣'];
   const values = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
@@ -830,7 +845,41 @@
 
   updateDynamicActionBar();
 
-  // 🔥 [신규] 실시간 채팅 UI 조작 로직
+  // 🔥 [신규] 펜 선 생성 및 지우기 로직
+  function addRenderedLine(points, colorHex) {
+    if (!points || points.length < 2) return;
+    const vectors = points.map(p => new THREE.Vector3(p.x, 0.28, p.z));
+    const geometry = new THREE.BufferGeometry().setFromPoints(vectors);
+    const material = new THREE.LineBasicMaterial({ color: colorHex, linewidth: 3 });
+    const lineMesh = new THREE.Line(geometry, material);
+    scene.add(lineMesh);
+    drawnLines.push(lineMesh);
+  }
+
+  function clearAllLines(isLocal = true) {
+    drawnLines.forEach(line => scene.remove(line));
+    drawnLines = [];
+    if (isLocal) broadcastData({ type: 'clear_lines' });
+  }
+
+  const penBtn = document.getElementById('pen-mode-btn');
+  penBtn.addEventListener('click', () => {
+    isPenMode = !isPenMode;
+    penBtn.innerText = isPenMode ? '✏️ 펜 [ON]' : '✏️ 펜 [OFF]';
+    penBtn.classList.toggle('active', isPenMode);
+
+    if (isPenMode && isSelectMode) {
+      isSelectMode = false;
+      document.getElementById('select-mode-btn').innerText = '🟦 영역 선택 [OFF]';
+      document.getElementById('select-mode-btn').classList.remove('active');
+    }
+  });
+
+  document.getElementById('clear-lines-btn').addEventListener('click', () => {
+    clearAllLines(true);
+  });
+
+  // 실시간 채팅 UI 조작 로직
   const chatHeader = document.getElementById('chat-header');
   const chatBody = document.getElementById('chat-body');
   const chatToggleIcon = document.getElementById('chat-toggle-icon');
@@ -911,6 +960,12 @@
     isSelectMode = !isSelectMode;
     selectBtn.innerText = isSelectMode ? '🟦 영역 선택 [ON]' : '🟦 영역 선택 [OFF]';
     selectBtn.classList.toggle('active', isSelectMode);
+
+    if (isSelectMode && isPenMode) {
+      isPenMode = false;
+      penBtn.innerText = '✏️ 펜 [OFF]';
+      penBtn.classList.remove('active');
+    }
   });
 
   let isCamModeAlwaysOn = false;
@@ -936,6 +991,7 @@
   let selectedObj = null;
   let groupDragOffsets = [];
   const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -CARD_BASE_Y);
+  const boardPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -0.28);
   
   let touchStartTime = 0;
   let touchStartPos = { x: 0, y: 0 };
@@ -996,6 +1052,21 @@
     touchStartTime = Date.now();
     touchStartPos = { x: pos.rawX, y: pos.rawY };
 
+    // 🔥 [신규] 펜 그리기 모드 동작
+    if (isPenMode) {
+      controls.enabled = false;
+      raycaster.setFromCamera(touch, camera);
+      const hitPoint = new THREE.Vector3();
+      raycaster.ray.intersectPlane(boardPlane, hitPoint);
+      
+      currentLinePoints = [{ x: hitPoint.x, z: hitPoint.z }];
+      const geom = new THREE.BufferGeometry().setFromPoints([hitPoint, hitPoint.clone()]);
+      const mat = new THREE.LineBasicMaterial({ color: getMyPenColor(), linewidth: 3 });
+      currentLineMesh = new THREE.Line(geom, mat);
+      scene.add(currentLineMesh);
+      return;
+    }
+
     if (isSelectMode) {
       isBoxSelecting = true;
       controls.enabled = false;
@@ -1045,6 +1116,23 @@
 
     const pos = getTouchPos(e);
 
+    // 🔥 [신규] 펜 그림을 이어 그리는 중일 때
+    if (isPenMode && currentLineMesh) {
+      touch.x = pos.x; touch.y = pos.y;
+      raycaster.setFromCamera(touch, camera);
+      const hitPoint = new THREE.Vector3();
+      raycaster.ray.intersectPlane(boardPlane, hitPoint);
+
+      const lastPt = currentLinePoints[currentLinePoints.length - 1];
+      if (Math.hypot(hitPoint.x - lastPt.x, hitPoint.z - lastPt.z) > 0.05) {
+        currentLinePoints.push({ x: hitPoint.x, z: hitPoint.z });
+        const vectors = currentLinePoints.map(p => new THREE.Vector3(p.x, 0.28, p.z));
+        currentLineMesh.geometry.dispose();
+        currentLineMesh.geometry = new THREE.BufferGeometry().setFromPoints(vectors);
+      }
+      return;
+    }
+
     if (isBoxSelecting) {
       const left = Math.min(touchStartPos.x, pos.rawX);
       const top = Math.min(touchStartPos.y, pos.rawY);
@@ -1081,6 +1169,20 @@
 
   function onTouchEnd(e) {
     const pos = getTouchPos(e);
+
+    // 🔥 [신규] 펜 그리기 종료 및 네트워킹 전송
+    if (isPenMode && currentLineMesh) {
+      if (currentLinePoints.length >= 2) {
+        drawnLines.push(currentLineMesh);
+        broadcastData({ type: 'draw_line', points: currentLinePoints, color: getMyPenColor() });
+      } else {
+        scene.remove(currentLineMesh);
+      }
+      currentLineMesh = null;
+      currentLinePoints = [];
+      controls.enabled = true;
+      return;
+    }
 
     if (isBoxSelecting) {
       isBoxSelecting = false;
@@ -1269,8 +1371,13 @@
 
   function handleNetworkData(data) {
     if (data.type === 'chat') {
-      // 🔥 상대방 채팅 수신 처리
       addChatMessage(data.sender, data.text, false);
+    } else if (data.type === 'draw_line') {
+      // 🔥 [신규] 상대방이 그린 선 수신 처리
+      addRenderedLine(data.points, data.color);
+    } else if (data.type === 'clear_lines') {
+      // 🔥 [신규] 선 지우기 수신 처리
+      clearAllLines(false);
     } else if (data.type === 'clear') {
       objects.forEach(obj => scene.remove(obj));
       cardSlots.forEach(slot => scene.remove(slot));
