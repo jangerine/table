@@ -197,7 +197,7 @@
     </select>
     <span id="status" style="color:#f59e0b;">(대기중)</span>
   </div>
-  <div>🛠 <b>최종 복원:</b> 테이블과 카메라 구도를 3D 스크린샷 맵처럼 입체적으로 변경했습니다.</div>
+  <div>🛠 <b>최종 복원:</b> 확장된 대형 테이블 크기에 맞춰 전체 시야를 최적화했습니다.</div>
 </div>
 
 <div id="chat-container">
@@ -223,15 +223,15 @@
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x0f172a);
 
-  // [수정] 카메라 구도를 입체적인 3D 형태로 변경
+  // [수정] 확장된 판 크기에 맞춰 초기 카메라 거리 조절
   const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1000);
-  camera.position.set(-10, 11, 0); // 기본 좌석(P3) 구도
+  camera.position.set(-15, 16, 0); // 기본 좌석(P3) 구도
 
   function updateCameraPosition() {
-    if (mySeat === 1) camera.position.set(0, 11, 10);
-    else if (mySeat === 2) camera.position.set(0, 11, -10);
-    else if (mySeat === 3) camera.position.set(-10, 11, 0);
-    else if (mySeat === 4) camera.position.set(10, 11, 0);
+    if (mySeat === 1) camera.position.set(0, 16, 15);
+    else if (mySeat === 2) camera.position.set(0, 16, -15);
+    else if (mySeat === 3) camera.position.set(-15, 16, 0);
+    else if (mySeat === 4) camera.position.set(15, 16, 0);
   }
   updateCameraPosition();
 
@@ -247,13 +247,13 @@
   controls.dampingFactor = 0.05;
   controls.maxPolarAngle = Math.PI / 2 - 0.05;
   controls.minDistance = 4;
-  controls.maxDistance = 25;
+  controls.maxDistance = 35; // [수정] 대형 판 조망을 위해 maxDistance 확대
   controls.target.set(0, 0.2, 0);
 
   const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
   scene.add(ambientLight);
   const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
-  dirLight.position.set(6, 12, 6);
+  dirLight.position.set(10, 20, 10);
   dirLight.castShadow = true;
   scene.add(dirLight);
 
@@ -266,55 +266,57 @@
     return new THREE.CanvasTexture(canvas);
   }
 
+  // [수정] 확장된 패브릭 매트에 맞춰 2048x2048 해상도 및 핸드존 비율 수정
   function createFeltMatTexture4P() {
-    const canvas = document.createElement('canvas'); canvas.width = 1024; canvas.height = 1024;
+    const canvas = document.createElement('canvas'); canvas.width = 2048; canvas.height = 2048;
     const ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#1b4d2e'; ctx.fillRect(0, 0, 1024, 1024);
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)'; ctx.lineWidth = 8; ctx.strokeRect(20, 20, 984, 984);
+    ctx.fillStyle = '#1b4d2e'; ctx.fillRect(0, 0, 2048, 2048);
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)'; ctx.lineWidth = 12; ctx.strokeRect(30, 30, 1988, 1988);
 
-    ctx.font = 'bold 26px sans-serif'; ctx.textAlign = 'center';
+    ctx.font = 'bold 48px sans-serif'; ctx.textAlign = 'center';
 
-    ctx.strokeStyle = 'rgba(96, 165, 250, 0.6)'; ctx.lineWidth = 4;
-    ctx.strokeRect(180, 850, 664, 140);
+    ctx.strokeStyle = 'rgba(96, 165, 250, 0.6)'; ctx.lineWidth = 6;
+    ctx.strokeRect(360, 1720, 1328, 260);
     ctx.fillStyle = 'rgba(96, 165, 250, 0.8)';
-    ctx.fillText('P1 HAND ZONE (남)', 512, 920);
+    ctx.fillText('P1 HAND ZONE (남)', 1024, 1860);
 
     ctx.strokeStyle = 'rgba(239, 68, 68, 0.6)';
-    ctx.strokeRect(180, 34, 664, 140);
+    ctx.strokeRect(360, 68, 1328, 260);
     ctx.fillStyle = 'rgba(239, 68, 68, 0.8)';
-    ctx.fillText('P2 HAND ZONE (북)', 512, 110);
+    ctx.fillText('P2 HAND ZONE (북)', 1024, 210);
 
     ctx.strokeStyle = 'rgba(16, 185, 129, 0.6)';
-    ctx.strokeRect(34, 180, 140, 664);
+    ctx.strokeRect(68, 360, 260, 1328);
     ctx.fillStyle = 'rgba(16, 185, 129, 0.8)';
-    ctx.save(); ctx.translate(100, 512); ctx.rotate(-Math.PI/2);
+    ctx.save(); ctx.translate(200, 1024); ctx.rotate(-Math.PI/2);
     ctx.fillText('P3 HAND ZONE (서)', 0, 0); ctx.restore();
 
     ctx.strokeStyle = 'rgba(245, 158, 11, 0.6)';
-    ctx.strokeRect(850, 180, 140, 664);
+    ctx.strokeRect(1720, 360, 260, 1328);
     ctx.fillStyle = 'rgba(245, 158, 11, 0.8)';
-    ctx.save(); ctx.translate(920, 512); ctx.rotate(Math.PI/2);
+    ctx.save(); ctx.translate(1848, 1024); ctx.rotate(Math.PI/2);
     ctx.fillText('P4 HAND ZONE (동)', 0, 0); ctx.restore();
 
     return new THREE.CanvasTexture(canvas);
   }
 
+  // [수정] 판의 크기 대폭 확장 (기존 w=7.5 -> 11.0)
   const tableShape = new THREE.Shape();
-  const w = 7.5, h = 7.5, r = 1.2;
+  const w = 11.0, h = 11.0, r = 1.8;
   tableShape.moveTo(-w + r, -h); tableShape.lineTo(w - r, -h);
   tableShape.lineTo(w, -h + r); tableShape.lineTo(w, h - r);
   tableShape.lineTo(w - r, h); tableShape.lineTo(-w + r, h);
   tableShape.lineTo(-w, h - r); tableShape.lineTo(-w, -h + r);
   tableShape.closePath();
 
-  // [수정] 테이블 모양을 더 입체적으로 변경
-  const tableGeo = new THREE.ExtrudeGeometry(tableShape, { depth: 0.3, bevelEnabled: true, bevelSegments: 2, steps: 1, bevelSize: 0.1, bevelThickness: 0.1 });
+  const tableGeo = new THREE.ExtrudeGeometry(tableShape, { depth: 0.35, bevelEnabled: true, bevelSegments: 3, steps: 1, bevelSize: 0.15, bevelThickness: 0.15 });
   tableGeo.rotateX(Math.PI / 2);
   const tableMesh = new THREE.Mesh(tableGeo, new THREE.MeshStandardMaterial({ map: createWoodTexture(), roughness: 0.6 }));
   tableMesh.position.y = -0.15;
   scene.add(tableMesh);
 
-  const matGeo = new THREE.PlaneGeometry(13.5, 13.5);
+  // [수정] 보드 매트 크기 확장 (기존 13.5 -> 20.0)
+  const matGeo = new THREE.PlaneGeometry(20.0, 20.0);
   const boardMatMesh = new THREE.Mesh(matGeo, new THREE.MeshStandardMaterial({ map: createFeltMatTexture4P(), roughness: 0.8 }));
   boardMatMesh.rotation.x = -Math.PI / 2;
   boardMatMesh.position.y = 0.26;
@@ -498,11 +500,12 @@
     return dice;
   }
 
+  // [수정] 확장된 매트 크기 영역에 맞추어 Seat 영역 판정 임계치 확대 (4.2 -> 6.8)
   function isPositionInSeatZone(x, z, seat) {
-    if (seat === 1) return z > 4.2 && x >= -4.2 && x <= 4.2;
-    if (seat === 2) return z < -4.2 && x >= -4.2 && x <= 4.2;
-    if (seat === 3) return x < -4.2 && z >= -4.2 && z <= 4.2;
-    if (seat === 4) return x > 4.2 && z >= -4.2 && z <= 4.2;
+    if (seat === 1) return z > 6.8 && x >= -6.8 && x <= 6.8;
+    if (seat === 2) return z < -6.8 && x >= -6.8 && x <= 6.8;
+    if (seat === 3) return x < -6.8 && z >= -6.8 && z <= 6.8;
+    if (seat === 4) return x > 6.8 && z >= -6.8 && z <= 6.8;
     return false;
   }
 
@@ -829,12 +832,12 @@
   const eraserBtn = document.getElementById('eraser-mode-btn');
   const penToolsPanel = document.getElementById('pen-tools-panel');
 
-  // [수정] 지우개 범위 시각화 원형 커서 생성 (초기 숨김)
-  const cursorGeo = new THREE.RingGeometry(0.77, 0.8, 32); // 기본 ERASER_RADIUS = 0.8 기준
+  // 지우개 범위 시각화 원형 커서 생성 (초기 숨김)
+  const cursorGeo = new THREE.RingGeometry(0.77, 0.8, 32);
   cursorGeo.rotateX(-Math.PI / 2);
   const cursorMat = new THREE.MeshBasicMaterial({ color: 0xff0000, side: THREE.DoubleSide });
   eraserCursorMesh = new THREE.Mesh(cursorGeo, cursorMat);
-  eraserCursorMesh.position.set(0, 0.29, 0); // 보드보다 약간 높게
+  eraserCursorMesh.position.set(0, 0.29, 0);
   eraserCursorMesh.visible = false;
   scene.add(eraserCursorMesh);
 
@@ -848,7 +851,7 @@
       isEraserMode = false;
       eraserBtn.innerText = '🧹 개별 지우개 [OFF]';
       eraserBtn.classList.remove('active');
-      eraserCursorMesh.visible = false; // 커서 숨김
+      eraserCursorMesh.visible = false;
 
       isSelectMode = false;
       document.getElementById('select-mode-btn').innerText = '🟦 영역 선택 [OFF]';
@@ -861,7 +864,6 @@
     eraserBtn.innerText = isEraserMode ? '🧹 개별 지우개 [ON]' : '🧹 개별 지우개 [OFF]';
     eraserBtn.classList.toggle('active', isEraserMode);
     
-    // [수정] 지우개 커서 표시 상태 연동
     eraserCursorMesh.visible = isEraserMode; 
 
     if (isEraserMode) {
@@ -998,44 +1000,34 @@
   let isBoxSelecting = false;
   const selectBox = document.getElementById('select-box');
 
-  function getTouchPos(e) {
-    const t = e.touches ? e.touches[0] : e;
-    return { x: (t.clientX / window.innerWidth) * 2 - 1, y: -(t.clientY / window.innerHeight) * 2 + 1, rawX: t.clientX, rawY: t.clientY };
-  }
-
-  // [수정] 지우개 감지 및 연속/다중 궤적 보간 삭제 함수
   function checkEraserAtPoint(touchVec) {
     raycaster.setFromCamera(touchVec, camera);
 
     const hitPoint = new THREE.Vector3();
     if (raycaster.ray.intersectPlane(boardPlane, hitPoint)) {
-      // 1. 지우개 커서 위치 업데이트
       eraserCursorMesh.position.set(hitPoint.x, 0.29, hitPoint.z);
 
-      const ERASER_RADIUS = 0.8; // 감지 반경
+      const ERASER_RADIUS = 0.8;
 
-      // 2. 보간 로직: 터치/마우스 이동 속도가 빨라도 중간 점을 채워 빈틈없이 지움
       let checkPoints = [hitPoint.clone()];
       if (lastEraserPoint) {
         const dist = hitPoint.distanceTo(lastEraserPoint);
-        const steps = Math.ceil(dist / 0.15); // 0.15 보간 간격
+        const steps = Math.ceil(dist / 0.15);
         for (let s = 1; s <= steps; s++) {
           checkPoints.push(new THREE.Vector3().lerpVectors(lastEraserPoint, hitPoint, s / steps));
         }
       }
       lastEraserPoint = hitPoint.clone();
 
-      // 3. 지우개 범위(ERASER_RADIUS) 안의 모든 선 탐색 및 다중 삭제 (return 없이 전체 순회)
       for (let i = drawnLines.length - 1; i >= 0; i--) {
         const line = drawnLines[i];
         
-        // 선을 구성하는 점들과 지우개 궤적 점 사이의 거리가 ERASER_RADIUS 이내인지 체크
         const isTouched = line.points.some(pt => {
           return checkPoints.some(cPt => Math.hypot(pt.x - cPt.x, pt.z - cPt.z) < ERASER_RADIUS);
         });
 
         if (isTouched) {
-          deleteSingleLine(line.id, true); // 지우고 return 하지 않고 다음 선 계속 검사
+          deleteSingleLine(line.id, true);
         }
       }
     }
@@ -1055,7 +1047,7 @@
 
     if (isEraserMode) {
       controls.enabled = false;
-      lastEraserPoint = null; // [수정] 궤적 초기화
+      lastEraserPoint = null;
       checkEraserAtPoint(touch);
       return;
     }
@@ -1176,7 +1168,7 @@
     const pos = getTouchPos(e);
 
     if (isEraserMode) {
-      lastEraserPoint = null; // [수정] 궤적 초기화
+      lastEraserPoint = null;
       controls.enabled = true;
       return;
     }
@@ -1250,6 +1242,11 @@
     }
     selectedObj = null;
     controls.enabled = true;
+  }
+
+  function getTouchPos(e) {
+    const t = e.touches ? e.touches[0] : e;
+    return { x: (t.clientX / window.innerWidth) * 2 - 1, y: -(t.clientY / window.innerHeight) * 2 + 1, rawX: t.clientX, rawY: t.clientY };
   }
 
   window.addEventListener('touchstart', onTouchStart, { passive: false });
