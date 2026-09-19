@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Mobile Tabletop Simulator - 8 Players Muffin Time Edition</title>
+  <title>Mobile Tabletop Simulator - Expanded 8 Players Board</title>
   <style>
     * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
     body { margin: 0; overflow: hidden; touch-action: none; font-family: 'Pretendard', sans-serif; background-color: #0f172a; }
@@ -204,7 +204,7 @@
     </select>
     <span id="status" style="color:#f59e0b;">(대기중)</span>
   </div>
-  <div>🧁 <b>최대 8인 지원:</b> 손패 카드가 10장이 모이면 🧁 MUFFIN TIME! 버튼을 눌러 승리를 선언하세요!</div>
+  <div>🧁 <b>확장된 대형 보드:</b> 8인 플레이에 맞춰 필드가 1.5배 확장되었습니다!</div>
 </div>
 
 <div id="chat-container">
@@ -214,7 +214,7 @@
   </div>
   <div id="chat-body">
     <div id="chat-messages">
-      <div class="chat-msg system">8인용 테이블탑 시뮬레이터 샌드박스에 오신 것을 환영합니다!</div>
+      <div class="chat-msg system">대형 8인 보드판에 오신 것을 환영합니다!</div>
     </div>
     <div id="chat-input-box">
       <input type="text" id="chat-input" placeholder="메시지 입력..." maxlength="100">
@@ -232,15 +232,16 @@
 
   const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1000);
 
+  // 확장된 보드판 크기에 맞춘 8방향 카메라 시점 좌표
   const seatCameraPositions = {
-    1: { x: 0, y: 18, z: 17 },
-    2: { x: -12, y: 18, z: 12 },
-    3: { x: -17, y: 18, z: 0 },
-    4: { x: -12, y: 18, z: -12 },
-    5: { x: 0, y: 18, z: -17 },
-    6: { x: 12, y: 18, z: -12 },
-    7: { x: 17, y: 18, z: 0 },
-    8: { x: 12, y: 18, z: 12 }
+    1: { x: 0, y: 26, z: 25 },
+    2: { x: -18, y: 26, z: 18 },
+    3: { x: -25, y: 26, z: 0 },
+    4: { x: -18, y: 26, z: -18 },
+    5: { x: 0, y: 26, z: -25 },
+    6: { x: 18, y: 26, z: -18 },
+    7: { x: 25, y: 26, z: 0 },
+    8: { x: 18, y: 26, z: 18 }
   };
 
   function updateCameraPosition() {
@@ -261,13 +262,13 @@
   controls.dampingFactor = 0.05;
   controls.maxPolarAngle = Math.PI / 2 - 0.05;
   controls.minDistance = 4;
-  controls.maxDistance = 45;
+  controls.maxDistance = 60; // 확장된 맵 조망을 위해 조망 거리 상향
   controls.target.set(0, 0.2, 0);
 
   const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
   scene.add(ambientLight);
   const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
-  dirLight.position.set(10, 20, 10);
+  dirLight.position.set(15, 30, 15);
   dirLight.castShadow = true;
   scene.add(dirLight);
 
@@ -280,24 +281,25 @@
     return new THREE.CanvasTexture(canvas);
   }
 
+  // 32.0 x 32.0 대형 매트 텍스처 생성
   function createFeltMatTexture8P() {
     const canvas = document.createElement('canvas'); canvas.width = 2048; canvas.height = 2048;
     const ctx = canvas.getContext('2d');
     ctx.fillStyle = '#1b4d2e'; ctx.fillRect(0, 0, 2048, 2048);
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)'; ctx.lineWidth = 12; ctx.strokeRect(30, 30, 1988, 1988);
 
-    ctx.font = 'bold 36px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.75)'; ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)'; ctx.lineWidth = 4;
+    ctx.font = 'bold 38px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.85)'; ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)'; ctx.lineWidth = 4;
 
     const zones = [
-      { name: "P1 (남)", x: 1024, y: 1850, angle: 0, w: 700, h: 200 },
-      { name: "P2 (남서)", x: 380, y: 1668, angle: Math.PI / 4, w: 700, h: 200 },
-      { name: "P3 (서)", x: 200, y: 1024, angle: Math.PI / 2, w: 700, h: 200 },
-      { name: "P4 (북서)", x: 380, y: 380, angle: (3 * Math.PI) / 4, w: 700, h: 200 },
-      { name: "P5 (북)", x: 1024, y: 200, angle: Math.PI, w: 700, h: 200 },
-      { name: "P6 (북동)", x: 1668, y: 380, angle: (-3 * Math.PI) / 4, w: 700, h: 200 },
-      { name: "P7 (동)", x: 1848, y: 1024, angle: -Math.PI / 2, w: 700, h: 200 },
-      { name: "P8 (남동)", x: 1668, y: 1668, angle: -Math.PI / 4, w: 700, h: 200 }
+      { name: "P1 (남)", x: 1024, y: 1860, angle: 0, w: 750, h: 220 },
+      { name: "P2 (남서)", x: 430, y: 1618, angle: Math.PI / 4, w: 750, h: 220 },
+      { name: "P3 (서)", x: 188, y: 1024, angle: Math.PI / 2, w: 750, h: 220 },
+      { name: "P4 (북서)", x: 430, y: 430, angle: (3 * Math.PI) / 4, w: 750, h: 220 },
+      { name: "P5 (북)", x: 1024, y: 188, angle: Math.PI, w: 750, h: 220 },
+      { name: "P6 (북동)", x: 1618, y: 430, angle: (-3 * Math.PI) / 4, w: 750, h: 220 },
+      { name: "P7 (동)", x: 1860, y: 1024, angle: -Math.PI / 2, w: 750, h: 220 },
+      { name: "P8 (남동)", x: 1618, y: 1618, angle: -Math.PI / 4, w: 750, h: 220 }
     ];
 
     zones.forEach(z => {
@@ -312,8 +314,9 @@
     return new THREE.CanvasTexture(canvas);
   }
 
+  // 원목 테이블 크기 확장 (w=17.0, h=17.0)
   const tableShape = new THREE.Shape();
-  const w = 11.0, h = 11.0, r = 1.8;
+  const w = 17.0, h = 17.0, r = 2.5;
   tableShape.moveTo(-w + r, -h); tableShape.lineTo(w - r, -h);
   tableShape.lineTo(w, -h + r); tableShape.lineTo(w, h - r);
   tableShape.lineTo(w - r, h); tableShape.lineTo(-w + r, h);
@@ -326,7 +329,8 @@
   tableMesh.position.y = -0.15;
   scene.add(tableMesh);
 
-  const matGeo = new THREE.PlaneGeometry(20.0, 20.0);
+  // 대형 보드 매트 (32.0 x 32.0)
+  const matGeo = new THREE.PlaneGeometry(32.0, 32.0);
   const boardMatMesh = new THREE.Mesh(matGeo, new THREE.MeshStandardMaterial({ map: createFeltMatTexture8P(), roughness: 0.8 }));
   boardMatMesh.rotation.x = -Math.PI / 2;
   boardMatMesh.position.y = 0.26;
@@ -601,12 +605,13 @@
     return card;
   }
 
+  // 넓어진 보드 공간에 맞추어 8인용 핸드존 좌표 재배치 (반지름 ~13.5 위치)
   function startMuffinTimeGame(isLocal = true) {
     objects.forEach(obj => scene.remove(obj));
     objects = [];
     clearSelectionGroup();
 
-    addChatMessage('시스템', '🧁 머핀 타임 8인용 덱 세팅 완료! P1~P8 핸드존으로 초기 3장씩 배치합니다.', false, true);
+    addChatMessage('시스템', '🧁 대형 8인용 머핀 타임 덱 배치 완료! P1~P8 넓어진 핸드존으로 초기 카드를 나눕니다.', false, true);
 
     let fullDeck = [];
     for (let i = 0; i < 8; i++) { fullDeck = fullDeck.concat(muffinCardDB); }
@@ -615,14 +620,14 @@
     fullDeck.forEach((cardData) => { createMuffinCard(0, 0, false, cardData); });
 
     const seatZones = [
-      { seat: 1, x: 0, z: 8.0 },
-      { seat: 2, x: -6.0, z: 6.0 },
-      { seat: 3, x: -8.0, z: 0 },
-      { seat: 4, x: -6.0, z: -6.0 },
-      { seat: 5, x: 0, z: -8.0 },
-      { seat: 6, x: 6.0, z: -6.0 },
-      { seat: 7, x: 8.0, z: 0 },
-      { seat: 8, x: 6.0, z: 6.0 }
+      { seat: 1, x: 0, z: 13.5 },
+      { seat: 2, x: -9.5, z: 9.5 },
+      { seat: 3, x: -13.5, z: 0 },
+      { seat: 4, x: -9.5, z: -9.5 },
+      { seat: 5, x: 0, z: -13.5 },
+      { seat: 6, x: 9.5, z: -9.5 },
+      { seat: 7, x: 13.5, z: 0 },
+      { seat: 8, x: 9.5, z: 9.5 }
     ];
 
     const cards = objects.filter(o => o.userData.type === 'card');
@@ -632,7 +637,7 @@
       for (let i = 0; i < 3; i++) {
         if (cardIdx < cards.length) {
           const card = cards[cardIdx++];
-          card.position.set(zone.x + (i - 1) * 0.9, CARD_BASE_Y, zone.z);
+          card.position.set(zone.x + (i - 1) * 1.0, CARD_BASE_Y, zone.z);
           alignCardRotationBySeat(card);
           updateHandVisibility(card);
         }
@@ -662,16 +667,17 @@
     return dice;
   }
 
+  // 확장된 보드 크기 맞춤 핸드존 구역 판정 (반지름 R=8.5 범위 적용)
   function isPositionInSeatZone(x, z, seat) {
-    const R = 5.2;
+    const R = 8.5;
     if (seat === 1) return z > R && x >= -R && x <= R;
-    if (seat === 2) return x < -3.5 && z > 3.5;
+    if (seat === 2) return x < -5.5 && z > 5.5;
     if (seat === 3) return x < -R && z >= -R && z <= R;
-    if (seat === 4) return x < -3.5 && z < -3.5;
+    if (seat === 4) return x < -5.5 && z < -5.5;
     if (seat === 5) return z < -R && x >= -R && x <= R;
-    if (seat === 6) return x > 3.5 && z < -3.5;
+    if (seat === 6) return x > 5.5 && z < -5.5;
     if (seat === 7) return x > R && z >= -R && z <= R;
-    if (seat === 8) return x > 3.5 && z > 3.5;
+    if (seat === 8) return x > 5.5 && z > 5.5;
     return false;
   }
 
