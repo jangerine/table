@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Mobile Tabletop Simulator - 4 Sides 8P Layout</title>
+  <title>Mobile Tabletop Simulator - Wide Non-Overlapping 8P Zones</title>
   <style>
     * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
     body { margin: 0; overflow: hidden; touch-action: none; font-family: 'Pretendard', sans-serif; background-color: #0f172a; }
@@ -204,7 +204,7 @@
     </select>
     <span id="status" style="color:#f59e0b;">(대기중)</span>
   </div>
-  <div>🧁 <b>스케치 레이아웃 적용 완료:</b> 정사각형 보드의 4개 면에 2개씩 깔끔하게 나란히 배치되었습니다!</div>
+  <div>🧁 <b>영역 확충 완료:</b> 옆 구역과 겹침 없이 각 플레이어 공간을 옆으로 넓게 확대했습니다!</div>
 </div>
 
 <div id="chat-container">
@@ -214,7 +214,7 @@
   </div>
   <div id="chat-body">
     <div id="chat-messages">
-      <div class="chat-msg system">4개 변 × 2구역 레이아웃 보드에 오신 것을 환영합니다!</div>
+      <div class="chat-msg system">확장된 8인 전용 보드에 오신 것을 환영합니다!</div>
     </div>
     <div id="chat-input-box">
       <input type="text" id="chat-input" placeholder="메시지 입력..." maxlength="100">
@@ -232,32 +232,31 @@
 
   const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1000);
 
-  // 4개 면 8구역에 맞춘 카메라 시점 위치 정의
+  // 구역 간격을 넓힘에 따른 카메라 시점 미세 조정 (간격 4.8 반영)
   const seatCameraPositions = {
-    1: { x: -3.8, y: 19, z: -18 }, // 북-좌
-    2: { x: 3.8, y: 19, z: -18 },  // 북-우
-    3: { x: 18, y: 19, z: -3.8 },  // 동-상
-    4: { x: 18, y: 19, z: 3.8 },   // 동-하
-    5: { x: 3.8, y: 19, z: 18 },   // 남-우
-    6: { x: -3.8, y: 19, z: 18 },  // 남-좌
-    7: { x: -18, y: 19, z: 3.8 },  // 서-하
-    8: { x: -18, y: 19, z: -3.8 }  // 서-상
+    1: { x: -4.8, y: 19, z: -18 },
+    2: { x: 4.8, y: 19, z: -18 },
+    3: { x: 18, y: 19, z: -4.8 },
+    4: { x: 18, y: 19, z: 4.8 },
+    5: { x: 4.8, y: 19, z: 18 },
+    6: { x: -4.8, y: 19, z: 18 },
+    7: { x: -18, y: 19, z: 4.8 },
+    8: { x: -18, y: 19, z: -4.8 }
   };
 
-  // 요청해주신 스케치 기반 8개 구역 좌표 정의
-  // 보드 크기(20.0 x 20.0) 기준, 각 변의 한계선 R_SIDE = 8.5 사용
+  // 구역 중심점 정의 (OFFSET = 4.8 로 넓혀 확장된 구역 간 겹침 방지)
   const R_SIDE = 8.5;
-  const OFFSET = 3.8; // 각 변에서 좌/우(상/하)로 떨어지는 거리를 넓혀 겹침 차단
+  const OFFSET = 4.8;
 
   const SEAT_CENTERS = {
-    1: { x: -OFFSET, z: -R_SIDE, angle: Math.PI },      // 북쪽 좌
-    2: { x: OFFSET, z: -R_SIDE, angle: Math.PI },       // 북쪽 우
-    3: { x: R_SIDE, z: -OFFSET, angle: -Math.PI / 2 },  // 동쪽 상
-    4: { x: R_SIDE, z: OFFSET, angle: -Math.PI / 2 },   // 동쪽 하
-    5: { x: OFFSET, z: R_SIDE, angle: 0 },              // 남쪽 우
-    6: { x: -OFFSET, z: R_SIDE, angle: 0 },             // 남쪽 좌
-    7: { x: -R_SIDE, z: OFFSET, angle: Math.PI / 2 },   // 서쪽 하
-    8: { x: -R_SIDE, z: -OFFSET, angle: Math.PI / 2 }   // 서쪽 상
+    1: { x: -OFFSET, z: -R_SIDE, angle: Math.PI },
+    2: { x: OFFSET, z: -R_SIDE, angle: Math.PI },
+    3: { x: R_SIDE, z: -OFFSET, angle: -Math.PI / 2 },
+    4: { x: R_SIDE, z: OFFSET, angle: -Math.PI / 2 },
+    5: { x: OFFSET, z: R_SIDE, angle: 0 },
+    6: { x: -OFFSET, z: R_SIDE, angle: 0 },
+    7: { x: -R_SIDE, z: OFFSET, angle: Math.PI / 2 },
+    8: { x: -R_SIDE, z: -OFFSET, angle: Math.PI / 2 }
   };
 
   function updateCameraPosition() {
@@ -297,7 +296,7 @@
     return new THREE.CanvasTexture(canvas);
   }
 
-  // 4개 면 × 2개 구역 전용 펠트 매트 텍스처 그리기
+  // 플레이어 구역 폭을 확장(w = 560)하여 그린 펠트 매트
   function createFeltMatTexture8P() {
     const canvas = document.createElement('canvas'); canvas.width = 2048; canvas.height = 2048;
     const ctx = canvas.getContext('2d');
@@ -325,7 +324,8 @@
       const cx = mapCoord(center.x);
       const cy = mapCoord(center.z);
       
-      const w = 420; const h = 180;
+      // 폭을 기존 420에서 560으로 크게 확대 (서로 안 겹치도록 정밀 조율)
+      const w = 560; const h = 180;
 
       ctx.save();
       ctx.translate(cx, cy);
@@ -338,7 +338,7 @@
     return new THREE.CanvasTexture(canvas);
   }
 
-  // 기본 원목 테이블 (11.0 x 11.0 기반)
+  // 기본 테이블 규격
   const tableShape = new THREE.Shape();
   const w = 11.0, h = 11.0, r = 1.8;
   tableShape.moveTo(-w + r, -h); tableShape.lineTo(w - r, -h);
@@ -353,7 +353,7 @@
   tableMesh.position.y = -0.15;
   scene.add(tableMesh);
 
-  // 원래 보드판 매트 (20.0 x 20.0)
+  // 보드판 매트 (20.0 x 20.0)
   const matGeo = new THREE.PlaneGeometry(20.0, 20.0);
   const boardMatMesh = new THREE.Mesh(matGeo, new THREE.MeshStandardMaterial({ map: createFeltMatTexture8P(), roughness: 0.8 }));
   boardMatMesh.rotation.x = -Math.PI / 2;
@@ -634,7 +634,7 @@
     objects = [];
     clearSelectionGroup();
 
-    addChatMessage('시스템', '🧁 머핀타임 8인 게임이 시작되었습니다! 각 구역에 손패가 배분됩니다.', false, true);
+    addChatMessage('시스템', '🧁 머핀타임 8인 게임이 시작되었습니다! 넓어진 각 구역에 손패가 배분됩니다.', false, true);
 
     let fullDeck = [];
     for (let i = 0; i < 8; i++) { fullDeck = fullDeck.concat(muffinCardDB); }
@@ -647,12 +647,12 @@
 
     for (let seat = 1; seat <= 8; seat++) {
       const center = SEAT_CENTERS[seat];
-      // 구역 축에 직교하는 패 분배
       const isHorizontalSide = (seat === 1 || seat === 2 || seat === 5 || seat === 6);
+      // 구역이 옆으로 확장되었으므로 카드를 1.1 간격으로 시원하게 배치
       for (let i = 0; i < 3; i++) {
         if (cardIdx < cards.length) {
           const card = cards[cardIdx++];
-          const offset = (i - 1) * 0.95;
+          const offset = (i - 1) * 1.1;
           const dx = isHorizontalSide ? offset : 0;
           const dz = isHorizontalSide ? 0 : offset;
           card.position.set(center.x + dx, CARD_BASE_Y, center.z + dz);
@@ -685,11 +685,20 @@
     return dice;
   }
 
+  // 옆으로 넓어진 구역 크기(560px)에 대응하도록 감지 반경 조정 (가로 2.8, 세로 1.25)
   function isPositionInSeatZone(x, z, seat) {
     const center = SEAT_CENTERS[seat];
     if (!center) return false;
-    const dist = Math.hypot(x - center.x, z - center.z);
-    return dist <= 2.2;
+    
+    const isHorizontalSide = (seat === 1 || seat === 2 || seat === 5 || seat === 6);
+    const dx = Math.abs(x - center.x);
+    const dz = Math.abs(z - center.z);
+
+    if (isHorizontalSide) {
+      return dx <= 2.8 && dz <= 1.25;
+    } else {
+      return dz <= 2.8 && dx <= 1.25;
+    }
   }
 
   function getSeatFromPosition(x, z) {
