@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Mobile Tabletop Simulator - Fully Restored & Improved Eraser</title>
+  <title>Mobile Tabletop Simulator - Full Sandbox & Muffin Time Edition</title>
   <style>
     * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
     body { margin: 0; overflow: hidden; touch-action: none; font-family: 'Pretendard', sans-serif; background-color: #0f172a; }
@@ -25,6 +25,7 @@
     .ui-btn:active { transform: scale(0.95); }
     .ui-btn.active { outline: 2px solid #ffffff; box-shadow: 0 0 12px rgba(255,255,255,0.6); }
 
+    .btn-muffin { background: linear-gradient(135deg, #f43f5e, #be123c); animation: pulse 2s infinite; }
     .btn-purple { background: linear-gradient(135deg, #8b5cf6, #7c3aed); }
     .btn-green { background: linear-gradient(135deg, #10b981, #059669); }
     .btn-teal { background: linear-gradient(135deg, #14b8a6, #0d9488); }
@@ -32,6 +33,12 @@
     .btn-red { background: linear-gradient(135deg, #ef4444, #dc2626); }
     .btn-blue { background: linear-gradient(135deg, #3b82f6, #2563eb); }
     .btn-pink { background: linear-gradient(135deg, #ec4899, #db2777); }
+
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.7); }
+      70% { box-shadow: 0 0 0 10px rgba(244, 63, 94, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(244, 63, 94, 0); }
+    }
 
     /* Pen/Eraser Tools Panel */
     #pen-tools-panel {
@@ -41,18 +48,12 @@
       border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 12px;
       box-shadow: 0 8px 20px rgba(0,0,0,0.4); pointer-events: auto;
     }
-    .color-dot {
-      width: 22px; height: 22px; border-radius: 50%; cursor: pointer;
-      border: 2px solid transparent; transition: transform 0.2s;
-    }
+    .color-dot { width: 22px; height: 22px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; transition: transform 0.2s; }
     .color-dot.selected { border-color: #ffffff; transform: scale(1.25); }
-    .size-btn {
-      padding: 3px 8px; font-size: 11px; background: #334155; color: white;
-      border: 1px solid #475569; border-radius: 6px; cursor: pointer;
-    }
+    .size-btn { padding: 3px 8px; font-size: 11px; background: #334155; color: white; border: 1px solid #475569; border-radius: 6px; cursor: pointer; }
     .size-btn.selected { background: #3b82f6; border-color: #60a5fa; }
     
-    /* Dynamic Action Bar (spawned when prop selected) */
+    /* Dynamic Action Bar */
     #dynamic-action-bar {
       position: absolute; top: 70px; left: 50%; transform: translateX(-50%);
       z-index: 110; display: none; gap: 8px; padding: 6px 12px;
@@ -81,8 +82,7 @@
       width: 260px; background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(10px);
       border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 14px;
       box-shadow: 0 10px 30px rgba(0,0,0,0.6); overflow: hidden;
-      display: flex; flex-direction: column; pointer-events: auto;
-      transition: all 0.3s ease;
+      display: flex; flex-direction: column; pointer-events: auto; transition: all 0.3s ease;
     }
     #chat-header {
       padding: 8px 12px; background: rgba(30, 41, 59, 0.8);
@@ -99,7 +99,7 @@
     .chat-msg { line-height: 1.3; word-break: break-all; }
     .chat-msg .sender { font-weight: bold; color: #38bdf8; margin-right: 4px; }
     .chat-msg.me .sender { color: #10b981; }
-    .chat-msg.system { color: #94a3b8; font-style: italic; }
+    .chat-msg.system { color: #f43f5e; font-style: italic; }
     #chat-input-box { display: flex; padding: 6px; border-top: 1px solid rgba(255, 255, 255, 0.1); background: #0f172a; }
     #chat-input {
       flex: 1; padding: 6px 8px; font-size: 11px; border-radius: 6px;
@@ -123,14 +123,12 @@
     /* Card Preview Modal */
     #card-preview-modal {
       position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-      width: 220px; height: 330px; z-index: 300; background: #1e293b;
+      width: 240px; height: 360px; z-index: 300; background: #1e293b;
       border: 3px solid #60a5fa; border-radius: 16px; display: none;
       flex-direction: column; justify-content: center; align-items: center;
-      box-shadow: 0 20px 50px rgba(0,0,0,0.8); color: white; text-align: center; padding: 10px; pointer-events: auto;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.8); color: white; text-align: center; padding: 12px; pointer-events: auto;
     }
-    #preview-canvas { border-radius: 10px; margin-bottom: 10px; }
 
-    /* Selection Box */
     #select-box {
       position: absolute; border: 2px dashed #60a5fa; background: rgba(96, 165, 250, 0.2);
       pointer-events: none; display: none; z-index: 150;
@@ -146,12 +144,13 @@
 
 <div id="top-bar">
   <div class="btn-group-left">
+    <button class="ui-btn btn-muffin" id="muffin-start-btn">🧁 머핀타임 세팅</button>
     <button class="ui-btn btn-purple" id="prop-menu-btn">🎮 소품 추가</button>
     <button class="ui-btn btn-orange" id="add-slot-btn">🔲 슬롯 생성</button>
     <button class="ui-btn btn-purple" id="select-mode-btn">🟦 영역 선택 [OFF]</button>
     <button class="ui-btn btn-pink" id="pen-mode-btn">✏️ 펜 [OFF]</button>
-    <button class="ui-btn btn-teal" id="eraser-mode-btn">🧹 개별 지우개 [OFF]</button>
-    <button class="ui-btn btn-red" id="clear-lines-btn">💥 전체 선 삭제</button>
+    <button class="ui-btn btn-teal" id="eraser-mode-btn">🧹 지우개 [OFF]</button>
+    <button class="ui-btn btn-red" id="clear-lines-btn">💥 선 삭제</button>
   </div>
   <div class="btn-group-right">
     <button class="ui-btn btn-blue" id="cam-mode-btn">카메라 회전</button>
@@ -173,15 +172,17 @@
 <div id="dynamic-action-bar"></div>
 
 <div id="prop-modal">
-  <button id="add-card-btn">🃏 무작위 카드 1장 추가</button>
-  <button id="add-deck-btn">🎴 52장 전체 덱 리셋</button>
+  <button id="add-card-btn">🃏 무작위 트럼프 카드 1장</button>
+  <button id="add-muffin-card-btn">🧁 머핀타임 카드 1장</button>
+  <button id="add-deck-btn">🎴 52장 전체 트럼프 덱</button>
   <button id="add-dice-btn">🎲 주사위 추가</button>
 </div>
 
 <div id="card-preview-modal">
-  <canvas id="preview-canvas" width="180" height="260"></canvas>
-  <div id="preview-title" style="font-size: 14px; font-weight: bold;">카드 정보</div>
-  <div style="font-size: 10px; color: #94a3b8; margin-top:4px;">(화면 탭 시 닫힘)</div>
+  <canvas id="preview-canvas" width="200" height="280"></canvas>
+  <div id="preview-title" style="font-size: 14px; font-weight: bold; margin-top:6px;">카드 정보</div>
+  <div id="preview-desc" style="font-size: 11px; color: #cbd5e1; margin-top:4px;"></div>
+  <div style="font-size: 10px; color: #94a3b8; margin-top:8px;">(탭 시 닫힘)</div>
 </div>
 
 <div id="bottom-info">
@@ -197,7 +198,7 @@
     </select>
     <span id="status" style="color:#f59e0b;">(대기중)</span>
   </div>
-  <div>🛠 <b>최종 복원:</b> 확장된 대형 테이블 크기에 맞춰 전체 시야를 최적화했습니다.</div>
+  <div>🎮 <b>자유 샌드박스 모드:</b> 턴 규칙 없이 원하는 게임을 손으로 자유롭게 플레이하세요!</div>
 </div>
 
 <div id="chat-container">
@@ -207,7 +208,7 @@
   </div>
   <div id="chat-body">
     <div id="chat-messages">
-      <div class="chat-msg system">테이블탑 시뮬레이터에 오신 것을 환영합니다!</div>
+      <div class="chat-msg system">테이블탑 시뮬레이터 샌드박스에 오신 것을 환영합니다!</div>
     </div>
     <div id="chat-input-box">
       <input type="text" id="chat-input" placeholder="메시지 입력..." maxlength="100">
@@ -223,9 +224,8 @@
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x0f172a);
 
-  // [수정] 확장된 판 크기에 맞춰 초기 카메라 거리 조절
   const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1000);
-  camera.position.set(-15, 16, 0); // 기본 좌석(P3) 구도
+  camera.position.set(-15, 16, 0);
 
   function updateCameraPosition() {
     if (mySeat === 1) camera.position.set(0, 16, 15);
@@ -247,7 +247,7 @@
   controls.dampingFactor = 0.05;
   controls.maxPolarAngle = Math.PI / 2 - 0.05;
   controls.minDistance = 4;
-  controls.maxDistance = 35; // [수정] 대형 판 조망을 위해 maxDistance 확대
+  controls.maxDistance = 35;
   controls.target.set(0, 0.2, 0);
 
   const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
@@ -266,7 +266,6 @@
     return new THREE.CanvasTexture(canvas);
   }
 
-  // [수정] 확장된 패브릭 매트에 맞춰 2048x2048 해상도 및 핸드존 비율 수정
   function createFeltMatTexture4P() {
     const canvas = document.createElement('canvas'); canvas.width = 2048; canvas.height = 2048;
     const ctx = canvas.getContext('2d');
@@ -300,7 +299,6 @@
     return new THREE.CanvasTexture(canvas);
   }
 
-  // [수정] 판의 크기 대폭 확장 (기존 w=7.5 -> 11.0)
   const tableShape = new THREE.Shape();
   const w = 11.0, h = 11.0, r = 1.8;
   tableShape.moveTo(-w + r, -h); tableShape.lineTo(w - r, -h);
@@ -315,7 +313,6 @@
   tableMesh.position.y = -0.15;
   scene.add(tableMesh);
 
-  // [수정] 보드 매트 크기 확장 (기존 13.5 -> 20.0)
   const matGeo = new THREE.PlaneGeometry(20.0, 20.0);
   const boardMatMesh = new THREE.Mesh(matGeo, new THREE.MeshStandardMaterial({ map: createFeltMatTexture4P(), roughness: 0.8 }));
   boardMatMesh.rotation.x = -Math.PI / 2;
@@ -327,7 +324,6 @@
   let selectedGroup = [];
   let objectIdCounter = 0;
 
-  // 펜/지우개 관련 변수
   let drawnLines = [];
   let isPenMode = false;
   let isEraserMode = false;
@@ -342,6 +338,7 @@
   const suits = ['♠', '♥', '♦', '♣'];
   const values = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 
+  // --- 일반 트럼프 카드 텍스처 ---
   function createTrumpCardTexture(suit, value) {
     const canvas = document.createElement('canvas'); canvas.width = 256; canvas.height = 384;
     const ctx = canvas.getContext('2d');
@@ -387,6 +384,81 @@
 
   const cardBackTexture = createCardBackTexture();
 
+  // --- 머핀 타임 200여 장 카드 데이터베이스 ---
+  const muffinCardDB = [
+    { title: "Gotta Go Fast!", type: "action", color: "#ec4899", desc: "덱에서 즉시 카드를 2장 뽑습니다." },
+    { title: "Mine Turtle", type: "action", color: "#ec4899", desc: "지뢰 거북이! 모든 플레이어는 보유 카드의 절반을 버립니다." },
+    { title: "Do the Flop!", type: "action", color: "#ec4899", desc: "모두 엎드려! 카드를 내지 않은 플레이어는 카드 2장을 버립니다." },
+    { title: "I Like Trains", type: "action", color: "#ec4899", desc: "기차가 지나갑니다. 지정한 사람의 카드 1장을 파괴합니다." },
+    { title: "Steal Deal", type: "action", color: "#ec4899", desc: "상대방 1명의 손에서 무작위 카드 1장을 빼앗아옵니다." },
+    { title: "Punch Tree", type: "action", color: "#ec4899", desc: "나무를 때려 목재 획득! 카드 1장을 뽑고 추가 액션을 실행합니다." },
+    { title: "Asdfmovie Magic", type: "action", color: "#ec4899", desc: "모든 플레이어가 자신의 손에 있는 카드를 옆 사람에게 넘깁니다." },
+    { title: "Overpowered Muffin", type: "action", color: "#ec4899", desc: "강력한 머핀의 힘으로 카드를 3장 연속으로 뽑습니다." },
+    { title: "NO!", type: "counter", color: "#3b82f6", desc: "상대방이 발동한 액션이나 효과를 무효화합니다." },
+    { title: "Reflect!", type: "counter", color: "#3b82f6", desc: "나를 향한 공격 효과를 원래 낸 플레이어에게 반사합니다." },
+    { title: "Bye Bye!", type: "counter", color: "#3b82f6", desc: "상대방이 내 카드를 버리게 만들 때 이를 방어합니다." },
+    { title: "Super Counter", type: "counter", color: "#3b82f6", desc: "상대의 카운터 카드를 무효화하는 전설의 카운터." },
+    { title: "It's a Trap!", type: "trap", color: "#f59e0b", desc: "[트랩] 누군가 카드를 뽑을 때 그 카드를 빼앗고 1장 더 뽑습니다." },
+    { title: "Exploding Kitten", type: "trap", color: "#f59e0b", desc: "[트랩] 내 카드가 공격받을 때 발동! 공격한 사람은 카드 2장을 버립니다." },
+    { title: "Slippery Floor", type: "trap", color: "#f59e0b", desc: "[트랩] 누군가 머핀 타임을 외칠 때 카드를 2장 뺏어 외침을 취소시킵니다." },
+    { title: "Rainbow Muffin", type: "rainbow", color: "#8b5cf6", desc: "[조커] 어떤 카드 위에도 낼 수 있는 머핀 타임 조커 카드." }
+  ];
+
+  function createMuffinCardTexture(cardData) {
+    const canvas = document.createElement('canvas'); canvas.width = 280; canvas.height = 420;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, 280, 420);
+    ctx.fillStyle = cardData.color; ctx.fillRect(10, 10, 260, 400);
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(20, 20, 240, 380);
+
+    ctx.fillStyle = cardData.color; ctx.fillRect(20, 20, 240, 60);
+    ctx.fillStyle = '#ffffff'; ctx.font = '900 20px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(cardData.title, 140, 50);
+
+    ctx.fillStyle = cardData.color; ctx.font = 'bold 15px sans-serif';
+    ctx.fillText(`[ ${cardData.type.toUpperCase()} ]`, 140, 102);
+
+    ctx.beginPath(); ctx.arc(140, 175, 48, 0, Math.PI * 2); ctx.fillStyle = '#fce7f3'; ctx.fill();
+    ctx.fillStyle = cardData.color; ctx.font = '38px sans-serif'; ctx.fillText('🧁', 140, 175);
+
+    ctx.fillStyle = '#1e293b'; ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'center';
+    wrapText(ctx, cardData.desc, 140, 250, 210, 20);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.center.set(0.5, 0.5);
+    return texture;
+  }
+
+  function createMuffinBackTexture() {
+    const canvas = document.createElement('canvas'); canvas.width = 280; canvas.height = 420;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#be123c'; ctx.fillRect(0, 0, 280, 420);
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 10; ctx.strokeRect(12, 12, 256, 396);
+    ctx.fillStyle = '#ffffff'; ctx.font = '900 36px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('MUFFIN', 140, 180); ctx.fillText('TIME!', 140, 230);
+    ctx.font = '50px sans-serif'; ctx.fillText('🧁', 140, 310);
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.center.set(0.5, 0.5);
+    return texture;
+  }
+
+  const muffinBackTexture = createMuffinBackTexture();
+
+  function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
+    const words = text.split(' ');
+    let line = '';
+    for (let n = 0; n < words.length; n++) {
+      let testLine = line + words[n] + ' ';
+      let metrics = ctx.measureText(testLine);
+      if (metrics.width > maxWidth && n > 0) {
+        ctx.fillText(line, x, y);
+        line = words[n] + ' ';
+        y += lineHeight;
+      } else { line = testLine; }
+    }
+    ctx.fillText(line, x, y);
+  }
+
   function createDiceFaceTexture(number) {
     const canvas = document.createElement('canvas'); canvas.width = 256; canvas.height = 256;
     const ctx = canvas.getContext('2d');
@@ -394,9 +466,7 @@
     ctx.strokeStyle = '#cbd5e1'; ctx.lineWidth = 12; ctx.strokeRect(6, 6, 244, 244);
     ctx.fillStyle = (number === 1) ? '#dc2626' : '#0f172a';
 
-    function drawDot(x, y, radius = 22) {
-      ctx.beginPath(); ctx.arc(x, y, radius, 0, Math.PI * 2); ctx.fill();
-    }
+    function drawDot(x, y, radius = 22) { ctx.beginPath(); ctx.arc(x, y, radius, 0, Math.PI * 2); ctx.fill(); }
     const c = 128, l = 68, r = 188, t = 68, b = 188;
     if (number === 1) drawDot(c, c, 34);
     else if (number === 2) { drawDot(l, t); drawDot(r, b); }
@@ -469,7 +539,7 @@
     card.position.set(x, CARD_BASE_Y, z);
     card.rotation.z = Math.PI;
     card.castShadow = true;
-    card.userData = { id: id, type: 'card', suit: suit, value: value, isFlipped: true, isLocked: false, isAnimating: false, lastMovedTime: Date.now() };
+    card.userData = { id: id, type: 'card', cardType: 'trump', suit: suit, value: value, isFlipped: true, isLocked: false, isAnimating: false, lastMovedTime: Date.now() };
     
     scene.add(card);
     objects.push(card);
@@ -481,6 +551,83 @@
 
     if (isLocal) broadcastData({ type: 'spawn', propType: 'card', id: id, x: x, z: z, suit: suit, value: value });
     return card;
+  }
+
+  function createMuffinCard(x = 0, z = 0, isLocal = true, customData = null, customId = null) {
+    const id = customId || ('mcard_' + (++objectIdCounter));
+    if (objects.some(o => o.userData.id === id)) return;
+
+    const cardData = customData || muffinCardDB[Math.floor(Math.random() * muffinCardDB.length)];
+
+    const geo = new THREE.BoxGeometry(0.95, 0.02, 1.4);
+    const frontTex = createMuffinCardTexture(cardData);
+    const backTex = muffinBackTexture.clone();
+
+    const materials = [
+      new THREE.MeshStandardMaterial({ color: 0xffffff }),
+      new THREE.MeshStandardMaterial({ color: 0xffffff }),
+      new THREE.MeshStandardMaterial({ map: frontTex }),
+      new THREE.MeshStandardMaterial({ map: backTex }),
+      new THREE.MeshStandardMaterial({ color: 0xffffff }),
+      new THREE.MeshStandardMaterial({ color: 0xffffff })
+    ];
+
+    const card = new THREE.Mesh(geo, materials);
+    card.position.set(x, CARD_BASE_Y, z);
+    card.rotation.z = Math.PI;
+    card.castShadow = true;
+    card.userData = { id: id, type: 'card', cardType: 'muffin', cardData: cardData, isFlipped: true, isLocked: false, isAnimating: false, lastMovedTime: Date.now() };
+
+    scene.add(card);
+    objects.push(card);
+
+    alignCardRotationBySeat(card);
+    updateHandVisibility(card);
+    updateStacking();
+    updateDynamicActionBar();
+
+    if (isLocal) broadcastData({ type: 'spawn', propType: 'muffin_card', id: id, x: x, z: z, cardData: cardData });
+    return card;
+  }
+
+  function startMuffinTimeGame(isLocal = true) {
+    objects.forEach(obj => scene.remove(obj));
+    objects = [];
+    clearSelectionGroup();
+
+    addChatMessage('시스템', '🧁 머핀 타임 200장 규모 덱 배치 완료! 각 핸드존으로 카드를 자유롭게 나누어 플레이하세요.', false, true);
+
+    let fullDeck = [];
+    for (let i = 0; i < 6; i++) { fullDeck = fullDeck.concat(muffinCardDB); }
+    fullDeck.sort(() => Math.random() - 0.5);
+
+    fullDeck.forEach((cardData) => { createMuffinCard(0, 0, false, cardData); });
+
+    const seatZones = [
+      { seat: 1, x: 0, z: 8.0 },
+      { seat: 2, x: 0, z: -8.0 },
+      { seat: 3, x: -8.0, z: 0 },
+      { seat: 4, x: 8.0, z: 0 }
+    ];
+
+    const cards = objects.filter(o => o.userData.type === 'card');
+    let cardIdx = 0;
+
+    seatZones.forEach(zone => {
+      for (let i = 0; i < 3; i++) {
+        if (cardIdx < cards.length) {
+          const card = cards[cardIdx++];
+          card.position.set(zone.x + (i - 1) * 1.1, CARD_BASE_Y, zone.z);
+          alignCardRotationBySeat(card);
+          updateHandVisibility(card);
+        }
+      }
+    });
+
+    updateStacking();
+    updateDynamicActionBar();
+
+    if (isLocal) broadcastData({ type: 'muffin_start' });
   }
 
   function createDice(x = (Math.random() - 0.5) * 4, z = (Math.random() - 0.5) * 4, isLocal = true, customId = null) {
@@ -500,7 +647,6 @@
     return dice;
   }
 
-  // [수정] 확장된 매트 크기 영역에 맞추어 Seat 영역 판정 임계치 확대 (4.2 -> 6.8)
   function isPositionInSeatZone(x, z, seat) {
     if (seat === 1) return z > 6.8 && x >= -6.8 && x <= 6.8;
     if (seat === 2) return z < -6.8 && x >= -6.8 && x <= 6.8;
@@ -733,6 +879,18 @@
     if (isLocal) broadcastData({ type: 'shuffle' });
   }
 
+  function shoutOneCard() {
+    const myCards = objects.filter(o => o.userData.type === 'card' && isPositionInSeatZone(o.position.x, o.position.z, mySeat));
+    addChatMessage('시스템', `🚨 P${mySeat} 님이 "ONE CARD!"를 외쳤습니다! (현재 보유: ${myCards.length}장)`, false, true);
+    broadcastData({ type: 'one_card_shout', seat: mySeat, count: myCards.length });
+  }
+
+  function declareMuffinTime() {
+    const myCards = objects.filter(o => o.userData.type === 'card' && isPositionInSeatZone(o.position.x, o.position.z, mySeat));
+    addChatMessage('시스템', `🎉 P${mySeat} 님이 "MUFFIN TIME!" 을 외쳤습니다! (보유: ${myCards.length}장)`, false, true);
+    broadcastData({ type: 'muffin_announce', seat: mySeat, count: myCards.length });
+  }
+
   const dynamicActionBar = document.getElementById('dynamic-action-bar');
   function updateDynamicActionBar() {
     const hasCards = objects.some(o => o.userData.type === 'card');
@@ -744,7 +902,11 @@
       return;
     }
 
-    let html = '';
+    let html = `
+      <button class="ui-btn btn-muffin" id="dyn-muffin-shout-btn">🧁 MUFFIN TIME!</button>
+      <button class="ui-btn btn-orange" id="dyn-onecard-shout-btn">🚨 ONE CARD!</button>
+    `;
+
     if (hasCards) {
       html += `
         <button class="ui-btn btn-green" id="dyn-shuffle-btn">🔲 섞기</button>
@@ -760,6 +922,9 @@
 
     dynamicActionBar.innerHTML = html;
     dynamicActionBar.style.display = 'flex';
+
+    document.getElementById('dyn-muffin-shout-btn').onclick = declareMuffinTime;
+    document.getElementById('dyn-onecard-shout-btn').onclick = shoutOneCard;
 
     if (hasCards) {
       document.getElementById('dyn-shuffle-btn').onclick = () => shuffleCards(true);
@@ -783,15 +948,13 @@
   }
   updateDynamicActionBar();
 
-  // 3D 펜 선 생성 함수
   function createLineMesh(points, colorHex, radius) {
     if (!points || points.length < 2) return null;
     const curvePoints = points.map(p => new THREE.Vector3(p.x, 0.28, p.z));
     const curve = new THREE.CatmullRomCurve3(curvePoints);
     const geometry = new THREE.TubeGeometry(curve, Math.max(points.length * 2, 8), radius, 6, false);
     const material = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.4 });
-    const mesh = new THREE.Mesh(geometry, material);
-    return mesh;
+    return new THREE.Mesh(geometry, material);
   }
 
   function addRenderedLine(points, colorHex, radius, customId = null) {
@@ -828,11 +991,12 @@
     if (isLocal) broadcastData({ type: 'clear_lines' });
   }
 
+  document.getElementById('muffin-start-btn').addEventListener('click', () => startMuffinTimeGame(true));
+
   const penBtn = document.getElementById('pen-mode-btn');
   const eraserBtn = document.getElementById('eraser-mode-btn');
   const penToolsPanel = document.getElementById('pen-tools-panel');
 
-  // 지우개 범위 시각화 원형 커서 생성 (초기 숨김)
   const cursorGeo = new THREE.RingGeometry(0.77, 0.8, 32);
   cursorGeo.rotateX(-Math.PI / 2);
   const cursorMat = new THREE.MeshBasicMaterial({ color: 0xff0000, side: THREE.DoubleSide });
@@ -848,38 +1012,27 @@
     penToolsPanel.style.display = isPenMode ? 'flex' : 'none';
 
     if (isPenMode) {
-      isEraserMode = false;
-      eraserBtn.innerText = '🧹 개별 지우개 [OFF]';
-      eraserBtn.classList.remove('active');
+      isEraserMode = false; eraserBtn.innerText = '🧹 지우개 [OFF]'; eraserBtn.classList.remove('active');
       eraserCursorMesh.visible = false;
-
-      isSelectMode = false;
-      document.getElementById('select-mode-btn').innerText = '🟦 영역 선택 [OFF]';
-      document.getElementById('select-mode-btn').classList.remove('active');
+      isSelectMode = false; document.getElementById('select-mode-btn').innerText = '🟦 영역 선택 [OFF]'; document.getElementById('select-mode-btn').classList.remove('active');
     }
   });
 
   eraserBtn.addEventListener('click', () => {
     isEraserMode = !isEraserMode;
-    eraserBtn.innerText = isEraserMode ? '🧹 개별 지우개 [ON]' : '🧹 개별 지우개 [OFF]';
+    eraserBtn.innerText = isEraserMode ? '🧹 지우개 [ON]' : '🧹 지우개 [OFF]';
     eraserBtn.classList.toggle('active', isEraserMode);
-    
     eraserCursorMesh.visible = isEraserMode; 
 
     if (isEraserMode) {
-      isPenMode = false;
-      penBtn.innerText = '✏️ 펜 [OFF]';
-      penBtn.classList.remove('active');
+      isPenMode = false; penBtn.innerText = '✏️ 펜 [OFF]'; penBtn.classList.remove('active');
       penToolsPanel.style.display = 'none';
-
-      isSelectMode = false;
-      document.getElementById('select-mode-btn').innerText = '🟦 영역 선택 [OFF]';
-      document.getElementById('select-mode-btn').classList.remove('active');
+      isSelectMode = false; document.getElementById('select-mode-btn').innerText = '🟦 영역 선택 [OFF]'; document.getElementById('select-mode-btn').classList.remove('active');
     }
   });
 
   document.querySelectorAll('.color-dot').forEach(dot => {
-    dot.addEventListener('click', (e) => {
+    dot.addEventListener('click', () => {
       document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('selected'));
       dot.classList.add('selected');
       selectedPenColor = parseInt(dot.getAttribute('data-color'), 16);
@@ -887,7 +1040,7 @@
   });
 
   document.querySelectorAll('.size-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
+    btn.addEventListener('click', () => {
       document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('selected'));
       btn.classList.add('selected');
       selectedPenRadius = parseFloat(btn.getAttribute('data-size'));
@@ -896,7 +1049,7 @@
 
   document.getElementById('clear-lines-btn').addEventListener('click', () => clearAllLines(true));
 
-  // 채팅 시스템
+  // 채팅 및 PeerJS 네트워킹
   const chatHeader = document.getElementById('chat-header');
   const chatBody = document.getElementById('chat-body');
   const chatToggleIcon = document.getElementById('chat-toggle-icon');
@@ -947,6 +1100,7 @@
   document.addEventListener('click', () => { propModal.style.display = 'none'; });
 
   document.getElementById('add-card-btn').addEventListener('click', () => createCard());
+  document.getElementById('add-muffin-card-btn').addEventListener('click', () => createMuffinCard());
   document.getElementById('add-deck-btn').addEventListener('click', () => spawnFullDeck(true));
   document.getElementById('add-dice-btn').addEventListener('click', () => createDice());
 
@@ -972,12 +1126,9 @@
     isSelectMode = !isSelectMode;
     selectBtn.innerText = isSelectMode ? '🟦 영역 선택 [ON]' : '🟦 영역 선택 [OFF]';
     selectBtn.classList.toggle('active', isSelectMode);
-
     if (isSelectMode) {
-      isPenMode = false; penBtn.innerText = '✏️ 펜 [OFF]'; penBtn.classList.remove('active');
-      penToolsPanel.style.display = 'none';
-      isEraserMode = false; eraserBtn.innerText = '🧹 개별 지우개 [OFF]'; eraserBtn.classList.remove('active');
-      eraserCursorMesh.visible = false;
+      isPenMode = false; penBtn.innerText = '✏️ 펜 [OFF]'; penBtn.classList.remove('active'); penToolsPanel.style.display = 'none';
+      isEraserMode = false; eraserBtn.innerText = '🧹 지우개 [OFF]'; eraserBtn.classList.remove('active'); eraserCursorMesh.visible = false;
     }
   });
 
@@ -1002,13 +1153,10 @@
 
   function checkEraserAtPoint(touchVec) {
     raycaster.setFromCamera(touchVec, camera);
-
     const hitPoint = new THREE.Vector3();
     if (raycaster.ray.intersectPlane(boardPlane, hitPoint)) {
       eraserCursorMesh.position.set(hitPoint.x, 0.29, hitPoint.z);
-
       const ERASER_RADIUS = 0.8;
-
       let checkPoints = [hitPoint.clone()];
       if (lastEraserPoint) {
         const dist = hitPoint.distanceTo(lastEraserPoint);
@@ -1021,20 +1169,52 @@
 
       for (let i = drawnLines.length - 1; i >= 0; i--) {
         const line = drawnLines[i];
-        
-        const isTouched = line.points.some(pt => {
-          return checkPoints.some(cPt => Math.hypot(pt.x - cPt.x, pt.z - cPt.z) < ERASER_RADIUS);
-        });
-
-        if (isTouched) {
-          deleteSingleLine(line.id, true);
-        }
+        const isTouched = line.points.some(pt => checkPoints.some(cPt => Math.hypot(pt.x - cPt.x, pt.z - cPt.z) < ERASER_RADIUS));
+        if (isTouched) deleteSingleLine(line.id, true);
       }
     }
   }
 
+  function showCardPreview(card) {
+    const modal = document.getElementById('card-preview-modal');
+    const canvas = document.getElementById('preview-canvas');
+    const ctx = canvas.getContext('2d');
+
+    if (card.userData.cardType === 'muffin' && card.userData.cardData) {
+      const data = card.userData.cardData;
+      ctx.fillStyle = '#1e293b'; ctx.fillRect(0, 0, 200, 280);
+      ctx.fillStyle = data.color; ctx.fillRect(8, 8, 184, 264);
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(14, 14, 172, 252);
+
+      ctx.fillStyle = data.color; ctx.fillRect(14, 14, 172, 40);
+      ctx.fillStyle = '#ffffff'; ctx.font = 'bold 15px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(data.title, 100, 34);
+
+      ctx.font = '36px sans-serif'; ctx.fillText('🧁', 100, 110);
+
+      ctx.fillStyle = '#0f172a'; ctx.font = 'bold 12px sans-serif';
+      wrapText(ctx, data.desc, 100, 160, 150, 16);
+
+      document.getElementById('preview-title').innerText = data.title;
+      document.getElementById('preview-desc').innerText = `유형: ${data.type.toUpperCase()}`;
+    } else {
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, 200, 280);
+      ctx.fillStyle = (card.userData.suit === '♥' || card.userData.suit === '♦') ? '#dc2626' : '#1e293b';
+      ctx.font = 'bold 30px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText(`${card.userData.value} ${card.userData.suit}`, 100, 140);
+
+      document.getElementById('preview-title').innerText = `${card.userData.value} ${card.userData.suit}`;
+      document.getElementById('preview-desc').innerText = '일반 트럼프 카드';
+    }
+    modal.style.display = 'flex';
+  }
+
+  document.getElementById('card-preview-modal').onclick = () => {
+    document.getElementById('card-preview-modal').style.display = 'none';
+  };
+
   function onTouchStart(e) {
-    if (e.target.closest('#top-bar, #bottom-info, #prop-modal, #card-preview-modal, #dynamic-action-bar, #chat-container, #pen-tools-panel')) return;
+    if (e.target.closest('#top-bar, #bottom-info, #prop-modal, #dynamic-action-bar, #chat-container, #pen-tools-panel, #card-preview-modal')) return;
 
     if (isCamModeAlwaysOn || (e.touches && e.touches.length > 1)) {
       selectedObj = null; controls.enabled = true; return;
@@ -1046,10 +1226,7 @@
     touchStartPos = { x: pos.rawX, y: pos.rawY };
 
     if (isEraserMode) {
-      controls.enabled = false;
-      lastEraserPoint = null;
-      checkEraserAtPoint(touch);
-      return;
+      controls.enabled = false; lastEraserPoint = null; checkEraserAtPoint(touch); return;
     }
 
     if (isPenMode) {
@@ -1065,13 +1242,9 @@
     }
 
     if (isSelectMode) {
-      isBoxSelecting = true;
-      controls.enabled = false;
-      selectBox.style.left = pos.rawX + 'px';
-      selectBox.style.top = pos.rawY + 'px';
-      selectBox.style.width = '0px';
-      selectBox.style.height = '0px';
-      selectBox.style.display = 'block';
+      isBoxSelecting = true; controls.enabled = false;
+      selectBox.style.left = pos.rawX + 'px'; selectBox.style.top = pos.rawY + 'px';
+      selectBox.style.width = '0px'; selectBox.style.height = '0px'; selectBox.style.display = 'block';
       return;
     }
 
@@ -1087,9 +1260,7 @@
 
       if (selectedGroup.includes(selectedObj)) {
         groupDragOffsets = selectedGroup.map(obj => ({
-          obj: obj,
-          offsetX: obj.position.x - selectedObj.position.x,
-          offsetZ: obj.position.z - selectedObj.position.z
+          obj: obj, offsetX: obj.position.x - selectedObj.position.x, offsetZ: obj.position.z - selectedObj.position.z
         }));
       } else {
         clearSelectionGroup();
@@ -1097,22 +1268,15 @@
       }
       controls.enabled = false;
     } else {
-      clearSelectionGroup();
-      selectedObj = null;
-      controls.enabled = true;
+      clearSelectionGroup(); selectedObj = null; controls.enabled = true;
     }
   }
 
   function onTouchMove(e) {
-    if (e.target.closest('#top-bar, #bottom-info, #prop-modal, #card-preview-modal, #dynamic-action-bar, #chat-container, #pen-tools-panel')) return;
-
+    if (e.target.closest('#top-bar, #bottom-info, #prop-modal, #dynamic-action-bar, #chat-container, #pen-tools-panel, #card-preview-modal')) return;
     const pos = getTouchPos(e);
 
-    if (isEraserMode) {
-      touch.x = pos.x; touch.y = pos.y;
-      checkEraserAtPoint(touch);
-      return;
-    }
+    if (isEraserMode) { touch.x = pos.x; touch.y = pos.y; checkEraserAtPoint(touch); return; }
 
     if (isPenMode && currentLineMesh) {
       touch.x = pos.x; touch.y = pos.y;
@@ -1135,11 +1299,8 @@
       const top = Math.min(touchStartPos.y, pos.rawY);
       const width = Math.abs(pos.rawX - touchStartPos.x);
       const height = Math.abs(pos.rawY - touchStartPos.y);
-
-      selectBox.style.left = left + 'px';
-      selectBox.style.top = top + 'px';
-      selectBox.style.width = width + 'px';
-      selectBox.style.height = height + 'px';
+      selectBox.style.left = left + 'px'; selectBox.style.top = top + 'px';
+      selectBox.style.width = width + 'px'; selectBox.style.height = height + 'px';
       return;
     }
 
@@ -1167,56 +1328,32 @@
   function onTouchEnd(e) {
     const pos = getTouchPos(e);
 
-    if (isEraserMode) {
-      lastEraserPoint = null;
-      controls.enabled = true;
-      return;
-    }
+    if (isEraserMode) { lastEraserPoint = null; controls.enabled = true; return; }
 
     if (isPenMode && currentLineMesh) {
       scene.remove(currentLineMesh);
       if (currentLinePoints.length >= 2) {
         const lineObj = addRenderedLine(currentLinePoints, selectedPenColor, selectedPenRadius);
         if (lineObj) {
-          broadcastData({
-            type: 'draw_line',
-            id: lineObj.id,
-            points: currentLinePoints,
-            color: selectedPenColor,
-            radius: selectedPenRadius
-          });
+          broadcastData({ type: 'draw_line', id: lineObj.id, points: currentLinePoints, color: selectedPenColor, radius: selectedPenRadius });
         }
       }
-      currentLineMesh = null;
-      currentLinePoints = [];
-      controls.enabled = true;
-      return;
+      currentLineMesh = null; currentLinePoints = []; controls.enabled = true; return;
     }
 
     if (isBoxSelecting) {
-      isBoxSelecting = false;
-      selectBox.style.display = 'none';
-      controls.enabled = true;
-      clearSelectionGroup();
-
-      const minX = Math.min(touchStartPos.x, pos.rawX);
-      const maxX = Math.max(touchStartPos.x, pos.rawX);
-      const minY = Math.min(touchStartPos.y, pos.rawY);
-      const maxY = Math.max(touchStartPos.y, pos.rawY);
+      isBoxSelecting = false; selectBox.style.display = 'none'; controls.enabled = true; clearSelectionGroup();
+      const minX = Math.min(touchStartPos.x, pos.rawX), maxX = Math.max(touchStartPos.x, pos.rawX);
+      const minY = Math.min(touchStartPos.y, pos.rawY), maxY = Math.max(touchStartPos.y, pos.rawY);
 
       objects.forEach(obj => {
         const screenPos = obj.position.clone().project(camera);
         const x = (screenPos.x * 0.5 + 0.5) * window.innerWidth;
         const y = (-screenPos.y * 0.5 + 0.5) * window.innerHeight;
-
         if (x >= minX && x <= maxX && y >= minY && y <= maxY) {
           selectedGroup.push(obj);
-          const outlineMesh = new THREE.Mesh(
-            new THREE.BoxGeometry(0.94, 0.04, 1.39),
-            new THREE.MeshBasicMaterial({ color: 0x10b981, wireframe: true })
-          );
-          obj.add(outlineMesh);
-          obj.userData.outlineMesh = outlineMesh;
+          const outlineMesh = new THREE.Mesh(new THREE.BoxGeometry(0.99, 0.04, 1.44), new THREE.MeshBasicMaterial({ color: 0x10b981, wireframe: true }));
+          obj.add(outlineMesh); obj.userData.outlineMesh = outlineMesh;
         }
       });
       return;
@@ -1234,14 +1371,16 @@
       }
 
       if (touchDuration < 300 && dist < 10) {
-        if (selectedObj.userData.type === 'card') flipCard(selectedObj, true);
-        else if (selectedObj.userData.type === 'dice') rollDice(selectedObj, true);
+        if (selectedObj.userData.type === 'card') {
+          showCardPreview(selectedObj);
+        } else if (selectedObj.userData.type === 'dice') {
+          rollDice(selectedObj, true);
+        }
       }
 
       updateStacking();
     }
-    selectedObj = null;
-    controls.enabled = true;
+    selectedObj = null; controls.enabled = true;
   }
 
   function getTouchPos(e) {
@@ -1274,32 +1413,6 @@
       x: obj.position.x, z: obj.position.z, 
       rotY: obj.rotation.y, isFlipped: isFlippedForOthers 
     });
-  }
-
-  function flipCard(card, isLocal = false) {
-    if (card.userData.isAnimating) return;
-    card.userData.isAnimating = true;
-
-    const targetRotZ = card.userData.isFlipped ? 0 : Math.PI;
-    const startRotZ = card.rotation.z;
-    let progress = 0;
-
-    function animateFlip() {
-      progress += 0.1;
-      card.rotation.z = THREE.MathUtils.lerp(startRotZ, targetRotZ, progress);
-      card.position.y = CARD_BASE_Y + Math.sin(progress * Math.PI) * 0.5;
-
-      if (progress < 1) requestAnimationFrame(animateFlip);
-      else {
-        card.rotation.z = targetRotZ;
-        card.userData.isFlipped = !card.userData.isFlipped;
-        card.userData.isAnimating = false;
-        updateStacking();
-        sendMoveData(card);
-      }
-    }
-    animateFlip();
-    if (isLocal) broadcastData({ type: 'flip', id: card.userData.id });
   }
 
   function rollDice(dice, isLocal = false, targetRot = null) {
@@ -1339,7 +1452,7 @@
   peer.on('connection', conn => {
     connections.push(conn);
     setupConnection(conn);
-    addChatMessage('시스템', '새 플레이어가 접속했습니다.', false, true);
+    addChatMessage('시스템', '새 플레이어가 멀티플레이어 테이블에 입장했습니다.', false, true);
   });
 
   document.getElementById('connect-btn').addEventListener('click', () => {
@@ -1371,6 +1484,12 @@
   function handleNetworkData(data) {
     if (data.type === 'chat') {
       addChatMessage(data.sender, data.text, false);
+    } else if (data.type === 'muffin_start') {
+      startMuffinTimeGame(false);
+    } else if (data.type === 'one_card_shout') {
+      addChatMessage('시스템', `🚨 P${data.seat} 님이 "ONE CARD!"를 외쳤습니다! (${data.count}장 보유)`, false, true);
+    } else if (data.type === 'muffin_announce') {
+      addChatMessage('시스템', `🎉 P${data.seat} 님이 "MUFFIN TIME!" 을 외쳤습니다! (${data.count}장 보유)`, false, true);
     } else if (data.type === 'draw_line') {
       addRenderedLine(data.points, data.color, data.radius, data.id);
     } else if (data.type === 'delete_line') {
@@ -1388,7 +1507,8 @@
     } else if (data.type === 'reset_deck') {
       spawnFullDeck(false);
     } else if (data.type === 'spawn') {
-      if (data.propType === 'card') createCard(data.x, data.z, false, data.suit, data.value, data.id);
+      if (data.propType === 'muffin_card') createMuffinCard(data.x, data.z, false, data.cardData, data.id);
+      else if (data.propType === 'card') createCard(data.x, data.z, false, data.suit, data.value, data.id);
       else if (data.propType === 'dice') createDice(data.x, data.z, false, data.id);
     } else if (data.type === 'shuffle') {
       shuffleCards(false);
@@ -1410,8 +1530,7 @@
           updateHandVisibility(targetObj);
         }
         updateStacking();
-      } else if (data.type === 'flip') flipCard(targetObj, false);
-      else if (data.type === 'roll') rollDice(targetObj, false, data.targetRot);
+      } else if (data.type === 'roll') rollDice(targetObj, false, data.targetRot);
     }
   }
 
