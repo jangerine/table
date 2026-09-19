@@ -3,9 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Standard Board Optimized 8P Zones - Unified Orientation</title>
+  <title>Mobile Tabletop Simulator - 4 Sides 8P Layout</title>
   <style>
-    /* ... (기존 CSS 스타일 유지) ... */
     * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
     body { margin: 0; overflow: hidden; touch-action: none; font-family: 'Pretendard', sans-serif; background-color: #0f172a; }
 
@@ -142,8 +141,8 @@
   <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 </head>
 <body>
-  <!-- ... (기존 HTML 구조 유지) ... -->
-  <div id="select-box"></div>
+
+<div id="select-box"></div>
 
 <div id="top-bar">
   <div class="btn-group-left">
@@ -194,18 +193,18 @@
     <input type="text" id="join-id" placeholder="방장 ID">
     <button id="connect-btn">참가</button>
     <select id="player-seat-select">
-      <option value="1">P1 (남)</option>
-      <option value="2">P2 (남서)</option>
-      <option value="3" selected>P3 (서)</option>
-      <option value="4">P4 (북서)</option>
-      <option value="5">P5 (북)</option>
-      <option value="6">P6 (북동)</option>
-      <option value="7">P7 (동)</option>
-      <option value="8">P8 (남동)</option>
+      <option value="1">P1 (북-좌)</option>
+      <option value="2">P2 (북-우)</option>
+      <option value="3">P3 (동-상)</option>
+      <option value="4">P4 (동-하)</option>
+      <option value="5" selected>P5 (남-우)</option>
+      <option value="6">P6 (남-좌)</option>
+      <option value="7">P7 (서-하)</option>
+      <option value="8">P8 (서-상)</option>
     </select>
     <span id="status" style="color:#f59e0b;">(대기중)</span>
   </div>
-  <div>🧁 <b>영역 방향 통일 완료:</b> 2, 4, 6, 8 구역의 카드 방향을 다른 구역과 동일하게 최적화했습니다!</div>
+  <div>🧁 <b>스케치 레이아웃 적용 완료:</b> 정사각형 보드의 4개 면에 2개씩 깔끔하게 나란히 배치되었습니다!</div>
 </div>
 
 <div id="chat-container">
@@ -215,7 +214,7 @@
   </div>
   <div id="chat-body">
     <div id="chat-messages">
-      <div class="chat-msg system">8인 플레이어 공간 최적화 보드에 오신 것을 환영합니다!</div>
+      <div class="chat-msg system">4개 변 × 2구역 레이아웃 보드에 오신 것을 환영합니다!</div>
     </div>
     <div id="chat-input-box">
       <input type="text" id="chat-input" placeholder="메시지 입력..." maxlength="100">
@@ -224,9 +223,8 @@
   </div>
 </div>
 
-  <script>
-    /* ... (기존 스크립트의 변수 및 함수 유지) ... */
-    let mySeat = 3;
+<script>
+  let mySeat = 5;
   const CARD_BASE_Y = 0.32;
 
   const scene = new THREE.Scene();
@@ -234,33 +232,36 @@
 
   const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1000);
 
-  // 기본 보드판 규격(20.0x20.0)에 최적화된 시점
+  // 4개 면 8구역에 맞춘 카메라 시점 위치 정의
   const seatCameraPositions = {
-    1: { x: 0, y: 19, z: 18 },
-    2: { x: -13, y: 19, z: 13 },
-    3: { x: -18, y: 19, z: 0 },
-    4: { x: -13, y: 19, z: -13 },
-    5: { x: 0, y: 19, z: -18 },
-    6: { x: 13, y: 19, z: -13 },
-    7: { x: 18, y: 19, z: 0 },
-    8: { x: 13, y: 19, z: 13 }
+    1: { x: -3.8, y: 19, z: -18 }, // 북-좌
+    2: { x: 3.8, y: 19, z: -18 },  // 북-우
+    3: { x: 18, y: 19, z: -3.8 },  // 동-상
+    4: { x: 18, y: 19, z: 3.8 },   // 동-하
+    5: { x: 3.8, y: 19, z: 18 },   // 남-우
+    6: { x: -3.8, y: 19, z: 18 },  // 남-좌
+    7: { x: -18, y: 19, z: 3.8 },  // 서-하
+    8: { x: -18, y: 19, z: -3.8 }  // 서-상
   };
 
-  // 플레이어 칸 구역 중심점 (외각 테두리 한계선 R=8.6 적용으로 구역 간 중첩 전면 제거)
-  const R_SEAT = 8.6;
+  // 요청해주신 스케치 기반 8개 구역 좌표 정의
+  // 보드 크기(20.0 x 20.0) 기준, 각 변의 한계선 R_SIDE = 8.5 사용
+  const R_SIDE = 8.5;
+  const OFFSET = 3.8; // 각 변에서 좌/우(상/하)로 떨어지는 거리를 넓혀 겹침 차단
+
   const SEAT_CENTERS = {
-    1: { x: 0, z: R_SEAT, angle: 0 },
-    2: { x: -R_SEAT * 0.7071, z: R_SEAT * 0.7071, angle: Math.PI / 4 },
-    3: { x: -R_SEAT, z: 0, angle: Math.PI / 2 },
-    4: { x: -R_SEAT * 0.7071, z: -R_SEAT * 0.7071, angle: (3 * Math.PI) / 4 },
-    5: { x: 0, z: -R_SEAT, angle: Math.PI },
-    6: { x: R_SEAT * 0.7071, z: -R_SEAT * 0.7071, angle: (-3 * Math.PI) / 4 },
-    7: { x: R_SEAT, z: 0, angle: -Math.PI / 2 },
-    8: { x: R_SEAT * 0.7071, z: R_SEAT * 0.7071, angle: -Math.PI / 4 }
+    1: { x: -OFFSET, z: -R_SIDE, angle: Math.PI },      // 북쪽 좌
+    2: { x: OFFSET, z: -R_SIDE, angle: Math.PI },       // 북쪽 우
+    3: { x: R_SIDE, z: -OFFSET, angle: -Math.PI / 2 },  // 동쪽 상
+    4: { x: R_SIDE, z: OFFSET, angle: -Math.PI / 2 },   // 동쪽 하
+    5: { x: OFFSET, z: R_SIDE, angle: 0 },              // 남쪽 우
+    6: { x: -OFFSET, z: R_SIDE, angle: 0 },             // 남쪽 좌
+    7: { x: -R_SIDE, z: OFFSET, angle: Math.PI / 2 },   // 서쪽 하
+    8: { x: -R_SIDE, z: -OFFSET, angle: Math.PI / 2 }   // 서쪽 상
   };
 
   function updateCameraPosition() {
-    const pos = seatCameraPositions[mySeat] || seatCameraPositions[1];
+    const pos = seatCameraPositions[mySeat] || seatCameraPositions[5];
     camera.position.set(pos.x, pos.y, pos.z);
   }
   updateCameraPosition();
@@ -296,54 +297,49 @@
     return new THREE.CanvasTexture(canvas);
   }
 
-    // --- 수정한 FeltMat Texture 함수 ---
-    function createFeltMatTexture8P() {
-      const canvas = document.createElement('canvas'); canvas.width = 2048; canvas.height = 2048;
-      const ctx = canvas.getContext('2d');
-      ctx.fillStyle = '#1b4d2e'; ctx.fillRect(0, 0, 2048, 2048);
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)'; ctx.lineWidth = 12; ctx.strokeRect(30, 30, 1988, 1988);
+  // 4개 면 × 2개 구역 전용 펠트 매트 텍스처 그리기
+  function createFeltMatTexture8P() {
+    const canvas = document.createElement('canvas'); canvas.width = 2048; canvas.height = 2048;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#1b4d2e'; ctx.fillRect(0, 0, 2048, 2048);
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)'; ctx.lineWidth = 12; ctx.strokeRect(30, 30, 1988, 1988);
 
-      ctx.font = 'bold 32px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.85)'; ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)'; ctx.lineWidth = 4;
+    ctx.font = 'bold 30px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.85)'; ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)'; ctx.lineWidth = 4;
 
-      const mapCoord = (val) => ((val + 10.0) / 20.0) * 2048;
+    const mapCoord = (val) => ((val + 10.0) / 20.0) * 2048;
 
-      const zones = [
-        { name: "P1 (남)", seat: 1 },
-        { name: "P2 (남서)", seat: 2 },
-        { name: "P3 (서)", seat: 3 },
-        { name: "P4 (북서)", seat: 4 },
-        { name: "P5 (북)", seat: 5 },
-        { name: "P6 (북동)", seat: 6 },
-        { name: "P7 (동)", seat: 7 },
-        { name: "P8 (남동)", seat: 8 }
-      ];
+    const zones = [
+      { name: "P1 (북-좌)", seat: 1 },
+      { name: "P2 (북-우)", seat: 2 },
+      { name: "P3 (동-상)", seat: 3 },
+      { name: "P4 (동-하)", seat: 4 },
+      { name: "P5 (남-우)", seat: 5 },
+      { name: "P6 (남-좌)", seat: 6 },
+      { name: "P7 (서-하)", seat: 7 },
+      { name: "P8 (서-상)", seat: 8 }
+    ];
 
-      zones.forEach(z => {
-        const center = SEAT_CENTERS[z.seat];
-        const cx = mapCoord(center.x);
-        const cy = mapCoord(center.z);
-        
-        // --- 짝수 구역(2, 4, 6, 8)도 홀수 구역과 동일한 방향으로 회전 ---
-        // 기존에 `z.seat % 2 === 0`일 때 다르게 주던 로직을 제거하고 통일합니다.
-        const effectiveAngle = -center.angle;
+    zones.forEach(z => {
+      const center = SEAT_CENTERS[z.seat];
+      const cx = mapCoord(center.x);
+      const cy = mapCoord(center.z);
+      
+      const w = 420; const h = 180;
 
-        const w = 480; const h = 170; // 겹치지 않도록 구역 세로 비율 슬림하게 조정
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(-center.angle);
+      ctx.strokeRect(-w / 2, -h / 2, w, h);
+      ctx.fillText(z.name, 0, 0);
+      ctx.restore();
+    });
 
-        ctx.save();
-        ctx.translate(cx, cy);
-        ctx.rotate(effectiveAngle);
-        ctx.strokeRect(-w / 2, -h / 2, w, h);
-        ctx.fillText(z.name, 0, 0);
-        ctx.restore();
-      });
+    return new THREE.CanvasTexture(canvas);
+  }
 
-      return new THREE.CanvasTexture(canvas);
-    }
-    // ------------------------------------
-
-    /* ... (기존 스크립트의 나머지 부분 유지) ... */
-    const tableShape = new THREE.Shape();
+  // 기본 원목 테이블 (11.0 x 11.0 기반)
+  const tableShape = new THREE.Shape();
   const w = 11.0, h = 11.0, r = 1.8;
   tableShape.moveTo(-w + r, -h); tableShape.lineTo(w - r, -h);
   tableShape.lineTo(w, -h + r); tableShape.lineTo(w, h - r);
@@ -357,7 +353,7 @@
   tableMesh.position.y = -0.15;
   scene.add(tableMesh);
 
-  // 원래 크기 매트 (20.0 x 20.0)
+  // 원래 보드판 매트 (20.0 x 20.0)
   const matGeo = new THREE.PlaneGeometry(20.0, 20.0);
   const boardMatMesh = new THREE.Mesh(matGeo, new THREE.MeshStandardMaterial({ map: createFeltMatTexture8P(), roughness: 0.8 }));
   boardMatMesh.rotation.x = -Math.PI / 2;
@@ -633,13 +629,12 @@
     return card;
   }
 
-  // 외곽 가장자리에 겹침 없이 손패 배치
   function startMuffinTimeGame(isLocal = true) {
     objects.forEach(obj => scene.remove(obj));
     objects = [];
     clearSelectionGroup();
 
-    addChatMessage('시스템', '🧁 8인 최적화 머핀타임 세팅 완료! 테두리 외곽 손패 구역으로 배치됩니다.', false, true);
+    addChatMessage('시스템', '🧁 머핀타임 8인 게임이 시작되었습니다! 각 구역에 손패가 배분됩니다.', false, true);
 
     let fullDeck = [];
     for (let i = 0; i < 8; i++) { fullDeck = fullDeck.concat(muffinCardDB); }
@@ -652,11 +647,14 @@
 
     for (let seat = 1; seat <= 8; seat++) {
       const center = SEAT_CENTERS[seat];
+      // 구역 축에 직교하는 패 분배
+      const isHorizontalSide = (seat === 1 || seat === 2 || seat === 5 || seat === 6);
       for (let i = 0; i < 3; i++) {
         if (cardIdx < cards.length) {
           const card = cards[cardIdx++];
-          const dx = (i - 1) * 0.95 * Math.cos(center.angle);
-          const dz = (i - 1) * 0.95 * Math.sin(center.angle);
+          const offset = (i - 1) * 0.95;
+          const dx = isHorizontalSide ? offset : 0;
+          const dz = isHorizontalSide ? 0 : offset;
           card.position.set(center.x + dx, CARD_BASE_Y, center.z + dz);
           alignCardRotationBySeat(card);
           updateHandVisibility(card);
@@ -687,7 +685,6 @@
     return dice;
   }
 
-  // 겹침이 절대 일어날 수 없는 구역 기반 판정 (반지름 2.2 이내)
   function isPositionInSeatZone(x, z, seat) {
     const center = SEAT_CENTERS[seat];
     if (!center) return false;
@@ -1574,6 +1571,6 @@
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
   });
-  </script>
+</script>
 </body>
 </html>
