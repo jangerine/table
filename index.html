@@ -204,7 +204,7 @@
     </select>
     <span id="status" style="color:#f59e0b;">(대기중)</span>
   </div>
-  <div>🧁 <b>최대 8인 지원:</b> 최대 8명의 플레이어가 동시에 참여 가능한 테이블탑 시뮬레이터입니다!</div>
+  <div>🧁 <b>최대 8인 지원:</b> 손패 카드가 10장이 모이면 🧁 MUFFIN TIME! 버튼을 눌러 승리를 선언하세요!</div>
 </div>
 
 <div id="chat-container">
@@ -230,19 +230,17 @@
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x0f172a);
 
-  // 8인 대형 매트를 위해 카메라 시야각 및 조망 거리 확대
   const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1000);
 
-  // P1~P8 좌석별 3D 카메라 위치 배치 (8방향 좌표 계산)
   const seatCameraPositions = {
-    1: { x: 0, y: 18, z: 17 },     // 남
-    2: { x: -12, y: 18, z: 12 },   // 남서
-    3: { x: -17, y: 18, z: 0 },    // 서
-    4: { x: -12, y: 18, z: -12 },  // 북서
-    5: { x: 0, y: 18, z: -17 },    // 북
-    6: { x: 12, y: 18, z: -12 },   // 북동
-    7: { x: 17, y: 18, z: 0 },     // 동
-    8: { x: 12, y: 18, z: 12 }     // 남동
+    1: { x: 0, y: 18, z: 17 },
+    2: { x: -12, y: 18, z: 12 },
+    3: { x: -17, y: 18, z: 0 },
+    4: { x: -12, y: 18, z: -12 },
+    5: { x: 0, y: 18, z: -17 },
+    6: { x: 12, y: 18, z: -12 },
+    7: { x: 17, y: 18, z: 0 },
+    8: { x: 12, y: 18, z: 12 }
   };
 
   function updateCameraPosition() {
@@ -263,7 +261,7 @@
   controls.dampingFactor = 0.05;
   controls.maxPolarAngle = Math.PI / 2 - 0.05;
   controls.minDistance = 4;
-  controls.maxDistance = 45; // 8인 조망을 고려한 최대 거리 확장
+  controls.maxDistance = 45;
   controls.target.set(0, 0.2, 0);
 
   const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
@@ -282,7 +280,6 @@
     return new THREE.CanvasTexture(canvas);
   }
 
-  // 8인 전용 패브릭 매트 텍스처 (P1~P8 핸드존 레이아웃)
   function createFeltMatTexture8P() {
     const canvas = document.createElement('canvas'); canvas.width = 2048; canvas.height = 2048;
     const ctx = canvas.getContext('2d');
@@ -604,7 +601,6 @@
     return card;
   }
 
-  // 8인용 머핀 타임 자동 분배 세팅
   function startMuffinTimeGame(isLocal = true) {
     objects.forEach(obj => scene.remove(obj));
     objects = [];
@@ -666,7 +662,6 @@
     return dice;
   }
 
-  // 8인 좌석 구역 범위 판정 로직
   function isPositionInSeatZone(x, z, seat) {
     const R = 5.2;
     if (seat === 1) return z > R && x >= -R && x <= R;
@@ -900,15 +895,9 @@
     if (isLocal) broadcastData({ type: 'shuffle' });
   }
 
-  function shoutOneCard() {
-    const myCards = objects.filter(o => o.userData.type === 'card' && isPositionInSeatZone(o.position.x, o.position.z, mySeat));
-    addChatMessage('시스템', `🚨 P${mySeat} 님이 "ONE CARD!"를 외쳤습니다! (현재 보유: ${myCards.length}장)`, false, true);
-    broadcastData({ type: 'one_card_shout', seat: mySeat, count: myCards.length });
-  }
-
   function declareMuffinTime() {
     const myCards = objects.filter(o => o.userData.type === 'card' && isPositionInSeatZone(o.position.x, o.position.z, mySeat));
-    addChatMessage('시스템', `🎉 P${mySeat} 님이 "MUFFIN TIME!" 을 외쳤습니다! (보유: ${myCards.length}장)`, false, true);
+    addChatMessage('시스템', `🎉 P${mySeat} 님이 "MUFFIN TIME!" 을 외쳤습니다! (보유 카드: ${myCards.length}장)`, false, true);
     broadcastData({ type: 'muffin_announce', seat: mySeat, count: myCards.length });
   }
 
@@ -923,10 +912,7 @@
       return;
     }
 
-    let html = `
-      <button class="ui-btn btn-muffin" id="dyn-muffin-shout-btn">🧁 MUFFIN TIME!</button>
-      <button class="ui-btn btn-orange" id="dyn-onecard-shout-btn">🚨 ONE CARD!</button>
-    `;
+    let html = `<button class="ui-btn btn-muffin" id="dyn-muffin-shout-btn">🧁 MUFFIN TIME!</button>`;
 
     if (hasCards) {
       html += `
@@ -945,7 +931,6 @@
     dynamicActionBar.style.display = 'flex';
 
     document.getElementById('dyn-muffin-shout-btn').onclick = declareMuffinTime;
-    document.getElementById('dyn-onecard-shout-btn').onclick = shoutOneCard;
 
     if (hasCards) {
       document.getElementById('dyn-shuffle-btn').onclick = () => shuffleCards(true);
@@ -1510,8 +1495,6 @@
       addChatMessage(data.sender, data.text, false);
     } else if (data.type === 'muffin_start') {
       startMuffinTimeGame(false);
-    } else if (data.type === 'one_card_shout') {
-      addChatMessage('시스템', `🚨 P${data.seat} 님이 "ONE CARD!"를 외쳤습니다! (${data.count}장 보유)`, false, true);
     } else if (data.type === 'muffin_announce') {
       addChatMessage('시스템', `🎉 P${data.seat} 님이 "MUFFIN TIME!" 을 외쳤습니다! (${data.count}장 보유)`, false, true);
     } else if (data.type === 'draw_line') {
