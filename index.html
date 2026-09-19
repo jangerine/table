@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Mobile Tabletop Simulator - Fully Restored & Improved Eraser</title>
+  <title>Mobile Tabletop Simulator - Poker Table Texture Applied</title>
   <style>
     * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
     body { margin: 0; overflow: hidden; touch-action: none; font-family: 'Pretendard', sans-serif; background-color: #0f172a; }
@@ -52,7 +52,7 @@
     }
     .size-btn.selected { background: #3b82f6; border-color: #60a5fa; }
     
-    /* Dynamic Action Bar (spawned when prop selected) */
+    /* Dynamic Action Bar */
     #dynamic-action-bar {
       position: absolute; top: 70px; left: 50%; transform: translateX(-50%);
       z-index: 110; display: none; gap: 8px; padding: 6px 12px;
@@ -197,7 +197,7 @@
     </select>
     <span id="status" style="color:#f59e0b;">(대기중)</span>
   </div>
-  <div>🛠 <b>최종 복원:</b> 테이블과 카메라 구도를 3D 스크린샷 맵처럼 입체적으로 변경했습니다.</div>
+  <div>🎰 <b>업데이트:</b> 초록색 매트를 실제 포커 테이블 이미지(외부 URL)로 교체했습니다.</div>
 </div>
 
 <div id="chat-container">
@@ -223,9 +223,8 @@
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x0f172a);
 
-  // [수정] 카메라 구도를 입체적인 3D 형태로 변경
   const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1000);
-  camera.position.set(-10, 11, 0); // 기본 좌석(P3) 구도
+  camera.position.set(-10, 11, 0);
 
   function updateCameraPosition() {
     if (mySeat === 1) camera.position.set(0, 11, 10);
@@ -266,38 +265,13 @@
     return new THREE.CanvasTexture(canvas);
   }
 
-  function createFeltMatTexture4P() {
-    const canvas = document.createElement('canvas'); canvas.width = 1024; canvas.height = 1024;
-    const ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#1b4d2e'; ctx.fillRect(0, 0, 1024, 1024);
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)'; ctx.lineWidth = 8; ctx.strokeRect(20, 20, 984, 984);
+  // [수정] 외부 이미지 텍스처 로더를 이용하여 포커 테이블 상판을 로드
+  const textureLoader = new THREE.TextureLoader();
 
-    ctx.font = 'bold 26px sans-serif'; ctx.textAlign = 'center';
-
-    ctx.strokeStyle = 'rgba(96, 165, 250, 0.6)'; ctx.lineWidth = 4;
-    ctx.strokeRect(180, 850, 664, 140);
-    ctx.fillStyle = 'rgba(96, 165, 250, 0.8)';
-    ctx.fillText('P1 HAND ZONE (남)', 512, 920);
-
-    ctx.strokeStyle = 'rgba(239, 68, 68, 0.6)';
-    ctx.strokeRect(180, 34, 664, 140);
-    ctx.fillStyle = 'rgba(239, 68, 68, 0.8)';
-    ctx.fillText('P2 HAND ZONE (북)', 512, 110);
-
-    ctx.strokeStyle = 'rgba(16, 185, 129, 0.6)';
-    ctx.strokeRect(34, 180, 140, 664);
-    ctx.fillStyle = 'rgba(16, 185, 129, 0.8)';
-    ctx.save(); ctx.translate(100, 512); ctx.rotate(-Math.PI/2);
-    ctx.fillText('P3 HAND ZONE (서)', 0, 0); ctx.restore();
-
-    ctx.strokeStyle = 'rgba(245, 158, 11, 0.6)';
-    ctx.strokeRect(850, 180, 140, 664);
-    ctx.fillStyle = 'rgba(245, 158, 11, 0.8)';
-    ctx.save(); ctx.translate(920, 512); ctx.rotate(Math.PI/2);
-    ctx.fillText('P4 HAND ZONE (동)', 0, 0); ctx.restore();
-
-    return new THREE.CanvasTexture(canvas);
-  }
+  // 원하시는 다른 사진 주소가 있으시다면 아래 URL을 변경해주시면 됩니다.
+  const pokerTableImageUrl = 'https://images.unsplash.com/photo-1511193311914-0346f16efe90?auto=format&fit=crop&w=1200&q=80';
+  
+  const boardMatTexture = textureLoader.load(pokerTableImageUrl);
 
   const tableShape = new THREE.Shape();
   const w = 7.5, h = 7.5, r = 1.2;
@@ -307,15 +281,15 @@
   tableShape.lineTo(-w, h - r); tableShape.lineTo(-w, -h + r);
   tableShape.closePath();
 
-  // [수정] 테이블 모양을 더 입체적으로 변경
   const tableGeo = new THREE.ExtrudeGeometry(tableShape, { depth: 0.3, bevelEnabled: true, bevelSegments: 2, steps: 1, bevelSize: 0.1, bevelThickness: 0.1 });
   tableGeo.rotateX(Math.PI / 2);
   const tableMesh = new THREE.Mesh(tableGeo, new THREE.MeshStandardMaterial({ map: createWoodTexture(), roughness: 0.6 }));
   tableMesh.position.y = -0.15;
   scene.add(tableMesh);
 
+  // [수정] 펠트 매트 대신 포커 테이블 이미지 재질 적용
   const matGeo = new THREE.PlaneGeometry(13.5, 13.5);
-  const boardMatMesh = new THREE.Mesh(matGeo, new THREE.MeshStandardMaterial({ map: createFeltMatTexture4P(), roughness: 0.8 }));
+  const boardMatMesh = new THREE.Mesh(matGeo, new THREE.MeshStandardMaterial({ map: boardMatTexture, roughness: 0.8 }));
   boardMatMesh.rotation.x = -Math.PI / 2;
   boardMatMesh.position.y = 0.26;
   scene.add(boardMatMesh);
@@ -780,7 +754,6 @@
   }
   updateDynamicActionBar();
 
-  // 3D 펜 선 생성 함수
   function createLineMesh(points, colorHex, radius) {
     if (!points || points.length < 2) return null;
     const curvePoints = points.map(p => new THREE.Vector3(p.x, 0.28, p.z));
@@ -829,12 +802,11 @@
   const eraserBtn = document.getElementById('eraser-mode-btn');
   const penToolsPanel = document.getElementById('pen-tools-panel');
 
-  // [수정] 지우개 범위 시각화 원형 커서 생성 (초기 숨김)
-  const cursorGeo = new THREE.RingGeometry(0.77, 0.8, 32); // 기본 ERASER_RADIUS = 0.8 기준
+  const cursorGeo = new THREE.RingGeometry(0.77, 0.8, 32);
   cursorGeo.rotateX(-Math.PI / 2);
   const cursorMat = new THREE.MeshBasicMaterial({ color: 0xff0000, side: THREE.DoubleSide });
   eraserCursorMesh = new THREE.Mesh(cursorGeo, cursorMat);
-  eraserCursorMesh.position.set(0, 0.29, 0); // 보드보다 약간 높게
+  eraserCursorMesh.position.set(0, 0.29, 0);
   eraserCursorMesh.visible = false;
   scene.add(eraserCursorMesh);
 
@@ -848,7 +820,7 @@
       isEraserMode = false;
       eraserBtn.innerText = '🧹 개별 지우개 [OFF]';
       eraserBtn.classList.remove('active');
-      eraserCursorMesh.visible = false; // 커서 숨김
+      eraserCursorMesh.visible = false;
 
       isSelectMode = false;
       document.getElementById('select-mode-btn').innerText = '🟦 영역 선택 [OFF]';
@@ -861,7 +833,6 @@
     eraserBtn.innerText = isEraserMode ? '🧹 개별 지우개 [ON]' : '🧹 개별 지우개 [OFF]';
     eraserBtn.classList.toggle('active', isEraserMode);
     
-    // [수정] 지우개 커서 표시 상태 연동
     eraserCursorMesh.visible = isEraserMode; 
 
     if (isEraserMode) {
@@ -1003,39 +974,34 @@
     return { x: (t.clientX / window.innerWidth) * 2 - 1, y: -(t.clientY / window.innerHeight) * 2 + 1, rawX: t.clientX, rawY: t.clientY };
   }
 
-  // [수정] 지우개 감지 및 연속/다중 궤적 보간 삭제 함수
   function checkEraserAtPoint(touchVec) {
     raycaster.setFromCamera(touchVec, camera);
 
     const hitPoint = new THREE.Vector3();
     if (raycaster.ray.intersectPlane(boardPlane, hitPoint)) {
-      // 1. 지우개 커서 위치 업데이트
       eraserCursorMesh.position.set(hitPoint.x, 0.29, hitPoint.z);
 
-      const ERASER_RADIUS = 0.8; // 감지 반경
+      const ERASER_RADIUS = 0.8;
 
-      // 2. 보간 로직: 터치/마우스 이동 속도가 빨라도 중간 점을 채워 빈틈없이 지움
       let checkPoints = [hitPoint.clone()];
       if (lastEraserPoint) {
         const dist = hitPoint.distanceTo(lastEraserPoint);
-        const steps = Math.ceil(dist / 0.15); // 0.15 보간 간격
+        const steps = Math.ceil(dist / 0.15);
         for (let s = 1; s <= steps; s++) {
           checkPoints.push(new THREE.Vector3().lerpVectors(lastEraserPoint, hitPoint, s / steps));
         }
       }
       lastEraserPoint = hitPoint.clone();
 
-      // 3. 지우개 범위(ERASER_RADIUS) 안의 모든 선 탐색 및 다중 삭제 (return 없이 전체 순회)
       for (let i = drawnLines.length - 1; i >= 0; i--) {
         const line = drawnLines[i];
         
-        // 선을 구성하는 점들과 지우개 궤적 점 사이의 거리가 ERASER_RADIUS 이내인지 체크
         const isTouched = line.points.some(pt => {
           return checkPoints.some(cPt => Math.hypot(pt.x - cPt.x, pt.z - cPt.z) < ERASER_RADIUS);
         });
 
         if (isTouched) {
-          deleteSingleLine(line.id, true); // 지우고 return 하지 않고 다음 선 계속 검사
+          deleteSingleLine(line.id, true);
         }
       }
     }
@@ -1055,7 +1021,7 @@
 
     if (isEraserMode) {
       controls.enabled = false;
-      lastEraserPoint = null; // [수정] 궤적 초기화
+      lastEraserPoint = null;
       checkEraserAtPoint(touch);
       return;
     }
@@ -1176,7 +1142,7 @@
     const pos = getTouchPos(e);
 
     if (isEraserMode) {
-      lastEraserPoint = null; // [수정] 궤적 초기화
+      lastEraserPoint = null;
       controls.enabled = true;
       return;
     }
