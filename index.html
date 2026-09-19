@@ -189,7 +189,7 @@
     </select>
     <span id="status" style="color:#f59e0b;">(대기중)</span>
   </div>
-  <div>🛠 <b>수정사항:</b> 개별 지우개 선택 시 선을 쓱 문지르면 정상적으로 즉시 지워집니다.</div>
+  <div>🛠 <b>수정사항:</b> 지우개 및 선 삭제 기능이 정상 작동하도록 판정 알고리즘을 개선했습니다.</div>
 </div>
 
 <div id="chat-container">
@@ -314,8 +314,8 @@
   let selectedGroup = [];
   let objectIdCounter = 0;
 
-  // 펜/지우개 관련 제어 변수
-  let drawnLines = []; // { id, mesh, points }
+  // 펜/지우개 관련 변수
+  let drawnLines = [];
   let isPenMode = false;
   let isEraserMode = false;
   let selectedPenColor = 0xef4444;
@@ -767,12 +767,12 @@
   }
   updateDynamicActionBar();
 
-  // 3D 튜브 메쉬 및 지우개 모드 완전 교체
+  // 3D 펜 선 생성 함수
   function createLineMesh(points, colorHex, radius) {
     if (!points || points.length < 2) return null;
     const curvePoints = points.map(p => new THREE.Vector3(p.x, 0.28, p.z));
     const curve = new THREE.CatmullRomCurve3(curvePoints);
-    const geometry = new THREE.TubeGeometry(curve, points.length * 2, radius, 6, false);
+    const geometry = new THREE.TubeGeometry(curve, Math.max(points.length * 2, 8), radius, 6, false);
     const material = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.4 });
     const mesh = new THREE.Mesh(geometry, material);
     return mesh;
@@ -795,8 +795,8 @@
     const index = drawnLines.findIndex(l => l.id === lineId);
     if (index !== -1) {
       scene.remove(drawnLines[index].mesh);
-      drawnLines[index].mesh.geometry.dispose();
-      drawnLines[index].mesh.material.dispose();
+      if (drawnLines[index].mesh.geometry) drawnLines[index].mesh.geometry.dispose();
+      if (drawnLines[index].mesh.material) drawnLines[index].mesh.material.dispose();
       drawnLines.splice(index, 1);
       if (isLocal) broadcastData({ type: 'delete_line', id: lineId });
     }
@@ -805,8 +805,8 @@
   function clearAllLines(isLocal = true) {
     drawnLines.forEach(l => {
       scene.remove(l.mesh);
-      l.mesh.geometry.dispose();
-      l.mesh.material.dispose();
+      if (l.mesh.geometry) l.mesh.geometry.dispose();
+      if (l.mesh.material) l.mesh.material.dispose();
     });
     drawnLines = [];
     if (isLocal) broadcastData({ type: 'clear_lines' });
@@ -959,15 +959,6 @@
     camBtn.classList.toggle('active', isCamModeAlwaysOn);
   });
 
-  ['#top-bar', '#bottom-info', '#prop-modal', '#card-preview-modal', '#dynamic-action-bar', '#chat-container', '#pen-tools-panel'].forEach(selector => {
-    const el = document.querySelector(selector);
-    if (el) {
-      ['touchstart', 'touchmove', 'touchend', 'mousedown', 'mousemove', 'mouseup', 'click'].forEach(evtType => {
-        el.addEventListener(evtType, (e) => e.stopPropagation());
-      });
-    }
-  });
-
   const raycaster = new THREE.Raycaster();
   const touch = new THREE.Vector2();
   let selectedObj = null;
@@ -985,7 +976,7 @@
     return { x: (t.clientX / window.innerWidth) * 2 - 1, y: -(t.clientY / window.innerHeight) * 2 + 1, rawX: t.clientX, rawY: t.clientY };
   }
 
-  // 🛠 [완전 고쳐진 개별 지우개 레이캐스팅 함수]
+  // 지우개 충돌 판정 개선 (Raycaster + Distance Check)
   function checkEraserAtPoint(touchVec) {
     raycaster.setFromCamera(touchVec, camera);
     const lineMeshes = drawnLines.map(l => l.mesh);
@@ -999,15 +990,16 @@
       }
     }
 
-    // 보조 거리 판정 (빠르게 슥 문지를 때 누락 방지)
+    // 터치 보충 판정 (지우개를 빨리 문지를 때 누락 예방)
     const hitPoint = new THREE.Vector3();
-    raycaster.ray.intersectPlane(boardPlane, hitPoint);
-    const ERASER_RADIUS = 0.45;
-    for (let i = drawnLines.length - 1; i >= 0; i--) {
-      const line = drawnLines[i];
-      const isNear = line.points.some(p => Math.hypot(p.x - hitPoint.x, p.z - hitPoint.z) < ERASER_RADIUS);
-      if (isNear) {
-        deleteSingleLine(line.id, true);
+    if (raycaster.ray.intersectPlane(boardPlane, hitPoint)) {
+      const ERASER_RADIUS = 0.5;
+      for (let i = drawnLines.length - 1; i >= 0; i--) {
+        const line = drawnLines[i];
+        const isNear = line.points.some(p => Math.hypot(p.x - hitPoint.x, p.z - hitPoint.z) < ERASER_RADIUS);
+        if (isNear) {
+          deleteSingleLine(line.id, true);
+        }
       }
     }
   }
@@ -1034,11 +1026,11 @@
       controls.enabled = false;
       raycaster.setFromCamera(touch, camera);
       const hitPoint = new THREE.Vector3();
-      raycaster.ray.intersectPlane(boardPlane, hitPoint);
-      
-      currentLinePoints = [{ x: hitPoint.x, z: hitPoint.z }];
-      currentLineMesh = createLineMesh([{ x: hitPoint.x, z: hitPoint.z }, { x: hitPoint.x + 0.001, z: hitPoint.z + 0.001 }], selectedPenColor, selectedPenRadius);
-      if (currentLineMesh) scene.add(currentLineMesh);
+      if (raycaster.ray.intersectPlane(boardPlane, hitPoint)) {
+        currentLinePoints = [{ x: hitPoint.x, z: hitPoint.z }];
+        currentLineMesh = createLineMesh([{ x: hitPoint.x, z: hitPoint.z }, { x: hitPoint.x + 0.001, z: hitPoint.z + 0.001 }], selectedPenColor, selectedPenRadius);
+        if (currentLineMesh) scene.add(currentLineMesh);
+      }
       return;
     }
 
@@ -1096,14 +1088,14 @@
       touch.x = pos.x; touch.y = pos.y;
       raycaster.setFromCamera(touch, camera);
       const hitPoint = new THREE.Vector3();
-      raycaster.ray.intersectPlane(boardPlane, hitPoint);
-
-      const lastPt = currentLinePoints[currentLinePoints.length - 1];
-      if (Math.hypot(hitPoint.x - lastPt.x, hitPoint.z - lastPt.z) > 0.08) {
-        currentLinePoints.push({ x: hitPoint.x, z: hitPoint.z });
-        scene.remove(currentLineMesh);
-        currentLineMesh = createLineMesh(currentLinePoints, selectedPenColor, selectedPenRadius);
-        if (currentLineMesh) scene.add(currentLineMesh);
+      if (raycaster.ray.intersectPlane(boardPlane, hitPoint)) {
+        const lastPt = currentLinePoints[currentLinePoints.length - 1];
+        if (Math.hypot(hitPoint.x - lastPt.x, hitPoint.z - lastPt.z) > 0.08) {
+          currentLinePoints.push({ x: hitPoint.x, z: hitPoint.z });
+          scene.remove(currentLineMesh);
+          currentLineMesh = createLineMesh(currentLinePoints, selectedPenColor, selectedPenRadius);
+          if (currentLineMesh) scene.add(currentLineMesh);
+        }
       }
       return;
     }
