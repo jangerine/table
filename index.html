@@ -3,11 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Mobile Tabletop Simulator - Fixed Eraser & Pen</title>
+  <title>Mobile Tabletop Simulator - Fully Restored & Improved Eraser</title>
   <style>
     * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
     body { margin: 0; overflow: hidden; touch-action: none; font-family: 'Pretendard', sans-serif; background-color: #0f172a; }
 
+    /* Top Toolbar */
     #top-bar {
       position: absolute; top: 0; left: 0; width: 100%; height: 60px;
       padding: 10px 16px; display: flex; justify-content: space-between; align-items: center;
@@ -32,6 +33,7 @@
     .btn-blue { background: linear-gradient(135deg, #3b82f6, #2563eb); }
     .btn-pink { background: linear-gradient(135deg, #ec4899, #db2777); }
 
+    /* Pen/Eraser Tools Panel */
     #pen-tools-panel {
       position: absolute; top: 65px; left: 16px; z-index: 120;
       display: none; align-items: center; gap: 8px; padding: 6px 12px;
@@ -49,7 +51,8 @@
       border: 1px solid #475569; border-radius: 6px; cursor: pointer;
     }
     .size-btn.selected { background: #3b82f6; border-color: #60a5fa; }
-
+    
+    /* Dynamic Action Bar (spawned when prop selected) */
     #dynamic-action-bar {
       position: absolute; top: 70px; left: 50%; transform: translateX(-50%);
       z-index: 110; display: none; gap: 8px; padding: 6px 12px;
@@ -59,6 +62,7 @@
       flex-wrap: wrap; justify-content: center;
     }
 
+    /* Bottom Info/Network Panel */
     #bottom-info {
       position: absolute; bottom: 16px; left: 16px; z-index: 100;
       background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(8px);
@@ -71,6 +75,7 @@
     #peer-ui button { padding: 4px 8px; font-size: 11px; border-radius: 6px; border: none; background: #10b981; color: white; font-weight: bold; }
     #player-seat-select { padding: 3px 6px; font-size: 11px; border-radius: 6px; background: #334155; color: white; border: 1px solid #475569; }
 
+    /* Chat System */
     #chat-container {
       position: absolute; bottom: 16px; right: 16px; z-index: 150;
       width: 260px; background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(10px);
@@ -103,6 +108,7 @@
     }
     #chat-send-btn { margin-left: 4px; padding: 6px 10px; font-size: 11px; font-weight: bold; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer; }
 
+    /* Prop Spawn Modal */
     #prop-modal {
       position: absolute; top: 70px; left: 16px; z-index: 200;
       background: rgba(30, 41, 59, 0.95); backdrop-filter: blur(10px);
@@ -114,6 +120,7 @@
       background: #334155; border: 1px solid #475569; border-radius: 8px; text-align: left;
     }
 
+    /* Card Preview Modal */
     #card-preview-modal {
       position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
       width: 220px; height: 330px; z-index: 300; background: #1e293b;
@@ -123,6 +130,7 @@
     }
     #preview-canvas { border-radius: 10px; margin-bottom: 10px; }
 
+    /* Selection Box */
     #select-box {
       position: absolute; border: 2px dashed #60a5fa; background: rgba(96, 165, 250, 0.2);
       pointer-events: none; display: none; z-index: 150;
@@ -189,7 +197,7 @@
     </select>
     <span id="status" style="color:#f59e0b;">(대기중)</span>
   </div>
-  <div>🛠 <b>수정사항:</b> 지우개 및 선 삭제 기능이 정상 작동하도록 판정 알고리즘을 개선했습니다.</div>
+  <div>🛠 <b>최종 복원:</b> 사라진 카드/주사위/멀티플레이어 기능을 모두 복구하고, 지우개 성능만 개선했습니다.</div>
 </div>
 
 <div id="chat-container">
@@ -323,6 +331,8 @@
   let currentLineMesh = null;
   let currentLinePoints = [];
   let lineIdCounter = 0;
+  let lastEraserPoint = null; // 지우기 궤적 보간용
+  let eraserCursorMesh = null; // 3D 지우개 커서
 
   const suits = ['♠', '♥', '♦', '♣'];
   const values = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
@@ -816,6 +826,15 @@
   const eraserBtn = document.getElementById('eraser-mode-btn');
   const penToolsPanel = document.getElementById('pen-tools-panel');
 
+  // 지우개 범위 시각화 원형 커서 생성 (초기 숨김)
+  const cursorGeo = new THREE.RingGeometry(0.77, 0.8, 32); // 기본 ERASER_RADIUS = 0.8 기준
+  cursorGeo.rotateX(-Math.PI / 2);
+  const cursorMat = new THREE.MeshBasicMaterial({ color: 0xff0000, side: THREE.DoubleSide });
+  eraserCursorMesh = new THREE.Mesh(cursorGeo, cursorMat);
+  eraserCursorMesh.position.set(0, 0.29, 0); // 보드보다 약간 높게
+  eraserCursorMesh.visible = false;
+  scene.add(eraserCursorMesh);
+
   penBtn.addEventListener('click', () => {
     isPenMode = !isPenMode;
     penBtn.innerText = isPenMode ? '✏️ 펜 [ON]' : '✏️ 펜 [OFF]';
@@ -826,6 +845,7 @@
       isEraserMode = false;
       eraserBtn.innerText = '🧹 개별 지우개 [OFF]';
       eraserBtn.classList.remove('active');
+      eraserCursorMesh.visible = false; // 커서 숨김
 
       isSelectMode = false;
       document.getElementById('select-mode-btn').innerText = '🟦 영역 선택 [OFF]';
@@ -837,6 +857,7 @@
     isEraserMode = !isEraserMode;
     eraserBtn.innerText = isEraserMode ? '🧹 개별 지우개 [ON]' : '🧹 개별 지우개 [OFF]';
     eraserBtn.classList.toggle('active', isEraserMode);
+    eraserCursorMesh.visible = isEraserMode; // 커서 표시 상태 연동
 
     if (isEraserMode) {
       isPenMode = false;
@@ -949,6 +970,7 @@
       isPenMode = false; penBtn.innerText = '✏️ 펜 [OFF]'; penBtn.classList.remove('active');
       penToolsPanel.style.display = 'none';
       isEraserMode = false; eraserBtn.innerText = '🧹 개별 지우개 [OFF]'; eraserBtn.classList.remove('active');
+      eraserCursorMesh.visible = false;
     }
   });
 
@@ -976,7 +998,7 @@
     return { x: (t.clientX / window.innerWidth) * 2 - 1, y: -(t.clientY / window.innerHeight) * 2 + 1, rawX: t.clientX, rawY: t.clientY };
   }
 
-  // 지우개 충돌 판정 개선 (Raycaster + Distance Check)
+  // [개선] 지우개 감지 및 궤적 보간 함수
   function checkEraserAtPoint(touchVec) {
     raycaster.setFromCamera(touchVec, camera);
     const lineMeshes = drawnLines.map(l => l.mesh);
@@ -993,11 +1015,32 @@
     // 터치 보충 판정 (지우개를 빨리 문지를 때 누락 예방)
     const hitPoint = new THREE.Vector3();
     if (raycaster.ray.intersectPlane(boardPlane, hitPoint)) {
-      const ERASER_RADIUS = 0.5;
+      // 커서 위치 업데이트
+      eraserCursorMesh.position.set(hitPoint.x, 0.29, hitPoint.z);
+
+      const ERASER_RADIUS = 0.8; // 감지 반경
+
+      // 보간 로직: 이전 점과 현재 점 사이를 메꿈
+      let checkPoints = [hitPoint];
+      if (lastEraserPoint) {
+        const dist = hitPoint.distanceTo(lastEraserPoint);
+        const steps = Math.ceil(dist / 0.2); // 0.2 단위로 중간 점 생성
+        for (let s = 1; s <= steps; s++) {
+          checkPoints.push(new THREE.Vector3().lerpVectors(lastEraserPoint, hitPoint, s / steps));
+        }
+      }
+      lastEraserPoint = hitPoint.clone();
+
+      // 지우개 범위 안의 모든 선 탐색 및 삭제
       for (let i = drawnLines.length - 1; i >= 0; i--) {
         const line = drawnLines[i];
-        const isNear = line.points.some(p => Math.hypot(p.x - hitPoint.x, p.z - hitPoint.z) < ERASER_RADIUS);
-        if (isNear) {
+        
+        // 선을 구성하는 점들과 지우개 궤적 점 사이의 거리 계산
+        const isTouched = line.points.some(pt => {
+          return checkPoints.some(cPt => Math.hypot(pt.x - cPt.x, pt.z - cPt.z) < ERASER_RADIUS);
+        });
+
+        if (isTouched) {
           deleteSingleLine(line.id, true);
         }
       }
@@ -1018,6 +1061,7 @@
 
     if (isEraserMode) {
       controls.enabled = false;
+      lastEraserPoint = null; // 궤적 초기화
       checkEraserAtPoint(touch);
       return;
     }
@@ -1138,6 +1182,7 @@
     const pos = getTouchPos(e);
 
     if (isEraserMode) {
+      lastEraserPoint = null; // 궤적 초기화
       controls.enabled = true;
       return;
     }
