@@ -1,1649 +1,1334 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Mobile Tabletop Simulator - Full Muffin Time Deck</title>
-  <style>
-    * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
-    body { margin: 0; overflow: hidden; touch-action: none; font-family: 'Pretendard', sans-serif; background-color: #0f172a; }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>머핀타임 (Muffin Time) - Web Edition</title>
+<style>
+  * { box-sizing: border-box; -webkit-user-select: none; user-select: none; }
+  html,body{margin:0;height:100%;background:#0f172a;font-family:'Pretendard',sans-serif;color:#e2e8f0;overflow:hidden;touch-action:manipulation;}
+  #app{position:relative;height:100%;width:100%;display:flex;flex-direction:column;}
 
-    /* Top Toolbar */
-    #top-bar {
-      position: absolute; top: 0; left: 0; width: 100%; height: 60px;
-      padding: 10px 16px; display: flex; justify-content: space-between; align-items: center;
-      z-index: 100; pointer-events: auto;
-    }
-    .btn-group-left, .btn-group-right { display: flex; gap: 6px; pointer-events: auto; flex-wrap: wrap; }
+  /* ---------- 로비 화면 ---------- */
+  #lobby{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:20px;z-index:500;background:radial-gradient(circle at 50% 20%,#1e293b,#0f172a);}
+  #lobby h1{font-size:30px;margin:0 0 4px;background:linear-gradient(90deg,#f59e0b,#ef4444);-webkit-background-clip:text;background-clip:text;color:transparent;}
+  #lobby .sub{color:#94a3b8;font-size:12px;margin-bottom:10px;text-align:center;}
+  .lobby-card{background:rgba(30,41,59,.9);border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:16px;width:100%;max-width:340px;display:flex;flex-direction:column;gap:8px;}
+  .lobby-card label{font-size:11px;color:#94a3b8;}
+  .lobby-card input{padding:10px;border-radius:10px;border:1px solid #475569;background:#0f172a;color:#fff;font-size:16px;text-align:center;text-transform:uppercase;}
+  .big-btn{padding:13px;border:none;border-radius:12px;font-weight:800;font-size:14px;color:#fff;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.4);}
+  .big-btn:active{transform:scale(.97);}
+  .btn-amber{background:linear-gradient(135deg,#f59e0b,#d97706);}
+  .btn-teal{background:linear-gradient(135deg,#14b8a6,#0d9488);}
+  .btn-purple{background:linear-gradient(135deg,#8b5cf6,#7c3aed);}
+  .btn-red{background:linear-gradient(135deg,#ef4444,#b91c1c);}
+  .btn-gray{background:linear-gradient(135deg,#64748b,#334155);}
+  #myRoomIdBox{font-size:26px;font-weight:900;letter-spacing:4px;color:#60a5fa;text-align:center;padding:8px;}
+  #lobbyPlayers{width:100%;max-width:340px;display:flex;flex-direction:column;gap:6px;}
+  .lobby-player-row{display:flex;justify-content:space-between;padding:8px 12px;background:rgba(255,255,255,.05);border-radius:8px;font-size:13px;}
 
-    .ui-btn {
-      padding: 7px 12px; font-size: 12px; font-weight: 700; color: white;
-      border: none; border-radius: 10px; cursor: pointer;
-      display: flex; align-items: center; gap: 4px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.3); transition: all 0.2s ease;
-    }
-    .ui-btn:active { transform: scale(0.95); }
-    .ui-btn.active { outline: 2px solid #ffffff; box-shadow: 0 0 12px rgba(255,255,255,0.6); }
+  /* ---------- 게임 화면 ---------- */
+  #game{position:absolute;inset:0;display:none;flex-direction:column;}
+  #topbar{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:rgba(15,23,42,.9);border-bottom:1px solid rgba(255,255,255,.08);font-size:11px;z-index:20;}
+  #topbar .info{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+  .pill{background:rgba(255,255,255,.08);padding:4px 9px;border-radius:20px;font-weight:700;}
+  .pill.turn{background:linear-gradient(135deg,#10b981,#059669);}
+  #playersStrip{display:flex;gap:6px;overflow-x:auto;padding:6px 8px;background:rgba(255,255,255,.03);}
+  .player-chip{flex:0 0 auto;background:#1e293b;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:6px 9px;font-size:10px;min-width:74px;text-align:center;}
+  .player-chip.me{border-color:#60a5fa;}
+  .player-chip.current{outline:2px solid #10b981;}
+  .player-chip .nm{font-weight:800;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .player-chip .stat{color:#94a3b8;margin-top:2px;}
 
-    .btn-muffin { background: linear-gradient(135deg, #f43f5e, #be123c); animation: pulse 2s infinite; }
-    .btn-purple { background: linear-gradient(135deg, #8b5cf6, #7c3aed); }
-    .btn-green { background: linear-gradient(135deg, #10b981, #059669); }
-    .btn-teal { background: linear-gradient(135deg, #14b8a6, #0d9488); }
-    .btn-orange { background: linear-gradient(135deg, #f59e0b, #d97706); }
-    .btn-red { background: linear-gradient(135deg, #ef4444, #dc2626); }
-    .btn-blue { background: linear-gradient(135deg, #3b82f6, #2563eb); }
-    .btn-pink { background: linear-gradient(135deg, #ec4899, #db2777); }
+  #logPanel{flex:1;overflow-y:auto;padding:8px 10px;font-size:11px;line-height:1.6;color:#cbd5e1;}
+  #logPanel div{margin-bottom:2px;}
+  #logPanel .sys{color:#f59e0b;}
+  #logPanel .win{color:#34d399;font-weight:800;}
 
-    @keyframes pulse {
-      0% { box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.7); }
-      70% { box-shadow: 0 0 0 10px rgba(244, 63, 94, 0); }
-      100% { box-shadow: 0 0 0 0 rgba(244, 63, 94, 0); }
-    }
+  #centerZone{display:flex;justify-content:center;gap:16px;padding:6px;font-size:11px;color:#94a3b8;}
+  #centerZone .zone-box{background:rgba(255,255,255,.05);border-radius:10px;padding:6px 12px;text-align:center;}
+  #centerZone .zone-box b{display:block;font-size:16px;color:#fff;}
 
-    /* Pen/Eraser Tools Panel */
-    #pen-tools-panel {
-      position: absolute; top: 65px; left: 16px; z-index: 120;
-      display: none; align-items: center; gap: 8px; padding: 6px 12px;
-      background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(8px);
-      border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 12px;
-      box-shadow: 0 8px 20px rgba(0,0,0,0.4); pointer-events: auto;
-    }
-    .color-dot { width: 22px; height: 22px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; transition: transform 0.2s; }
-    .color-dot.selected { border-color: #ffffff; transform: scale(1.25); }
-    .size-btn { padding: 3px 8px; font-size: 11px; background: #334155; color: white; border: 1px solid #475569; border-radius: 6px; cursor: pointer; }
-    .size-btn.selected { background: #3b82f6; border-color: #60a5fa; }
-    
-    /* Dynamic Action Bar */
-    #dynamic-action-bar {
-      position: absolute; top: 70px; left: 50%; transform: translateX(-50%);
-      z-index: 110; display: none; gap: 8px; padding: 6px 12px;
-      background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(8px);
-      border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 14px;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.5); pointer-events: auto;
-      flex-wrap: wrap; justify-content: center;
-    }
+  #trapRow{display:flex;gap:6px;padding:4px 10px;overflow-x:auto;}
+  .trap-slot{flex:0 0 auto;width:46px;height:64px;border-radius:6px;background:linear-gradient(135deg,#7f1d1d,#450a0a);border:2px solid #ef4444;display:flex;align-items:center;justify-content:center;font-size:9px;text-align:center;color:#fecaca;cursor:pointer;}
+  .trap-slot.empty{background:rgba(255,255,255,.03);border:2px dashed rgba(255,255,255,.15);}
 
-    /* Bottom Info/Network Panel */
-    #bottom-info {
-      position: absolute; bottom: 16px; left: 16px; z-index: 100;
-      background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(8px);
-      border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px;
-      padding: 10px 14px; color: #e2e8f0; font-size: 11px; line-height: 1.5;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.4); max-width: 440px; pointer-events: auto;
-    }
-    #peer-ui { margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-    #peer-ui input { width: 80px; padding: 4px 6px; font-size: 11px; border-radius: 6px; border: 1px solid #475569; background: #1e293b; color: white; text-transform: uppercase; }
-    #peer-ui button { padding: 4px 8px; font-size: 11px; border-radius: 6px; border: none; background: #10b981; color: white; font-weight: bold; }
-    #player-seat-select { padding: 3px 6px; font-size: 11px; border-radius: 6px; background: #334155; color: white; border: 1px solid #475569; }
+  #handWrap{background:rgba(15,23,42,.95);border-top:1px solid rgba(255,255,255,.1);padding:8px 8px 10px;z-index:20;}
+  #handActions{display:flex;gap:6px;justify-content:center;margin-bottom:8px;flex-wrap:wrap;}
+  #hand{display:flex;gap:8px;overflow-x:auto;padding:4px 4px 8px;}
+  .card{flex:0 0 auto;width:88px;height:124px;border-radius:10px;padding:8px 7px;display:flex;flex-direction:column;justify-content:space-between;font-size:10px;line-height:1.3;box-shadow:0 4px 10px rgba(0,0,0,.4);cursor:pointer;border:2px solid rgba(255,255,255,.15);}
+  .card.selected{outline:3px solid #fbbf24;transform:translateY(-6px);}
+  .card .cname{font-weight:900;font-size:11px;}
+  .card .cen{font-size:8px;opacity:.7;}
+  .card .cdesc{font-size:8.5px;opacity:.92;}
+  .card.trap{background:linear-gradient(160deg,#7f1d1d,#450a0a);color:#fee2e2;}
+  .card.action{background:linear-gradient(160deg,#075985,#0c4a6e);color:#e0f2fe;}
+  .card.counter{background:linear-gradient(160deg,#14532d,#052e14);color:#dcfce7;}
+  .card.minigame{background:linear-gradient(160deg,#6b21a8,#3b0764);color:#f3e8ff;}
+  .card .tag{font-size:7.5px;opacity:.65;text-transform:uppercase;}
 
-    /* Chat System */
-    #chat-container {
-      position: absolute; bottom: 16px; right: 16px; z-index: 150;
-      width: 260px; background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(10px);
-      border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 14px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.6); overflow: hidden;
-      display: flex; flex-direction: column; pointer-events: auto; transition: all 0.3s ease;
-    }
-    #chat-header {
-      padding: 8px 12px; background: rgba(30, 41, 59, 0.8);
-      font-size: 12px; font-weight: bold; color: #f8fafc;
-      display: flex; justify-content: space-between; align-items: center;
-      cursor: pointer; border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-    }
-    #chat-body { display: flex; flex-direction: column; height: 180px; transition: height 0.3s ease; }
-    #chat-messages {
-      flex: 1; padding: 8px 10px; overflow-y: auto; font-size: 11px;
-      display: flex; flex-direction: column; gap: 6px; color: #e2e8f0;
-      user-select: text; -webkit-user-select: text;
-    }
-    .chat-msg { line-height: 1.3; word-break: break-all; }
-    .chat-msg .sender { font-weight: bold; color: #38bdf8; margin-right: 4px; }
-    .chat-msg.me .sender { color: #10b981; }
-    .chat-msg.system { color: #f43f5e; font-style: italic; }
-    #chat-input-box { display: flex; padding: 6px; border-top: 1px solid rgba(255, 255, 255, 0.1); background: #0f172a; }
-    #chat-input {
-      flex: 1; padding: 6px 8px; font-size: 11px; border-radius: 6px;
-      border: 1px solid #334155; background: #1e293b; color: white; outline: none;
-      user-select: text; -webkit-user-select: text;
-    }
-    #chat-send-btn { margin-left: 4px; padding: 6px 10px; font-size: 11px; font-weight: bold; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer; }
+  /* ---------- 모달 ---------- */
+  .overlay{position:absolute;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:300;padding:16px;}
+  .modal{background:#1e293b;border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:18px;max-width:360px;width:100%;max-height:80vh;overflow-y:auto;box-shadow:0 20px 50px rgba(0,0,0,.6);}
+  .modal h3{margin:0 0 10px;font-size:15px;}
+  .modal .desc{font-size:12px;color:#94a3b8;margin-bottom:12px;}
+  .choice-list{display:flex;flex-direction:column;gap:6px;margin-bottom:12px;}
+  .choice-btn{padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.05);color:#fff;text-align:left;font-size:12px;cursor:pointer;}
+  .choice-btn.picked{background:#f59e0b;color:#000;font-weight:800;}
+  .modal-actions{display:flex;gap:8px;justify-content:flex-end;}
+  .modal-actions button{padding:9px 14px;border-radius:8px;border:none;font-weight:700;cursor:pointer;}
+  #timerBar{height:4px;background:#334155;border-radius:2px;overflow:hidden;margin-bottom:10px;}
+  #timerBar div{height:100%;background:linear-gradient(90deg,#f59e0b,#ef4444);width:100%;transition:width linear;}
 
-    /* Prop Spawn Modal */
-    #prop-modal {
-      position: absolute; top: 70px; left: 16px; z-index: 200;
-      background: rgba(30, 41, 59, 0.95); backdrop-filter: blur(10px);
-      border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 12px;
-      display: none; flex-direction: column; gap: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); pointer-events: auto;
-    }
-    #prop-modal button {
-      padding: 8px 12px; font-size: 12px; font-weight: bold; color: white;
-      background: #334155; border: 1px solid #475569; border-radius: 8px; text-align: left; cursor: pointer;
-    }
-    #prop-modal button:hover { background: #475569; }
-    #prop-modal .btn-muffin-modal { background: linear-gradient(135deg, #f43f5e, #be123c) !important; }
-
-    /* Card Preview Modal */
-    #card-preview-modal {
-      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-      width: 240px; height: 360px; z-index: 300; background: #1e293b;
-      border: 3px solid #60a5fa; border-radius: 16px; display: none;
-      flex-direction: column; justify-content: center; align-items: center;
-      box-shadow: 0 20px 50px rgba(0,0,0,0.8); color: white; text-align: center; padding: 12px; pointer-events: auto;
-    }
-
-    #select-box {
-      position: absolute; border: 2px dashed #60a5fa; background: rgba(96, 165, 250, 0.2);
-      pointer-events: none; display: none; z-index: 150;
-    }
-  </style>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+  #toast{position:absolute;top:70px;left:50%;transform:translateX(-50%);background:rgba(30,41,59,.96);border:1px solid rgba(255,255,255,.15);padding:10px 16px;border-radius:10px;font-size:12px;z-index:400;display:none;max-width:88%;text-align:center;}
+  #winOverlay{position:absolute;inset:0;background:rgba(0,0,0,.85);display:none;align-items:center;justify-content:center;flex-direction:column;gap:14px;z-index:600;}
+  #winOverlay h1{font-size:34px;background:linear-gradient(90deg,#fbbf24,#f43f5e);-webkit-background-clip:text;background-clip:text;color:transparent;}
+</style>
 </head>
 <body>
+<div id="app">
 
-<div id="select-box"></div>
+  <!-- ============ 로비 ============ -->
+  <div id="lobby">
+    <h1>🧁 머핀타임</h1>
+    <div class="sub">asdfmovie 원작 카드 파티게임 · 손패가 정확히 10장이 되면 승리!</div>
 
-<div id="top-bar">
-  <div class="btn-group-left">
-    <button class="ui-btn btn-purple" id="prop-menu-btn">🎮 소품 추가</button>
-    <button class="ui-btn btn-orange" id="add-slot-btn">🔲 슬롯 생성</button>
-    <button class="ui-btn btn-purple" id="select-mode-btn">🟦 영역 선택 [OFF]</button>
-    <button class="ui-btn btn-pink" id="pen-mode-btn">✏️ 펜 [OFF]</button>
-    <button class="ui-btn btn-teal" id="eraser-mode-btn">🧹 지우개 [OFF]</button>
-    <button class="ui-btn btn-red" id="clear-lines-btn">💥 선 삭제</button>
-  </div>
-  <div class="btn-group-right">
-    <button class="ui-btn btn-blue" id="cam-mode-btn">카메라 회전</button>
-  </div>
-</div>
-
-<div id="pen-tools-panel">
-  <div class="color-dot selected" style="background:#ef4444;" data-color="0xef4444"></div>
-  <div class="color-dot" style="background:#3b82f6;" data-color="0x3b82f6"></div>
-  <div class="color-dot" style="background:#10b981;" data-color="0x10b981"></div>
-  <div class="color-dot" style="background:#f59e0b;" data-color="0xf59e0b"></div>
-  <div class="color-dot" style="background:#ffffff;" data-color="0xffffff"></div>
-  <div style="width:1px; height:16px; background:rgba(255,255,255,0.2); margin:0 4px;"></div>
-  <button class="size-btn" data-size="0.02">얇게</button>
-  <button class="size-btn selected" data-size="0.05">보통</button>
-  <button class="size-btn" data-size="0.09">굵게</button>
-</div>
-
-<div id="dynamic-action-bar"></div>
-
-<div id="prop-modal">
-  <button class="btn-muffin-modal" id="muffin-start-btn">🧁 머핀타임 8인 전체 세팅</button>
-  <button id="add-muffin-card-btn">🧁 머핀타임 카드 1장</button>
-  <button id="add-card-btn">🃏 무작위 트럼프 카드 1장</button>
-  <button id="add-deck-btn">🎴 52장 전체 트럼프 덱</button>
-  <button id="add-dice-btn">🎲 주사위 추가</button>
-</div>
-
-<div id="card-preview-modal">
-  <canvas id="preview-canvas" width="200" height="280"></canvas>
-  <div id="preview-title" style="font-size: 14px; font-weight: bold; margin-top:6px;">카드 정보</div>
-  <div id="preview-desc" style="font-size: 11px; color: #cbd5e1; margin-top:4px;"></div>
-  <div style="font-size: 10px; color: #94a3b8; margin-top:8px;">(탭 시 닫힘)</div>
-</div>
-
-<div id="bottom-info">
-  <div id="peer-ui">
-    <span>ID: <strong id="my-id" style="color:#60a5fa;">생성 중...</strong></span> | 
-    <input type="text" id="join-id" placeholder="방장 ID">
-    <button id="connect-btn">참가</button>
-    <select id="player-seat-select">
-      <option value="1">P1 (북-좌)</option>
-      <option value="2">P2 (북-우)</option>
-      <option value="3">P3 (동-상)</option>
-      <option value="4">P4 (동-하)</option>
-      <option value="5" selected>P5 (남-우)</option>
-      <option value="6">P6 (남-좌)</option>
-      <option value="7">P7 (서-하)</option>
-      <option value="8">P8 (서-상)</option>
-    </select>
-    <span id="status" style="color:#f59e0b;">(대기중)</span>
-  </div>
-  <div>🧁 <b>머핀타임 전체 덱 탑재 완료:</b> 80여 종 이상의 공식 액션/카운터/트랩 전체 카드가 적용되었습니다!</div>
-</div>
-
-<div id="chat-container">
-  <div id="chat-header">
-    <span>💬 실시간 채팅</span>
-    <span id="chat-toggle-icon">▼</span>
-  </div>
-  <div id="chat-body">
-    <div id="chat-messages">
-      <div class="chat-msg system">머핀 타임 풀 커스텀 덱 게임에 오신 것을 환영합니다!</div>
+    <div class="lobby-card">
+      <label>내 닉네임</label>
+      <input id="nickInput" maxlength="8" placeholder="닉네임 입력">
     </div>
-    <div id="chat-input-box">
-      <input type="text" id="chat-input" placeholder="메시지 입력..." maxlength="100">
-      <button id="chat-send-btn">전송</button>
+
+    <div class="lobby-card" id="hostCard">
+      <label>방 만들기 (호스트가 되어 게임을 관리합니다)</label>
+      <button class="big-btn btn-amber" id="createRoomBtn">🏠 방 만들기</button>
+      <div id="myRoomIdBox" style="display:none;"></div>
+    </div>
+
+    <div class="lobby-card">
+      <label>방 참가하기</label>
+      <input id="joinIdInput" maxlength="4" placeholder="4자리 코드">
+      <button class="big-btn btn-teal" id="joinRoomBtn">🚪 참가하기</button>
+    </div>
+
+    <div id="lobbyPlayers"></div>
+    <button class="big-btn btn-purple" id="startGameBtn" style="display:none;max-width:340px;width:100%;">🎮 게임 시작</button>
+    <div class="sub" id="lobbyStatus"></div>
+  </div>
+
+  <!-- ============ 게임 화면 ============ -->
+  <div id="game">
+    <div id="topbar">
+      <div class="info">
+        <span class="pill">🎴 덱 <span id="deckCount">0</span></span>
+        <span class="pill">🗑️ <span id="discardTop">-</span></span>
+        <span class="pill">🏆 목표 <span id="winThresholdView">10</span>장</span>
+      </div>
+      <div class="pill turn" id="turnIndicator">대기중</div>
+    </div>
+    <div id="playersStrip"></div>
+    <div id="centerZone">
+      <div class="zone-box">내 손패<b id="myHandCount">0</b></div>
+      <div class="zone-box">설치한 함정<b id="myTrapCount">0</b>/3</div>
+    </div>
+    <div id="trapRow"></div>
+    <div id="logPanel"></div>
+
+    <div id="handWrap">
+      <div id="handActions"></div>
+      <div id="hand"></div>
     </div>
   </div>
+
+  <!-- 카운터 응답 토스트 -->
+  <div id="toast"></div>
+
+  <!-- 범용 모달 (선택/디스카드/카운터/미니게임 등) -->
+  <div class="overlay" id="modalOverlay">
+    <div class="modal" id="modalBox"></div>
+  </div>
+
+  <div id="winOverlay">
+    <h1 id="winText">🎉 승리! 🎉</h1>
+    <button class="big-btn btn-gray" onclick="location.reload()">새 게임</button>
+  </div>
+
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.2/dist/peerjs.min.js"></script>
 <script>
-  let mySeat = 5;
-  const CARD_BASE_Y = 0.32;
+/* =========================================================================
+   머핀타임 WEB EDITION
+   ------------------------------------------------------------------------
+   구조:
+   1) CARD_DB            : 카드 데이터 (트랩/액션/카운터/미니게임)
+   2) EffectEngine        : 카드 효과를 해석/적용하는 호스트 전용 엔진
+   3) Net                 : PeerJS 기반 호스트-권위형(Star topology) 네트워크
+   4) GameHost            : 호스트에서만 도는 게임 상태 머신 (권위 데이터)
+   5) UI                  : 렌더링 + 사용자 입력 (모든 클라이언트 공통)
+   ========================================================================= */
+(function(){
+'use strict';
 
-  const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x0f172a);
+/* =========================================================================
+   1) CARD DATABASE
+   ========================================================================= */
+const CARD_DB = [
+/* ---------------- 함정 카드 (trap, 빨강) ---------------- */
+{id:'t_robbery',name:'강도다!',en:'A ROBBERY',type:'trap',n:3,desc:'상대에게 전화를 걸었다고 우깁니다. 걸려든 사람은 카드 3장을 버립니다.',fx:{k:'discard',who:'target',n:3}},
+{id:'t_dontthink',name:'고양이를 생각하지 마',en:"DON'T THINK ABOUT CATS",type:'trap',desc:'누군가 고양이 얘기를 꺼냈다면 그 사람은 카드 3장을 버립니다.',fx:{k:'discard',who:'target',n:3}},
+{id:'t_jump',name:'깜짝 놀랐지!',en:'MADE YA JUMP',type:'trap',desc:'누군가를 놀래키는 데 성공했다면 그 사람은 카드 3장을 버립니다.',fx:{k:'discard',who:'target',n:3}},
+{id:'t_dontbeatme',name:'난 쓰러지지 않는다',en:"DON'T BEAT ME",type:'trap',desc:'내 손패가 0장일 때만 발동 가능. 지목한 상대의 손패 전부를 가져옵니다.',trigger:'self',condition:'handEmpty',fx:{k:'stealAll',from:'target',to:'self'}},
+{id:'t_named',name:'너의 이름은',en:'NAMED THIS WAY',type:'trap',desc:'누군가 내 이름을 불렀다면 그 사람은 카드 3장을 버립니다.',fx:{k:'discard',who:'target',n:3}},
+{id:'t_face',name:'네 얼굴 위에',en:'ON YOUR FACE',type:'trap',desc:'들키지 않고 버텼다면, 지목한 사람을 포함해 나를 제외한 모두가 카드 3장씩 버립니다.',fx:{k:'discard',who:'others',n:3}},
+{id:'t_happy',name:'네가 행복하다면',en:"IF YOU'RE HAPPY",type:'trap',desc:'누군가 큰소리로 노래를 불렀다면 그 사람에게서 카드 3장을 빼앗습니다.',fx:{k:'steal',from:'target',to:'self',n:3}},
+{id:'t_whoate',name:'누가 먹었어?',en:'WHO ATE THIS?',type:'trap',desc:'누군가 뭔가를 먹었다면 그 사람에게서 카드 3장을 빼앗습니다.',fx:{k:'steal',from:'target',to:'self',n:3}},
+{id:'t_magicword',name:'마법의 단어',en:'MAGIC WORD',type:'trap',desc:'누군가 "~해줘"라고 부탁했다면 그 사람에게서 카드 3장을 빼앗습니다.',fx:{k:'steal',from:'target',to:'self',n:3}},
+{id:'t_donttouch',name:'만지지 마',en:"DON'T TOUCH",type:'trap',desc:'누군가 이 카드를 건드렸다고 지목당하면 카드 5장을 버립니다.',fx:{k:'discard',who:'target',n:5}},
+{id:'t_youfool',name:'멍청하군',en:'YOU FOOL',type:'trap',desc:'누군가 카드를 버리는 걸 목격했다면 그 사람에게서 카드 1장을 빼앗습니다.',fx:{k:'steal',from:'target',to:'self',n:1}},
+{id:'t_hello',name:'모두들 안녕',en:'HELLO THERE',type:'trap',desc:'내가 인사했는데 화답한 사람이 있다면 그 사람에게서 카드 3장을 빼앗습니다.',fx:{k:'steal',from:'target',to:'self',n:3}},
+{id:'t_what',name:'뭐어라고?!',en:'WHAT?!',type:'trap',desc:'누군가 "뭐라고?"라고 말하게 만들었다면 그 사람은 카드 3장을 버립니다.',fx:{k:'discard',who:'target',n:3}},
+{id:'t_upsidedown',name:'반대로',en:'UPSIDE DOWN',type:'trap',desc:'카드 효과를 착각한 사람이 있다면 그 사람에게서 카드 2장을 빼앗습니다.',fx:{k:'steal',from:'target',to:'self',n:2}},
+{id:'t_fart',name:'방귀 뿡뿡 엉덩이',en:'FARTING BUTT',type:'trap',desc:'누군가 방귀/트림/기침/재채기를 했다면 그 사람에게서 카드 3장을 빼앗습니다.',fx:{k:'steal',from:'target',to:'self',n:3}},
+{id:'t_sarcasm',name:'비꼬기 대장',en:'BEST SARCASM',type:'trap',desc:'누군가 비꼬는 말을 했다면 그 사람에게서 카드 3장을 빼앗습니다.',fx:{k:'steal',from:'target',to:'self',n:3}},
+{id:'t_lol',name:'빵 터졌네',en:'LOL OUT LOUD',type:'trap',desc:'누군가 "머핀 타임!"을 외쳤다면 그 사람은 카드 3장을 버립니다.',fx:{k:'discard',who:'target',n:3},hookOn:'declareMuffinTime'},
+{id:'t_countdown',name:'카운트다운',en:'COUNTDOWN',type:'trap',desc:'누군가 내 카드가 몇 장이냐고 물었다면 그 사람은 카드 3장을 버립니다.',fx:{k:'discard',who:'target',n:3}},
+{id:'t_tired',name:'피곤하니?',en:'TIRED?',type:'trap',desc:'누군가 하품을 했다면 그 사람은 카드 4장을 버립니다.',fx:{k:'discard',who:'target',n:4}},
+{id:'t_highfive',name:'하이파이브',en:'HIGH FIVE',type:'trap',desc:'나와 하이파이브를 한 사람은 카드 5장을 버립니다.',fx:{k:'discard',who:'target',n:5}},
+{id:'t_cardsick',name:'카드 울렁증',en:'CARD SICK',type:'trap',desc:'내 손패가 10장을 초과하는 즉시, 10장이 될 때까지 자동으로 버립니다. (설치 시 항상 감시)',trigger:'passive',custom:'cardSick'},
+{id:'t_whattwist',name:'오히려 좋아',en:'WHAT A TWIST',type:'trap',desc:'내 손패가 0장이라면 즉시 카드 10장을 뽑을 수 있습니다.',trigger:'self',condition:'handEmpty',fx:{k:'draw',who:'self',n:10}},
 
-  const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1000);
+/* ---------------- 행동 카드 (action, 하늘색) ---------------- */
+{id:'a_end',name:'-끝-',en:'THE END',type:'action',desc:'내 다음 차례가 시작될 때, 그 시점 손패가 가장 적은 사람이 즉시 승리합니다. (동률이면 계속 진행)',fx:{k:'setWinRuleAt',rule:'fewest'}},
+{id:'a_oneyear',name:'1년 남으셨습니다',en:'ONE YEAR TO LIVE',type:'action',desc:'내 다음 차례가 시작될 때, 그 시점 손패가 가장 많은 사람이 즉시 승리합니다. (동률이면 계속 진행)',fx:{k:'setWinRuleAt',rule:'most'}},
+{id:'a_pineapple',name:'갑자기 분위기 파인애플',en:'SUDDENLY PINEAPPLES',type:'action',desc:'설치된 모든 함정 카드를 버립니다.',fx:{k:'removeTraps',who:'all'}},
+{id:'a_bigbaby',name:'거대 아기',en:'BIG BABY',type:'action',desc:'무작위로 정해진 한 명이 카드 3장을 버립니다.',fx:{k:'discard',who:'randomOther',n:3}},
+{id:'a_bee',name:'거대함',en:'BIG BEE',type:'action',desc:'손패가 가장 많은 사람을 제외한 모두가 그 사람에게서 카드 1장씩 빼앗습니다.',fx:{k:'custom',id:'bigBee'}},
+{id:'a_gunman',name:'건맨',en:'GUNMAN',type:'action',desc:'무작위로 정해진 한 명이 손에 든 카드를 전부 버립니다.',fx:{k:'discard',who:'randomOther',n:'all'}},
+{id:'a_bear',name:'곰 찾았다',en:'DRAW A BEAR',type:'action',desc:'카드를 3장 뽑습니다.',fx:{k:'draw',who:'self',n:3}},
+{id:'a_fallingup',name:'굴러 올라가기',en:'FALLING UP',type:'action',desc:'게임 진행 방향을 반대로 바꿉니다.',needsTarget:false,fx:{k:'reverse'}},
+{id:'a_dontwantfat',name:'그만 먹을래',en:"DON'T WANT TO BE FAT",type:'action',desc:'아무나 한 명을 지목해 카드 5장을 버리게 합니다.',needsTarget:true,fx:{k:'discard',who:'target',n:5}},
+{id:'a_wait',name:'기다려야지',en:'YOU CAN WAIT',type:'action',desc:'상대를 지목해 다음 차례를 쉬게 합니다.',needsTarget:true,fx:{k:'skip',who:'target'}},
+{id:'a_takeout',name:'끌어내',en:"TAKE 'EM OUT",type:'action',desc:'상대를 지목해 손에 든 카드를 모두 버리게 합니다.',needsTarget:true,fx:{k:'discard',who:'target',n:'all'}},
+{id:'a_pieceofme',name:'나의 일부',en:'PIECE OF ME',type:'action',desc:'상대를 지목해 내 손패 중 2장을 골라 건네줍니다.',needsTarget:true,fx:{k:'giveN',from:'self',to:'target',n:2}},
+{id:'a_trains',name:'난 기차가 좋아',en:'I LIKE TRAINS',type:'action',desc:'모두가 자기보다 순서상 바로 앞사람의 손패를 전부 빼앗습니다.',fx:{k:'custom',id:'iLikeTrains'}},
+{id:'a_crazy',name:'난 미쳤다',en:"I'M CRAZY",type:'action',desc:'모든 카드를 모아 다시 섞고 게임을 처음부터 다시 시작합니다.',fx:{k:'restart'}},
+{id:'a_wannadie',name:'난 죽고 싶다구!',en:'I WANNA DIE',type:'action',desc:'손에 든 카드를 모두 버립니다.',fx:{k:'discard',who:'self',n:'all'}},
+{id:'a_shootme',name:'날 쏘고 가라',en:'SHOOT ME',type:'action',desc:'내 다음 차례가 시작될 때 손에 카드가 남아있다면 즉시 승리합니다.',fx:{k:'setWinRuleAt',rule:'anyLeft'}},
+{id:'a_barbershop',name:'남성 4중창단',en:'BARBERSHOP QUARTET',type:'action',desc:'상대 한 명에게서 카드 4장을 빼앗거나, 덱에서 카드 4장을 뽑습니다. (선택)',needsTarget:true,fx:{k:'custom',id:'stealOrDraw',n:4}},
+{id:'a_pullfinger',name:'내 손가락 당겨봐',en:'PULL MY FINGER',type:'action',desc:'상대를 지목해 카드 1장을 빼앗습니다.',needsTarget:true,fx:{k:'steal',from:'target',to:'self',n:1}},
+{id:'a_getoff',name:'내 집에서 나가',en:'GET OFF MY PROPERTY',type:'action',desc:'나를 제외한 모든 사람이 카드 2장씩 버립니다.',fx:{k:'discard',who:'others',n:2}},
+{id:'a_explain',name:'내가 설명할 수 있어',en:'I CAN EXPLAIN',type:'action',desc:'상대를 지목해 그 사람이 설치한 함정 카드를 모두 무효화합니다.',needsTarget:true,fx:{k:'revealTrap',who:'target',n:'all'}},
+{id:'a_haveit',name:'너 다 가져!',en:'HERE! HAVE IT!',type:'action',desc:'상대를 지목해 내 손패 중 원하는 카드를 골라 건네줍니다.',needsTarget:true,fx:{k:'giveN',from:'self',to:'target',n:1}},
+{id:'a_onlyone',name:'너 뿐이야',en:'ONLY ONE',type:'action',desc:'모두가 카드 1장만 남기고 나머지를 전부 버립니다.',fx:{k:'discard',who:'all',n:'allButOne'}},
+{id:'a_yourdead',name:'넌 끝이다',en:"YOU'RE DEAD",type:'action',desc:'상대를 지목해 카운터 카드를 모두 버리게 합니다. (카운터로 막을 수 없음)',needsTarget:true,uncounterable:true,fx:{k:'discardType',who:'target',cardType:'counter'}},
+{id:'a_yourefat',name:'넌 뚱보야!',en:"YOU'RE FAT",type:'action',desc:'상대를 지목해 카드 5장을 뽑게 합니다.',needsTarget:true,fx:{k:'draw',who:'target',n:5}},
+{id:'a_adopted',name:'넌 입양됐어',en:"YOU'RE ADOPTED",type:'action',desc:'버린 카드 더미 맨 위 3장을 가져옵니다.',fx:{k:'custom',id:'adoptTop3'}},
+{id:'a_gotnose',name:'네 코 여깄다',en:'GOT YOUR NOSE',type:'action',desc:'상대를 지목해 카드 1장을 빼앗습니다.',needsTarget:true,fx:{k:'steal',from:'target',to:'self',n:1}},
+{id:'a_flop',name:'모두 엎어져',en:'DO THE FLOP!',type:'action',desc:'모두가 카드를 1장씩 버립니다.',fx:{k:'discard',who:'all',n:1}},
+{id:'a_muffinfactory',name:'머핀 공장',en:'MUFFIN FACTORY',type:'action',desc:'이번 차례에 행동 카드를 2장 더 사용할 수 있습니다.',fx:{k:'custom',id:'extraActions',n:2}},
+{id:'a_muffintime',name:'머핀 타임',en:'MUFFIN TIME',type:'action',desc:'카드를 5장 뽑습니다.',fx:{k:'draw',who:'self',n:5}},
+{id:'a_levelup',name:'레벨 업',en:'LEVEL UP',type:'action',desc:'나는 카드 2장을 뽑고, 다른 모두는 1장씩 뽑습니다.',fx:{k:'custom',id:'levelUp'}},
+{id:'a_magicalpony',name:'마법의 포니',en:'MAGICAL PONY',type:'action',desc:'카드를 4장 뽑습니다.',fx:{k:'draw',who:'self',n:4}},
+{id:'a_gravity',name:'뒤틀린 중력',en:'SCREW GRAVITY',type:'action',desc:'카드 더미 맨 밑에서 3장을 뽑습니다.',fx:{k:'draw',who:'self',n:3,fromBottom:true}},
+{id:'a_killedusall',name:'다 죽자',en:'KILLED US ALL',type:'action',desc:'나는 카드 2장을 버리고, 다른 모두도 1장씩 버립니다.',fx:{k:'custom',id:'killedUsAll'}},
+{id:'a_homework',name:'숙제',en:'HOMEWORK',type:'action',desc:'덱 맨 위 5장을 확인하고 그중 1장을 가져옵니다.',fx:{k:'viewTopTake1',n:5}},
+{id:'a_skateboards',name:'스케이트보드',en:'SKATEBOARDS',type:'action',desc:'모두가 자기보다 순서상 바로 다음 사람의 손패를 전부 빼앗습니다.',fx:{k:'custom',id:'skateboards'}},
+{id:'a_promotion',name:'승진',en:'PROMOTION',type:'action',desc:'카드를 뺏길 사람과 뺏을 사람을 지정해 강제로 카드 1장을 이동시킵니다.',needsTarget:true,needsTarget2:true,fx:{k:'steal',from:'target',to:'target2',n:1}},
+{id:'a_dontwant',name:'안 가질래요',en:'DO NOT WANT',type:'action',desc:'상대를 지목해 카드 1장을 빼앗습니다.',needsTarget:true,fx:{k:'steal',from:'target',to:'self',n:1}},
+{id:'a_nollama',name:'안돼, 라마! 안돼!',en:'NO, LLAMA! NO!',type:'action',desc:'무작위로 정해진 절반의 인원이 카드 1장씩 버립니다.',fx:{k:'custom',id:'noLlama'}},
+{id:'a_cakeday',name:'케이크의 날',en:'CAKE DAY',type:'action',desc:'모두가 무작위로 정해진 한 사람에게 카드 1장씩 줍니다.',fx:{k:'custom',id:'cakeDay'}},
+{id:'a_hereitcomes',name:'올 것이 왔군',en:'HERE IT COMES',type:'action',desc:'모두가 자기보다 순서상 바로 앞사람에게서 카드 1장씩 빼앗습니다.',fx:{k:'custom',id:'hereItComes'}},
+{id:'a_yaycookies',name:'와! 쿠키!',en:'YAY! COOKIES!',type:'action',desc:'모든 사람에게서 카드 1장씩 빼앗습니다.',fx:{k:'custom',id:'yayCookies'}},
+{id:'a_newyou',name:'완전히 달라진 나',en:'NEW YOU',type:'action',desc:'손에 든 카드를 모두 버리고, 버린 만큼 새로 뽑습니다.',fx:{k:'custom',id:'newYou'}},
+{id:'a_alieninvasion',name:'외계인 침공',en:'ALIEN INVASION',type:'action',desc:'상대를 지목해 내 손패를 전부 넘겨줍니다.',needsTarget:true,fx:{k:'giveAll',from:'self',to:'target'}},
+{id:'a_confession',name:'용의자',en:'CONFESSION',type:'action',desc:'카드 3장을 뽑되, 뽑은 카드를 모두에게 공개합니다.',fx:{k:'draw',who:'self',n:3,reveal:true}},
+{id:'a_bound',name:'운명 공동체',en:'BOUND TOGETHER',type:'action',desc:'상대를 지목해 두 사람의 손패를 합쳐 섞고 공평하게 나눠 가집니다.',needsTarget:true,fx:{k:'redistributeTwo'}},
+{id:'a_pointless',name:'의미 없음',en:'POINTLESS',type:'action',desc:'아무 일도 일어나지 않습니다.',fx:{k:'noop'}},
+{id:'a_isuck',name:'이 게임 구려',en:'I SUCK AT THIS GAME',type:'action',desc:'손패가 가장 적은 사람(들)이 카드 3장을 뽑습니다.',fx:{k:'custom',id:'fewestDraw3'}},
+{id:'a_timemachine',name:'타임머신',en:'TIME MACHINE',type:'action',desc:'버린 카드 더미에서 아무 카드나 1장을 다시 손으로 가져옵니다.',fx:{k:'custom',id:'timeMachine'}},
+{id:'a_holdthis',name:'이것 좀 받아줘',en:'HOLD THIS',type:'action',desc:'상대를 지목해 손패를 전부 맞바꿉니다.',needsTarget:true,fx:{k:'swap'}},
+{id:'a_minenow',name:'이제 제 겁니다',en:'MINE NOW',type:'action',desc:'상대가 설치한 함정 카드 1장을 골라 내 손으로 가져옵니다.',needsTarget:true,fx:{k:'stealTrap',who:'target'}},
+{id:'a_dontEven',name:'절대 안 돼',en:"DON'T EVEN",type:'action',desc:'내 다음 차례가 될 때까지 아무도 행동 카드를 사용할 수 없습니다.',fx:{k:'custom',id:'lockActions'}},
+{id:'a_holdyourhorses',name:'좀 기다려봐',en:'HOLD YOUR HORSES',type:'action',desc:'내 다음 차례가 될 때까지 아무도 승리할 수 없습니다.',fx:{k:'custom',id:'lockWin'}},
+{id:'a_mineturtle',name:'지뢰 거북이',en:'MINE TURTLE',type:'action',desc:'모두가 손에서 카드 3장씩 버립니다.',fx:{k:'discard',who:'all',n:3}},
+{id:'a_cheese',name:'치즈해',en:'THROW THE CHEESE',type:'action',desc:'나를 제외한 모두가 카드 1장씩 버립니다.',fx:{k:'discard',who:'others',n:1}},
 
-  /* 보드 가장자리에 영역을 맞추기 위해 좌표를 상향 조정하여 영역 간 겹침 방지 */
-  const R_SIDE = 8.2;
-  const OFFSET = 4.1;
+/* ---------------- 미니게임 (행동 카드의 일종, 카운터 불가) ---------------- */
+{id:'m_joust',name:'결투 시작',en:'JOUST TIME',type:'minigame',desc:'상대 한 명과 가위바위보! 이긴 사람이 카드 3장을 뽑습니다.',needsTarget:true,uncounterable:true,minigame:'rps',n:3},
+{id:'m_lie',name:'내게 거짓말을 해봐',en:'LIE TO ME',type:'minigame',desc:'상대에게 진실 하나, 거짓 하나를 들려줍니다. 상대가 맞히지 못하면 카드 3장을 빼앗습니다.',needsTarget:true,uncounterable:true,minigame:'selfJudge',judgeText:'상대가 정답을 맞혔나요?',fx:{k:'steal',from:'target',to:'self',n:3}},
+{id:'m_showdown',name:'쇼다운',en:'SHOWDOWN',type:'minigame',desc:'상대와 눈싸움! 이긴 사람이 카드 3장을 뽑습니다.',needsTarget:true,uncounterable:true,minigame:'selfJudgeWinner',n:3},
+{id:'m_button',name:'수상한 버튼',en:'MYSTERY BUTTON',type:'minigame',desc:'동전을 던집니다. 앞면이면 카드 3장을 뽑고, 뒷면이면 3장을 버립니다.',uncounterable:true,minigame:'coinflip'},
+{id:'m_breath',name:'숨막혀',en:"CAN'T BREATHE",type:'minigame',desc:'상대와 숨참기 대결! 버튼을 오래 누르는 쪽이 이겨서 카드 3장을 뽑습니다.',needsTarget:true,uncounterable:true,minigame:'holdDuel',n:3},
+{id:'m_babyvoice',name:'아기 목소리',en:'BABY VOICE',type:'minigame',desc:'상대를 지목합니다. 내 다음 차례까지 아기 목소리를 유지 못하면 그 사람에게서 카드 3장을 빼앗습니다.',needsTarget:true,uncounterable:true,minigame:'selfJudge',judgeText:'상대가 계속 아기 목소리를 유지했나요?',fx:{k:'steal',from:'target',to:'self',n:3}},
+{id:'m_ohno',name:'오 안돼!',en:'OH NO!',type:'minigame',desc:'상대를 지목해 그 사람의 행동 카드 개수를 맞혀보세요. 맞히면 행동 카드를 전부 빼앗습니다.',needsTarget:true,uncounterable:true,minigame:'guessCount'},
+{id:'m_standup',name:'일어서기 수업',en:'STANDING UP SCHOOL',type:'minigame',desc:'모두 동시에 탭! 가장 늦게 탭한 사람이 카드 3장을 버립니다.',uncounterable:true,minigame:'reactionRace'},
+{id:'m_okdraw',name:'준비, 발사!',en:'OKAY, DRAW!',type:'minigame',desc:'모두가 동시에 한 명을 몰래 지목합니다. 가장 많이 지목된 사람이 카드 3장을 버립니다.',uncounterable:true,minigame:'secretVote'},
+{id:'m_camera',name:'카메라 샀어',en:'NEW CAMERA',type:'minigame',desc:'다 같이 모여 기념 사진을 찍습니다. (효과 없음, 우정만 상승)',uncounterable:true,minigame:'flavor'},
+{id:'m_takeitoutside',name:'한판 붙어 볼래?',en:'TAKE IT OUTSIDE',type:'minigame',desc:'상대와 팔씨름! 이긴 사람이 카드 3장을 뽑습니다.',needsTarget:true,uncounterable:true,minigame:'selfJudgeWinner',n:3},
+{id:'m_canyoudo',name:'이거할 수 있어?',en:'CAN YOU DO THIS?',type:'minigame',desc:'동작을 보여주고 상대가 따라하게 합니다. 실패하면 그 사람의 카드를 전부 빼앗습니다.',needsTarget:true,uncounterable:true,minigame:'selfJudge',judgeText:'상대가 따라하기에 성공했나요?',fx:{k:'stealAll',from:'target',to:'self'}},
 
-  const seatCameraPositions = {
-    1: { x: -OFFSET, y: 19, z: -18 },
-    2: { x: OFFSET, y: 19, z: -18 },
-    3: { x: 18, y: 19, z: -OFFSET },
-    4: { x: 18, y: 19, z: OFFSET },
-    5: { x: OFFSET, y: 19, z: 18 },
-    6: { x: -OFFSET, y: 19, z: 18 },
-    7: { x: -18, y: 19, z: OFFSET },
-    8: { x: -18, y: 19, z: -OFFSET }
-  };
+/* ---------------- 카운터 카드 (counter, 초록) ---------------- */
+{id:'c_thanksyoutoo',name:'고맙다 어 나도',en:'THANKS, YOU TOO',type:'counter',desc:'함정에 걸렸다면, 그 함정을 설치한 사람도 함께 효과를 받습니다.',fx:{k:'counterShare',addTarget:'source'}},
+{id:'c_meme',name:'나! 나! 나!',en:'ME! ME! ME!',type:'counter',desc:'행동 카드를 취소하고, 곧바로 내 차례를 가져옵니다.',fx:{k:'counterCancel'},then:{k:'passTurnTo',who:'self'}},
+{id:'c_chaseme',name:'나 잡아봐라',en:'CHASE ME',type:'counter',desc:'내 카드를 빼앗으려는 걸 막고, 시도한 사람이 손패를 전부 버립니다.',fx:{k:'counterCancel'},then:{k:'discard',who:'sourceOfEvent',n:'all'}},
+{id:'c_treepowers',name:'나무의 힘',en:'TREE POWERS',type:'counter',desc:'카드를 빼앗기는 걸 막을 수 있지만, 대신 다음 차례를 쉽니다.',fx:{k:'counterCancel'},then:{k:'skip',who:'self'}},
+{id:'c_ghost',name:'난 유령이야',en:"I'M A GHOST",type:'counter',desc:'효과를 취소하는 대신, 내가 설치한 함정 카드를 전부 버립니다.',fx:{k:'counterCancel'},then:{k:'removeTraps',who:'self'}},
+{id:'c_nevertakeme',name:'날 잡을 순 없을 걸',en:'NEVER TAKE ME ALIVE',type:'counter',desc:'행동 카드를 취소하고, 다음 차례를 쉽니다.',fx:{k:'counterCancel'},then:{k:'skip',who:'self'}},
+{id:'c_reallyfar',name:'너어어어무 멀어',en:'REALLY FAR AWAY',type:'counter',desc:'함정 카드를 취소합니다.',fx:{k:'counterCancel'}},
+{id:'c_putitback',name:'다 돌려놔',en:'PUT IT BACK',type:'counter',desc:'방금 나온 카드 효과를 취소하고 사용한 사람 손으로 되돌립니다.',fx:{k:'counterCancelReturn'}},
+{id:'c_dontjump',name:'뛰어내리지 마',en:"DON'T JUMP",type:'counter',desc:'누군가 카드를 버리려는 것을 취소시킵니다.',fx:{k:'counterCancel'}},
+{id:'c_stopit',name:'멈춰!',en:'STOP IT!',type:'counter',desc:'누군가 카드를 뽑으려는 것을 취소시킵니다.',fx:{k:'counterCancel'}},
+{id:'c_cantread',name:'못 읽겠는데',en:"I CAN'T READ",type:'counter',desc:'방금 나온 효과가 나에게는 적용되지 않게 합니다.',fx:{k:'counterNegateSelf'}},
+{id:'c_oppositeday',name:'날 의대반',en:'OPPOSITE DAY',type:'counter',desc:'행동 카드를 취소하고, 대신 내가 즉시 그 카드를 사용합니다.',fx:{k:'counterHijack'}},
+{id:'c_evilbutterfly',name:'사악한 나비',en:'EVIL BUTTERFLY',type:'counter',desc:'상대가 낸 카운터 카드를 취소하고 그 카드를 내가 가져갑니다.',fx:{k:'counterCancelCounterSteal'}},
+{id:'c_stegosaurus',name:'스테고사우르스',en:'STEGOSAURUS',type:'counter',desc:'상대를 지목해 나 대신 방금 효과를 받게 합니다.',needsChoiceTarget:true,fx:{k:'counterRedirect'}},
+{id:'c_awcomeon',name:'아, 제발 좀!',en:'AW, COME ON!',type:'counter',desc:'행동 카드를 취소하고, 그 카드를 사용한 사람은 카드 3장을 버립니다.',fx:{k:'counterCancel'},then:{k:'discard',who:'sourceOfEvent',n:3}},
+{id:'c_cantell',name:'아무 말도 하지마',en:"CAN'T TELL ME",type:'counter',desc:'행동 카드를 취소하고 카드 1장을 뽑습니다.',fx:{k:'counterCancel'},then:{k:'draw',who:'self',n:1}},
+{id:'c_no',name:'안돼!!!',en:'NO!!!',type:'counter',desc:'행동 카드를 취소하고 그 카드를 내가 가져갑니다.',fx:{k:'counterCancelSteal'}},
+{id:'c_nope',name:'안돼 돌아가',en:'NOPE!',type:'counter',desc:'내 카드를 빼앗으려는 것을 취소시킵니다.',fx:{k:'counterCancel'}},
+{id:'c_ohokay',name:'어… 괜찮아?',en:'OH… OKAY?',type:'counter',desc:'카드를 버리게 만드는 효과를 취소하고, 그만큼 카드를 뽑습니다.',fx:{k:'counterCancel'},then:{k:'drawFromEventN',who:'self'}},
+{id:'c_nottoday',name:'오늘은 아니야!',en:'NOT TODAY!',type:'counter',desc:'방금 나온 카드 효과(행동/함정/카운터)를 취소합니다.',fx:{k:'counterCancel'}},
+{id:'c_wefailed',name:'우린 망했어',en:'WE FAILED',type:'counter',desc:'상대를 지목해 방금 효과를 함께 받게 합니다.',needsChoiceTarget:true,fx:{k:'counterShare',addTarget:'chosen'}},
+{id:'c_nou',name:'응 아니야',en:'NO U',type:'counter',desc:'내 카드를 빼앗으려는 효과를 취소하고, 그만큼 상대의 카드를 빼앗습니다.',fx:{k:'counterReverseSteal'}},
+{id:'c_lookout',name:'조심해!',en:'LOOK OUT',type:'counter',desc:'다른 사람의 카드를 빼앗으려는 걸 취소시킵니다.',fx:{k:'counterCancel'}},
+{id:'c_deadtome',name:'죽은거나 다름없어',en:'DEAD TO ME',type:'counter',desc:'방금 나온 효과를 취소하고, 카드를 낸 사람은 다음 차례를 쉽니다.',fx:{k:'counterCancel'},then:{k:'skip',who:'sourceOfEvent'}},
+{id:'c_catchknife',name:'칼 날아 간다',en:'CATCH THE KNIFE',type:'counter',desc:'방금 나온 카운터 카드를 취소합니다.',fx:{k:'counterCancel'}},
+];
+const CARD_MAP = {}; CARD_DB.forEach(c=>CARD_MAP[c.id]=c);
+const TRAP_IDS = CARD_DB.filter(c=>c.type==='trap').map(c=>c.id);
+const NONTRAP_IDS = CARD_DB.filter(c=>c.type!=='trap').map(c=>c.id);
 
-  const SEAT_CENTERS = {
-    1: { x: -OFFSET, z: -R_SIDE, angle: Math.PI },
-    2: { x: OFFSET, z: -R_SIDE, angle: Math.PI },
-    3: { x: R_SIDE, z: -OFFSET, angle: -Math.PI / 2 },
-    4: { x: R_SIDE, z: OFFSET, angle: -Math.PI / 2 },
-    5: { x: OFFSET, z: R_SIDE, angle: 0 },
-    6: { x: -OFFSET, z: R_SIDE, angle: 0 },
-    7: { x: -R_SIDE, z: OFFSET, angle: Math.PI / 2 },
-    8: { x: -R_SIDE, z: -OFFSET, angle: Math.PI / 2 }
-  };
+/* =========================================================================
+   2) UTIL
+   ========================================================================= */
+function uid(){ return Math.random().toString(36).slice(2,10)+Date.now().toString(36); }
+function shuffle(arr){ const a=arr.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+function buildDeck(){
+  // 카드 등장 빈도를 살짝 다르게 하여 실제 덱 구성 느낌을 냄
+  let deck=[];
+  CARD_DB.forEach(c=>{
+    let copies = c.type==='trap' ? 2 : (c.type==='counter' ? 2 : (c.type==='minigame'?1:2));
+    for(let i=0;i<copies;i++) deck.push(c.id);
+  });
+  return shuffle(deck);
+}
+function esc(s){ const d=document.createElement('div'); d.textContent=String(s==null?'':s); return d.innerHTML; }
+function cardNeedsTarget(card){
+  if(typeof card.needsTarget==='boolean') return card.needsTarget;
+  const fx=card.fx||{};
+  return fx.who==='target'||fx.from==='target'||fx.to==='target';
+}
+function cardNeedsTarget2(card){
+  if(typeof card.needsTarget2==='boolean') return card.needsTarget2;
+  const fx=card.fx||{};
+  return fx.from==='target2'||fx.to==='target2';
+}
+function typeLabel(t){ return t==='trap'?'TRAP':t==='action'?'ACTION':t==='counter'?'COUNTER':'MINI'; }
 
-  function updateCameraPosition() {
-    const pos = seatCameraPositions[mySeat] || seatCameraPositions[5];
-    camera.position.set(pos.x, pos.y, pos.z);
+/* =========================================================================
+   3) 전역 가변 상태
+   ========================================================================= */
+let peer=null, myId=null, isHost=false, hostConn=null, guestConns={}, myName='';
+let lobbyPlayers=[];
+let state=null;          // 호스트에서만 채워지는 권위 상태
+let myView=null;         // 모든 클라이언트가 렌더링에 사용하는 개인화된 뷰
+let selectedCardForPlay=null;
+let lastHandledPromptId=null, lastHandledMultiId=null, lastCounterEventKey=null;
+
+/* =========================================================================
+   4) 호스트 전용 게임 엔진
+   ========================================================================= */
+function findPlayer(pid){ return state.players.find(p=>p.id===pid); }
+function otherPlayers(pid){ return state.players.filter(p=>p.id!==pid); }
+function nextIndex(idx,dir,len){ return (idx+dir+len)%len; }
+function nameOf(pid){ const p=findPlayer(pid); return p?p.name:'???'; }
+function addLog(text){ state.log.push(text); if(state.log.length>80) state.log.shift(); }
+function minHand(){ const m=Math.min(...state.players.map(p=>p.hand.length)); return state.players.filter(p=>p.hand.length===m); }
+function maxHand(){ const m=Math.max(...state.players.map(p=>p.hand.length)); return state.players.filter(p=>p.hand.length===m); }
+function markSkip(pid){ if(!pid) return; state.skipSet=state.skipSet||{}; state.skipSet[pid]=true; }
+function resolveWho(w,ev){
+  if(w==='self') return ev.sourceId;
+  if(w==='target') return ev.targetId;
+  if(w==='target2') return ev.targetId2;
+  if(w==='sourceOfEvent') return ev.sourceId;
+  return w;
+}
+
+function reshuffleDiscardIntoDeck(){
+  if(state.discard.length===0) return;
+  state.deck = shuffle(state.discard); state.discard=[];
+  addLog('🔄 카드 더미가 비어 버린 카드 더미를 섞어 다시 채웠습니다.');
+}
+function drawCards(pid,n,opts){
+  opts=opts||{};
+  const p=findPlayer(pid); if(!p||!n) return;
+  for(let i=0;i<n;i++){
+    if(state.deck.length===0) reshuffleDiscardIntoDeck();
+    if(state.deck.length===0) break;
+    const c = opts.fromBottom ? state.deck.shift() : state.deck.pop();
+    p.hand.push(c);
+    if(opts.reveal) addLog('👀 '+nameOf(pid)+'님이 ['+CARD_MAP[c].name+']를 공개하며 뽑았습니다.');
   }
-  updateCameraPosition();
-
-  const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true });
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  document.body.appendChild(renderer.domElement);
-
-  const controls = new THREE.OrbitControls(camera, renderer.domElement);
-  controls.enableDamping = true;
-  controls.dampingFactor = 0.05;
-  controls.maxPolarAngle = Math.PI / 2 - 0.05;
-  controls.minDistance = 4;
-  controls.maxDistance = 50;
-  controls.target.set(0, 0.2, 0);
-
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
-  scene.add(ambientLight);
-  const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
-  dirLight.position.set(10, 20, 10);
-  dirLight.castShadow = true;
-  scene.add(dirLight);
-
-  function createWoodTexture() {
-    const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 512;
-    const ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#5c3a21'; ctx.fillRect(0, 0, 512, 512);
-    ctx.fillStyle = '#4a2e19';
-    for (let i = 0; i < 50; i++) ctx.fillRect(0, i * 10, 512, 3 + Math.random() * 2);
-    return new THREE.CanvasTexture(canvas);
+  if(!opts.reveal) addLog(nameOf(pid)+'님이 카드 '+n+'장을 뽑았습니다.');
+  checkCardSick(pid);
+}
+function doSteal(from,to,n){
+  if(!from||!to||from===to) return;
+  const pf=findPlayer(from), pt=findPlayer(to); if(!pf||!pt) return;
+  const count = n==='all' ? pf.hand.length : Math.min(n,pf.hand.length);
+  if(count<=0) return;
+  const taken = shuffle(pf.hand).slice(0,count);
+  taken.forEach(c=>{ const i=pf.hand.indexOf(c); pf.hand.splice(i,1); pt.hand.push(c); });
+  addLog(nameOf(to)+'님이 '+nameOf(from)+'님에게서 카드 '+count+'장을 빼앗았습니다.');
+  checkCardSick(to);
+}
+function checkCardSick(pid){
+  const p=findPlayer(pid); if(!p) return;
+  if(p.traps.includes('t_cardsick') && p.hand.length>state.winThreshold){
+    const excess=p.hand.length-state.winThreshold;
+    const drop=shuffle(p.hand).slice(0,excess);
+    drop.forEach(c=>{ const i=p.hand.indexOf(c); p.hand.splice(i,1); state.discard.push(c); });
+    addLog('🩹 [카드 울렁증] 함정이 자동 발동해 '+nameOf(pid)+'님이 카드 '+excess+'장을 버렸습니다.');
   }
+}
 
-  function createFeltMatTexture8P() {
-    const canvas = document.createElement('canvas'); canvas.width = 2048; canvas.height = 2048;
-    const ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#1b4d2e'; ctx.fillRect(0, 0, 2048, 2048);
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)'; ctx.lineWidth = 12; ctx.strokeRect(30, 30, 1988, 1988);
-
-    ctx.font = 'bold 32px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.85)'; ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)'; ctx.lineWidth = 4;
-
-    const mapCoord = (val) => ((val + 10.0) / 20.0) * 2048;
-
-    const zones = [
-      { name: "P1 (북-좌)", seat: 1 },
-      { name: "P2 (북-우)", seat: 2 },
-      { name: "P3 (동-상)", seat: 3 },
-      { name: "P4 (동-하)", seat: 4 },
-      { name: "P5 (남-우)", seat: 5 },
-      { name: "P6 (남-좌)", seat: 6 },
-      { name: "P7 (서-하)", seat: 7 },
-      { name: "P8 (서-상)", seat: 8 }
-    ];
-
-    zones.forEach(z => {
-      const center = SEAT_CENTERS[z.seat];
-      const cx = mapCoord(center.x);
-      const cy = mapCoord(center.z);
-      
-      const w = 720; const h = 280;
-
-      ctx.save();
-      ctx.translate(cx, cy);
-      ctx.rotate(-center.angle);
-      ctx.strokeRect(-w / 2, -h / 2, w, h);
-      ctx.fillText(z.name, 0, 0);
-      ctx.restore();
-    });
-
-    return new THREE.CanvasTexture(canvas);
+/* ---- 턴 진행 ---- */
+function startTurn(){
+  const pid=state.currentId;
+  if(state.ruleFlags.lockActionsUntil===pid) state.ruleFlags.lockActionsUntil=null;
+  if(state.ruleFlags.lockWinUntil===pid) state.ruleFlags.lockWinUntil=null;
+  if(state.ruleFlags.winRuleAt && state.ruleFlags.winRuleAt.who===pid){
+    const rule=state.ruleFlags.winRuleAt.rule; state.ruleFlags.winRuleAt=null;
+    if(rule==='fewest'){ const m=minHand(); if(m.length===1){ endGame(m[0].id); return; } addLog('동률이라 [-끝-] 효과가 무산되었습니다.'); }
+    else if(rule==='most'){ const m=maxHand(); if(m.length===1){ endGame(m[0].id); return; } addLog('동률이라 [1년 남으셨습니다] 효과가 무산되었습니다.'); }
+    else if(rule==='anyLeft'){ const p=findPlayer(pid); if(p.hand.length>0){ endGame(pid); return; } }
   }
+  const p=findPlayer(pid);
+  if(!state.ruleFlags.lockWinUntil && p.hand.length===state.winThreshold){ endGame(pid); return; }
+  state.phase='trap';
+  broadcastAll();
+}
+function advanceTurn(){
+  if(state.forceNextTurnTo){ state.turnIndex=state.order.indexOf(state.forceNextTurnTo); state.forceNextTurnTo=null; }
+  else state.turnIndex = nextIndex(state.turnIndex, state.direction, state.order.length);
+  let guard=0;
+  while(state.skipSet && state.skipSet[state.order[state.turnIndex]] && guard<30){
+    addLog(nameOf(state.order[state.turnIndex])+'님은 이번 차례를 쉽니다.');
+    delete state.skipSet[state.order[state.turnIndex]];
+    state.turnIndex = nextIndex(state.turnIndex, state.direction, state.order.length);
+    guard++;
+  }
+  state.currentId = state.order[state.turnIndex];
+  startTurn();
+}
+function finishMainAction(){
+  if(state.forceNextTurnTo){ advanceTurn(); return; }
+  if(state.ruleFlags.extraActionsFor===state.currentId && state.ruleFlags.extraActionsCount>0){
+    state.ruleFlags.extraActionsCount--;
+    if(state.ruleFlags.extraActionsCount<=0) state.ruleFlags.extraActionsFor=null;
+    state.phase='main';
+    broadcastAll();
+  } else advanceTurn();
+}
+function endGame(winnerId){ state.phase='gameover'; state.winnerId=winnerId; addLog('🏆 '+nameOf(winnerId)+'님 승리!'); broadcastAll(); }
 
-  const tableShape = new THREE.Shape();
-  const w = 11.0, h = 11.0, r = 1.8;
-  tableShape.moveTo(-w + r, -h); tableShape.lineTo(w - r, -h);
-  tableShape.lineTo(w, -h + r); tableShape.lineTo(w, h - r);
-  tableShape.lineTo(w - r, h); tableShape.lineTo(-w + r, h);
-  tableShape.lineTo(-w, h - r); tableShape.lineTo(-w, -h + r);
-  tableShape.closePath();
+/* ---- 프롬프트 큐 (한 명씩 선택이 필요한 효과) ---- */
+function enqueuePrompt(p){ state.promptQueue.push(p); }
+function processPromptQueue(onDone){ state.onQueueDrained=onDone; pumpQueue(); }
+function pumpQueue(){
+  if(state.promptQueue.length===0){ const cb=state.onQueueDrained; state.onQueueDrained=null; if(cb) cb(); return; }
+  const next=state.promptQueue.shift();
+  const reqId=uid();
+  state.pendingPrompt={id:reqId,forId:next.forId,type:next.type,payload:next.payload,deadline:Date.now()+16000};
+  state.phase='promptWait';
+  broadcastAll();
+  state.promptTimer=setTimeout(()=>{ if(state.pendingPrompt&&state.pendingPrompt.id===reqId) autoResolvePrompt(); },16000);
+}
+function autoResolvePrompt(){
+  const pp=state.pendingPrompt; if(!pp) return;
+  let payload={};
+  const p=findPlayer(pp.forId);
+  if(pp.type==='chooseDiscard'){ let n=pp.payload.n; if(n==='all') n=p.hand.length; if(n==='allButOne') n=Math.max(0,p.hand.length-1); payload={cardIds:shuffle(p.hand).slice(0,Math.min(n,p.hand.length))}; }
+  else if(pp.type==='chooseGive'){ payload={cardIds:shuffle(p.hand).slice(0,Math.min(pp.payload.n,p.hand.length))}; }
+  else if(pp.type==='pickFromReveal'){ payload={cardId:pp.payload.options[0]}; }
+  else if(pp.type==='pickTrapSlot'){ payload={slot:0}; }
+  else if(pp.type==='selfJudge'){ payload={success:true}; }
+  else if(pp.type==='selfJudgeWinner'){ payload={winnerId:null}; }
+  else if(pp.type==='guessCount'){ payload={guess:-1}; }
+  else if(pp.type==='stealOrDraw'){ payload={choice:'draw'}; }
+  addLog('⏰ '+nameOf(pp.forId)+'님이 시간 초과로 자동 처리되었습니다.');
+  applyPromptResult(pp,payload);
+  state.pendingPrompt=null;
+  pumpQueue();
+}
+function hostPromptResponse(pid,reqId,payload){
+  if(!state.pendingPrompt||state.pendingPrompt.id!==reqId||state.pendingPrompt.forId!==pid) return;
+  clearTimeout(state.promptTimer);
+  applyPromptResult(state.pendingPrompt,payload);
+  state.pendingPrompt=null;
+  pumpQueue();
+}
+function applyPromptResult(pp,payload){
+  const p=findPlayer(pp.forId);
+  if(pp.type==='chooseDiscard'){
+    (payload.cardIds||[]).forEach(cid=>{ const i=p.hand.indexOf(cid); if(i>=0){ p.hand.splice(i,1); state.discard.push(cid); } });
+    addLog(nameOf(pp.forId)+'님이 카드 '+(payload.cardIds||[]).length+'장을 버렸습니다.');
+  } else if(pp.type==='chooseGive'){
+    const toP=findPlayer(pp.payload.toId);
+    (payload.cardIds||[]).forEach(cid=>{ const i=p.hand.indexOf(cid); if(i>=0){ p.hand.splice(i,1); toP.hand.push(cid); } });
+    addLog(nameOf(pp.forId)+'님이 '+nameOf(pp.payload.toId)+'님에게 카드 '+(payload.cardIds||[]).length+'장을 건넸습니다.');
+    checkCardSick(pp.payload.toId);
+  } else if(pp.type==='pickFromReveal'){
+    const chosen=payload.cardId;
+    if(chosen){ p.hand.push(chosen); addLog(nameOf(pp.forId)+'님이 ['+CARD_MAP[chosen].name+']를 가져갔습니다.'); }
+    (pp.payload.options||[]).filter(c=>c!==chosen).forEach(c=>state.deck.push(c));
+  } else if(pp.type==='pickTrapSlot'){
+    const victim=findPlayer(pp.payload.victimId);
+    const slot=Math.max(0,Math.min(payload.slot||0, victim.traps.length-1));
+    if(victim.traps.length>0){ const taken=victim.traps.splice(slot,1)[0]; p.hand.push(taken); addLog(nameOf(pp.forId)+'님이 '+nameOf(pp.payload.victimId)+'님의 함정 카드를 가져갔습니다.'); }
+  } else if(pp.type==='selfJudge'){
+    if(payload.success===false){
+      const ev=state.pendingEvent; const card=CARD_MAP[ev.cardId];
+      applyBaseEffect(card.fx,ev,[]);
+      addLog('❌ '+nameOf(ev.targetId)+'님이 실패해 카드를 빼앗겼습니다.');
+    } else addLog('✅ 성공! 아무 일도 일어나지 않았습니다.');
+  } else if(pp.type==='selfJudgeWinner'){
+    if(payload.winnerId){ drawCards(payload.winnerId,pp.payload.n); addLog('🏅 '+nameOf(payload.winnerId)+'님이 승리해 카드 '+pp.payload.n+'장을 뽑았습니다.'); }
+    else addLog('무승부로 처리되었습니다.');
+  } else if(pp.type==='guessCount'){
+    const victim=findPlayer(pp.payload.targetId);
+    const actual=victim.hand.filter(c=>CARD_MAP[c].type==='action'||CARD_MAP[c].type==='minigame').length;
+    if(Number(payload.guess)===actual){
+      const taken=victim.hand.filter(c=>CARD_MAP[c].type==='action'||CARD_MAP[c].type==='minigame');
+      taken.forEach(c=>{ const i=victim.hand.indexOf(c); victim.hand.splice(i,1); findPlayer(pp.forId).hand.push(c); });
+      addLog('🎯 정답! '+nameOf(pp.forId)+'님이 '+nameOf(pp.payload.targetId)+'님의 행동 카드를 전부 가져갔습니다.');
+      checkCardSick(pp.forId);
+    } else addLog('❌ 오답이었습니다 (실제 '+actual+'장). 아무 일도 일어나지 않습니다.');
+  } else if(pp.type==='stealOrDraw'){
+    if(payload.choice==='steal') doSteal(pp.payload.targetId,pp.forId,pp.payload.n);
+    else drawCards(pp.forId,pp.payload.n);
+  }
+}
 
-  const tableGeo = new THREE.ExtrudeGeometry(tableShape, { depth: 0.35, bevelEnabled: true, bevelSegments: 3, steps: 1, bevelSize: 0.15, bevelThickness: 0.15 });
-  tableGeo.rotateX(Math.PI / 2);
-  const tableMesh = new THREE.Mesh(tableGeo, new THREE.MeshStandardMaterial({ map: createWoodTexture(), roughness: 0.6 }));
-  tableMesh.position.y = -0.15;
-  scene.add(tableMesh);
+/* ---- 다중 응답 프롬프트 (미니게임: 동시에 여러 명 응답 필요) ---- */
+function enqueuePromptMulti(forIds,type,payload){
+  const reqId=uid();
+  state.pendingMultiPrompt={id:reqId,forIds:forIds.slice(),type,payload:payload||{},responses:{},deadline:Date.now()+14000};
+  state.phase='minigame';
+  broadcastAll();
+  state.multiTimer=setTimeout(()=>{ if(state.pendingMultiPrompt&&state.pendingMultiPrompt.id===reqId) autoResolveMulti(); },14000);
+}
+function hostMultiResponse(pid,reqId,payload){
+  const mp=state.pendingMultiPrompt; if(!mp||mp.id!==reqId||mp.forIds.indexOf(pid)<0) return;
+  mp.responses[pid]=payload;
+  if(Object.keys(mp.responses).length>=mp.forIds.length){ clearTimeout(state.multiTimer); finishMultiPrompt(); }
+  else broadcastAll();
+}
+function autoDefaultFor(type){
+  if(type==='rpsChoice') return {choice:['rock','paper','scissors'][Math.floor(Math.random()*3)]};
+  if(type==='holdDuel') return {duration:Math.floor(Math.random()*1500)};
+  if(type==='reactionRace') return {ts:9007199254740990};
+  if(type==='secretVote') return {votedId:null};
+  return {};
+}
+function autoResolveMulti(){
+  const mp=state.pendingMultiPrompt; if(!mp) return;
+  mp.forIds.forEach(id=>{ if(!(id in mp.responses)) mp.responses[id]=autoDefaultFor(mp.type); });
+  finishMultiPrompt();
+}
+function rpsWinner(aId,aC,bId,bC){
+  if(aC===bC) return null;
+  const beats={rock:'scissors',scissors:'paper',paper:'rock'};
+  return beats[aC]===bC ? aId : bId;
+}
+function finishMultiPrompt(){
+  const mp=state.pendingMultiPrompt; state.pendingMultiPrompt=null;
+  const ev=state.pendingEvent; const card=CARD_MAP[ev.cardId];
+  if(mp.type==='rpsChoice'){
+    const a=(mp.responses[ev.sourceId]||{}).choice, b=(mp.responses[ev.targetId]||{}).choice;
+    const winner=rpsWinner(ev.sourceId,a,ev.targetId,b);
+    if(winner){ drawCards(winner,card.n||3); addLog('✊✋✌️ '+nameOf(winner)+'님 승리! 카드 '+(card.n||3)+'장 획득'); }
+    else addLog('✊✋✌️ 무승부!');
+  } else if(mp.type==='holdDuel'){
+    const da=(mp.responses[ev.sourceId]||{}).duration||0, db=(mp.responses[ev.targetId]||{}).duration||0;
+    const winner = da===db?null:(da>db?ev.sourceId:ev.targetId);
+    if(winner){ drawCards(winner,card.n||3); addLog('😤 숨참기 승자: '+nameOf(winner)+' → 카드 '+(card.n||3)+'장 획득'); }
+    else addLog('😤 무승부!');
+  } else if(mp.type==='reactionRace'){
+    let lastId=null,lastTs=-1;
+    mp.forIds.forEach(id=>{ const ts=(mp.responses[id]&&mp.responses[id].ts)||Infinity; if(ts>lastTs){ lastTs=ts; lastId=id; } });
+    if(lastId){ addLog('🐌 가장 늦게 반응한 '+nameOf(lastId)+'님이 카드를 버립니다.'); enqueuePrompt({forId:lastId,type:'chooseDiscard',payload:{n:3}}); }
+  } else if(mp.type==='secretVote'){
+    const tally={};
+    mp.forIds.forEach(id=>{ const v=mp.responses[id]&&mp.responses[id].votedId; if(v) tally[v]=(tally[v]||0)+1; });
+    let top=null,topN=-1;
+    Object.keys(tally).forEach(k=>{ if(tally[k]>topN){ topN=tally[k]; top=k; } });
+    if(top){ addLog('👉 가장 많이 지목된 '+nameOf(top)+'님이 카드를 버립니다.'); enqueuePrompt({forId:top,type:'chooseDiscard',payload:{n:3}}); }
+    else addLog('아무도 지목되지 않았습니다.');
+  }
+  state.discard.push(ev.cardId);
+  processPromptQueue(()=>{ finishMainAction(); });
+}
+function startMinigame(card,ev){
+  state.phase='minigame';
+  addLog('🎲 미니게임: ['+card.name+'] — '+nameOf(ev.sourceId)+(ev.targetId?' vs '+nameOf(ev.targetId):''));
+  if(card.minigame==='rps'||card.minigame==='holdDuel'){
+    enqueuePromptMulti([ev.sourceId,ev.targetId], card.minigame==='rps'?'rpsChoice':'holdDuel', {});
+    return;
+  }
+  if(card.minigame==='reactionRace'||card.minigame==='secretVote'){
+    enqueuePromptMulti(state.players.map(p=>p.id), card.minigame, {});
+    return;
+  }
+  if(card.minigame==='coinflip'){
+    const heads=Math.random()<0.5;
+    addLog(heads?'🪙 앞면! 카드 3장을 뽑습니다.':'🪙 뒷면! 카드 3장을 버려야 합니다.');
+    if(heads) drawCards(ev.sourceId,3); else enqueuePrompt({forId:ev.sourceId,type:'chooseDiscard',payload:{n:3}});
+    state.discard.push(ev.cardId);
+    processPromptQueue(()=>finishMainAction());
+    return;
+  }
+  if(card.minigame==='flavor'){
+    addLog('📸 다 같이 모여 추억을 남겼습니다.');
+    state.discard.push(ev.cardId);
+    processPromptQueue(()=>finishMainAction());
+    return;
+  }
+  if(card.minigame==='selfJudge') enqueuePrompt({forId:ev.sourceId,type:'selfJudge',payload:{judgeText:card.judgeText}});
+  else if(card.minigame==='selfJudgeWinner') enqueuePrompt({forId:ev.sourceId,type:'selfJudgeWinner',payload:{n:card.n||3}});
+  else if(card.minigame==='guessCount') enqueuePrompt({forId:ev.sourceId,type:'guessCount',payload:{targetId:ev.targetId}});
+  state.discard.push(ev.cardId);
+  processPromptQueue(()=>finishMainAction());
+}
 
-  const matGeo = new THREE.PlaneGeometry(20.0, 20.0);
-  const boardMatMesh = new THREE.Mesh(matGeo, new THREE.MeshStandardMaterial({ map: createFeltMatTexture8P(), roughness: 0.8 }));
-  boardMatMesh.rotation.x = -Math.PI / 2;
-  boardMatMesh.position.y = 0.26;
-  scene.add(boardMatMesh);
-
-  let objects = [];
-  let cardSlots = [];
-  let selectedGroup = [];
-  let objectIdCounter = 0;
-
-  let drawnLines = [];
-  let isPenMode = false;
-  let isEraserMode = false;
-  let selectedPenColor = 0xef4444;
-  let selectedPenRadius = 0.05;
-  let currentLineMesh = null;
-  let currentLinePoints = [];
-  let lineIdCounter = 0;
-  let lastEraserPoint = null;
-  let eraserCursorMesh = null;
-
-  const suits = ['♠', '♥', '♦', '♣'];
-  const values = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
-
-  const muffinCardDB = [
-    { title: "Gotta Go Fast!", type: "action", color: "#ec4899", desc: "덱에서 즉시 카드를 2장 뽑습니다." },
-    { title: "Mine Turtle", type: "action", color: "#ec4899", desc: "지뢰 거북이! 모든 플레이어는 보유 카드의 절반을 버립니다." },
-    { title: "Do the Flop!", type: "action", color: "#ec4899", desc: "모두 엎드려! 카드를 가장 늦게 내거나 반응하지 못한 플레이어는 카드 2장을 버립니다." },
-    { title: "I Like Trains", type: "action", color: "#ec4899", desc: "기차가 지나갑니다. 지정한 플레이어의 카드 1장을 버리게 합니다." },
-    { title: "Steal Deal", type: "action", color: "#ec4899", desc: "상대방 1명의 손에서 무작위 카드 1장을 빼앗아옵니다." },
-    { title: "Punch Tree", type: "action", color: "#ec4899", desc: "나무를 때려 목재 획득! 카드 1장을 뽑고 추가 액션을 1회 더 실행합니다." },
-    { title: "Asdfmovie Magic", type: "action", color: "#ec4899", desc: "모든 플레이어가 자신의 손에 있는 카드를 시계 방향 옆 사람에게 모두 넘깁니다." },
-    { title: "Overpowered Muffin", type: "action", color: "#ec4899", desc: "강력한 머핀의 힘으로 덱에서 카드를 3장 연속으로 뽑습니다." },
-    { title: "Meow Meow", type: "action", color: "#ec4899", desc: "야옹! 다른 플레이어 1명을 지칭하여 그 사람의 무작위 카드 1장을 내 손패로 가져옵니다." },
-    { title: "Look At My Horse", type: "action", color: "#ec4899", desc: "멋진 말을 자랑합니다. 원하는 플레이어와 내 손패 전체를 바꿉니다." },
-    { title: "Everybody Do The Dinosaur", type: "action", color: "#ec4899", desc: "모든 플레이어는 카드 1장을 덱으로 되돌리고 셔플합니다." },
-    { title: "Desperate Times", type: "action", color: "#ec4899", desc: "내 손패가 1장뿐이라면, 덱에서 4장을 바로 뽑습니다." },
-    { title: "Cake is a Lie", type: "action", color: "#ec4899", desc: "상대의 손패 중 1장을 지목하여 트랩 카드면 파괴합니다." },
-    { title: "Science Side of Tumblr", type: "action", color: "#ec4899", desc: "덱 맨 위 3장을 확인하고 원하는 순서대로 다시 올립니다." },
-    { title: "Big Sad", type: "action", color: "#ec4899", desc: "가장 카드가 많은 플레이어 1명이 카드 2장을 버립니다." },
-    { title: "Dance Off", type: "action", color: "#ec4899", desc: "가위바위보를 진행하여 패배한 사람은 상대에게 카드를 1장 줍니다." },
-    { title: "Parkour!", type: "action", color: "#ec4899", desc: "다른 플레이어 2명을 지정하여 그 둘의 손패를 서로 교환시킵니다." },
-    { title: "Screaming Cowboy", type: "action", color: "#ec4899", desc: "지정한 상대는 자신의 다음 턴을 스킵해야 합니다." },
-    { title: "Tactical Nuke", type: "action", color: "#ec4899", desc: "전원 보유 카드를 2장씩 버립니다." },
-    { title: "Muffin Time Out", type: "action", color: "#ec4899", desc: "누군가의 머핀 타임을 즉시 취소시키고 카드 2장을 뽑게 합니다." },
-    { title: "Baby Shoes", type: "action", color: "#ec4899", desc: "가장 카드가 적은 플레이어에게 카드 2장을 선물합니다." },
-    { title: "Laser Bear", type: "action", color: "#ec4899", desc: "지정한 플레이어의 카운터 카드를 무작위로 1장 버립니다." },
-    { title: "Baguette Weapon", type: "action", color: "#ec4899", desc: "바게트로 공격! 지정 플레이어는 1장을 버리거나 2장을 뽑아야 합니다." },
-    { title: "Alien Abduction", type: "action", color: "#ec4899", desc: "버린 카드 더미에서 가장 최신의 액션 카드를 1장 가져옵니다." },
-    { title: "Pufferfish Slap", type: "action", color: "#ec4899", desc: "복어로 찰싹! 지정 상대는 손패 1장을 공개합니다." },
-    { title: "Nyan Cat Run", type: "action", color: "#ec4899", desc: "덱에서 카드 1장을 뽑고 연속해서 카드를 1장 더 냅니다." },
-    { title: "Keyboard Cat", type: "action", color: "#ec4899", desc: "지정한 플레이어의 턴을 즉시 종료시킵니다." },
-    { title: "Doggo Dance", type: "action", color: "#ec4899", desc: "모든 플레이어가 덱에서 카드를 1장씩 동시에 뽑습니다." },
-    { title: "Space Turtle", type: "action", color: "#ec4899", desc: "우주 거북이! 모든 트랩 카드가 무효화되어 파괴됩니다." },
-    { title: "Magic Hat", type: "action", color: "#ec4899", desc: "모든 플레이어는 무작위 카드를 1장씩 가운데 내놓고 섞어서 다시 나눕니다." },
-
-    { title: "NO!", type: "counter", color: "#3b82f6", desc: "상대방이 발동한 액션이나 효과를 완전히 무효화합니다." },
-    { title: "Reflect!", type: "counter", color: "#3b82f6", desc: "나를 향한 공격 효과를 원래 낸 플레이어에게 그대로 반사합니다." },
-    { title: "Bye Bye!", type: "counter", color: "#3b82f6", desc: "상대방이 내 카드를 버리게 만들려고 할 때 이를 방어합니다." },
-    { title: "Super Counter", type: "counter", color: "#3b82f6", desc: "상대의 카운터 카드를 무효화하는 전설의 카운터 카드." },
-    { title: "Stop Right There!", type: "counter", color: "#3b82f6", desc: "상대가 카드를 뽑으려고 할 때 이를 저지하고 내가 대신 뽑습니다." },
-    { title: "Uno Reverse", type: "counter", color: "#3b82f6", desc: "효과의 대상을 나에서 다른 플레이어로 변경합니다." },
-    { title: "Not Today", type: "counter", color: "#3b82f6", desc: "나에게 적용되는 손패 버리기 효과를 방어합니다." },
-    { title: "Card Shield", type: "counter", color: "#3b82f6", desc: "상대의 카드 빼앗기 시도를 무효화합니다." },
-    { title: "Sike!", type: "counter", color: "#3b82f6", desc: "상대의 액션 카드를 무효화하고 그 카드를 내 손패로 가져옵니다." },
-    { title: "Mirror Shield", type: "counter", color: "#3b82f6", desc: "반사된 효과를 한 번 더 반사합니다." },
-    { title: "Nope Train", type: "counter", color: "#3b82f6", desc: "트랩 발동 효과를 즉시 무효화하고 파괴합니다." },
-    { title: "Absolute Defense", type: "counter", color: "#3b82f6", desc: "이번 턴 동안 내게 가해지는 모든 불이익을 무시합니다." },
-    { title: "Counter Strike", type: "counter", color: "#3b82f6", desc: "카운터 성공 시 상대의 손패 1장을 추가로 버리게 만듭니다." },
-    { title: "Bouncer", type: "counter", color: "#3b82f6", desc: "상대가 머핀 타임을 외치는 순간 무효화시킵니다." },
-    { title: "Emergency Brake", type: "counter", color: "#3b82f6", desc: "상대의 추가 턴/연속 플레이 효과를 즉시 중지시킵니다." },
-
-    { title: "It's a Trap!", type: "trap", color: "#f59e0b", desc: "[트랩] 누군가 카드를 뽑을 때 그 카드를 빼앗고 1장 더 뽑습니다." },
-    { title: "Exploding Kitten", type: "trap", color: "#f59e0b", desc: "[트랩] 내 카드가 공격받을 때 발동! 공격한 사람은 카드 2장을 버립니다." },
-    { title: "Slippery Floor", type: "trap", color: "#f59e0b", desc: "[트랩] 누군가 머핀 타임을 외칠 때 카드를 2장 뺏어 외침을 취소시킵니다." },
-    { title: "Bear Trap", type: "trap", color: "#f59e0b", desc: "[트랩] 누군가 3장 이상의 카드를 가질 때 그 플레이어의 카드 1장을 버립니다." },
-    { title: "Banana Peel", type: "trap", color: "#f59e0b", desc: "[트랩] 카드를 바꿀 때 발동! 원래 카드로 원복시키고 상대는 1장 더 버립니다." },
-    { title: "Pitfall", type: "trap", color: "#f59e0b", desc: "[트랩] 상대가 액션 카드를 사용했을 때 액션 실행을 취소시키고 버리게 합니다." },
-    { title: "Mimic Chest", type: "trap", color: "#f59e0b", desc: "[트랩] 내 카드를 훔쳐가려는 플레이어는 손패의 절반을 잃습니다." },
-    { title: "Laser Grid", type: "trap", color: "#f59e0b", desc: "[트랩] 상대가 카드를 2장 이상 낼 때 그 중 1장을 파괴합니다." },
-    { title: "Poison Apple", type: "trap", color: "#f59e0b", desc: "[트랩] 상대가 카드를 뽑았을 때 뽑은 카드를 버리게 만듭니다." },
-    { title: "Time Bomb", type: "trap", color: "#f59e0b", desc: "[트랩] 3턴 후 발동! 모든 플레이어는 손패에서 카드를 1장씩 버립니다." },
-    { title: "Net Trap", type: "trap", color: "#f59e0b", desc: "[트랩] 상대가 턴을 마칠 때 그 플레이어는 카드 1장을 뽑고 턴을 마쳐야 합니다." },
-    { title: "Confetti Canon", type: "trap", color: "#f59e0b", desc: "[트랩] 누군가 게임에서 승리(10장)하려고 할 때 카드 3장을 강제로 지어줍니다." },
-    { title: "Spike Strip", type: "trap", color: "#f59e0b", desc: "[트랩] 연속 액션을 실행하려는 상대의 턴을 즉시 종료합니다." },
-    { title: "False Door", type: "trap", color: "#f59e0b", desc: "[트랩] 버려진 카드를 가져가려는 상대의 행동을 막고 내가 가져옵니다." },
-    { title: "Sticky Glue", type: "trap", color: "#f59e0b", desc: "[트랩] 상대 손패의 카드 1장을 이번 라운드 동안 사용할 수 없게 만듭니다." },
-
-    { title: "Rainbow Muffin", type: "rainbow", color: "#8b5cf6", desc: "[조커] 어떤 카드 위에도 내거나 대용할 수 있는 머핀 타임 조커 카드." },
-    { title: "Golden Muffin", type: "rainbow", color: "#8b5cf6", desc: "[조커] 이 카드를 가지고 있는 동안 승리 조건 카드가 10장에서 8장으로 줄어듭니다." },
-    { title: "Unicorn Blessing", type: "rainbow", color: "#8b5cf6", desc: "[조커] 원하는 종류(액션/카운터/트랩)로 선언하여 즉시 발동할 수 있습니다." },
-    { title: "Cosmic Muffin", type: "rainbow", color: "#8b5cf6", desc: "[조커] 모든 플레이어의 트랩 카드를 내 손패로 모두 수집합니다." }
-  ];
-
-  const textureCache = {};
-
-  function createTrumpCardTexture(suit, value) {
-    const key = `trump_${suit}_${value}`;
-    if (textureCache[key]) return textureCache[key];
-
-    const canvas = document.createElement('canvas'); canvas.width = 256; canvas.height = 384;
-    const ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, 256, 384);
-    ctx.strokeStyle = '#d1d5db'; ctx.lineWidth = 4; ctx.strokeRect(6, 6, 244, 372);
-
-    const color = (suit === '♥' || suit === '♦') ? '#dc2626' : '#1e293b';
-    ctx.fillStyle = color;
-
-    function drawIndex(x, y) {
-      ctx.font = 'bold 30px sans-serif'; ctx.textAlign = 'center';
-      ctx.fillText(value, x, y);
-      ctx.font = '26px sans-serif'; ctx.fillText(suit, x, y + 32);
+/* ---- 카드 효과 해석기 ---- */
+function applyBaseEffect(fx,ev,extraTargetIds){
+  const negated=ev.negatedFor||[];
+  const applyToSingle=(pid,fn)=>{ if(!pid) return; if(negated.indexOf(pid)>=0) return; fn(pid); };
+  switch((fx||{}).k){
+    case 'noop': addLog('...아무 일도 일어나지 않았습니다.'); break;
+    case 'draw': {
+      if(fx.who==='all') state.players.forEach(p=>applyToSingle(p.id,id=>drawCards(id,fx.n,{fromBottom:fx.fromBottom,reveal:fx.reveal})));
+      else if(fx.who==='others') otherPlayers(ev.sourceId).forEach(p=>applyToSingle(p.id,id=>drawCards(id,fx.n,{fromBottom:fx.fromBottom,reveal:fx.reveal})));
+      else { const pid=resolveWho(fx.who,ev); applyToSingle(pid,id=>drawCards(id,fx.n,{fromBottom:fx.fromBottom,reveal:fx.reveal})); (extraTargetIds||[]).forEach(t=>applyToSingle(t,id=>drawCards(id,fx.n))); }
+      break;
     }
-
-    drawIndex(28, 42);
-    ctx.save(); ctx.translate(256 - 28, 384 - 42); ctx.rotate(Math.PI);
-    drawIndex(0, 0); ctx.restore();
-
-    ctx.font = '84px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(suit, 128, 192);
-
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.center.set(0.5, 0.5);
-    textureCache[key] = texture;
-    return texture;
-  }
-
-  function createCardBackTexture() {
-    const key = 'card_back_trump';
-    if (textureCache[key]) return textureCache[key];
-
-    const canvas = document.createElement('canvas'); canvas.width = 256; canvas.height = 384;
-    const ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#b22222'; ctx.fillRect(0, 0, 256, 384);
-    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 8; ctx.strokeRect(8, 8, 240, 368);
-    ctx.fillStyle = '#8b0000';
-    for (let i = 0; i < 256; i += 16) {
-      for (let j = 0; j < 384; j += 16) {
-        if ((i + j) % 32 === 0) ctx.fillRect(i, j, 16, 16);
-      }
+    case 'discard': {
+      const doOne=(pid)=>applyToSingle(pid,id=>enqueuePrompt({forId:id,type:'chooseDiscard',payload:{n:fx.n}}));
+      if(fx.who==='all') state.players.forEach(p=>doOne(p.id));
+      else if(fx.who==='others') otherPlayers(ev.sourceId).forEach(p=>doOne(p.id));
+      else if(fx.who==='randomOther'){ const ops=otherPlayers(ev.sourceId); if(ops.length) doOne(ops[Math.floor(Math.random()*ops.length)].id); }
+      else { doOne(resolveWho(fx.who,ev)); (extraTargetIds||[]).forEach(t=>doOne(t)); }
+      break;
     }
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.center.set(0.5, 0.5);
-    textureCache[key] = texture;
-    return texture;
-  }
-
-  const cardBackTexture = createCardBackTexture();
-
-  function createMuffinCardTexture(cardData) {
-    const key = `muffin_${cardData.title}`;
-    if (textureCache[key]) return textureCache[key];
-
-    const canvas = document.createElement('canvas'); canvas.width = 280; canvas.height = 420;
-    const ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, 280, 420);
-    ctx.fillStyle = cardData.color; ctx.fillRect(10, 10, 260, 400);
-    ctx.fillStyle = '#ffffff'; ctx.fillRect(20, 20, 240, 380);
-
-    ctx.fillStyle = cardData.color; ctx.fillRect(20, 20, 240, 60);
-    ctx.fillStyle = '#ffffff'; ctx.font = '900 18px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(cardData.title, 140, 50);
-
-    ctx.fillStyle = cardData.color; ctx.font = 'bold 14px sans-serif';
-    ctx.fillText(`[ ${cardData.type.toUpperCase()} ]`, 140, 102);
-
-    ctx.beginPath(); ctx.arc(140, 170, 44, 0, Math.PI * 2); ctx.fillStyle = '#fce7f3'; ctx.fill();
-    ctx.fillStyle = cardData.color; ctx.font = '36px sans-serif'; ctx.fillText('🧁', 140, 170);
-
-    ctx.fillStyle = '#1e293b'; ctx.font = 'bold 13px sans-serif'; ctx.textAlign = 'center';
-    wrapText(ctx, cardData.desc, 140, 240, 210, 18);
-
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.center.set(0.5, 0.5);
-    textureCache[key] = texture;
-    return texture;
-  }
-
-  function createMuffinBackTexture() {
-    const key = 'card_back_muffin';
-    if (textureCache[key]) return textureCache[key];
-
-    const canvas = document.createElement('canvas'); canvas.width = 280; canvas.height = 420;
-    const ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#be123c'; ctx.fillRect(0, 0, 280, 420);
-    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 10; ctx.strokeRect(12, 12, 256, 396);
-    ctx.fillStyle = '#ffffff'; ctx.font = '900 36px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText('MUFFIN', 140, 180); ctx.fillText('TIME!', 140, 230);
-    ctx.font = '50px sans-serif'; ctx.fillText('🧁', 140, 310);
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.center.set(0.5, 0.5);
-    textureCache[key] = texture;
-    return texture;
-  }
-
-  const muffinBackTexture = createMuffinBackTexture();
-
-  function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
-    const words = text.split(' ');
-    let line = '';
-    for (let n = 0; n < words.length; n++) {
-      let testLine = line + words[n] + ' ';
-      let metrics = ctx.measureText(testLine);
-      if (metrics.width > maxWidth && n > 0) {
-        ctx.fillText(line, x, y);
-        line = words[n] + ' ';
-        y += lineHeight;
-      } else { line = testLine; }
+    case 'discardType': {
+      const pid=resolveWho(fx.who,ev); const p=findPlayer(pid);
+      const toDiscard=p.hand.filter(c=>CARD_MAP[c].type===fx.cardType);
+      toDiscard.forEach(c=>{ const i=p.hand.indexOf(c); p.hand.splice(i,1); state.discard.push(c); });
+      addLog(nameOf(pid)+'님의 '+fx.cardType+' 카드가 모두 버려졌습니다.');
+      break;
     }
-    ctx.fillText(line, x, y);
-  }
-
-  function createDiceFaceTexture(number) {
-    const canvas = document.createElement('canvas'); canvas.width = 256; canvas.height = 256;
-    const ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#f8fafc'; ctx.fillRect(0, 0, 256, 256);
-    ctx.strokeStyle = '#cbd5e1'; ctx.lineWidth = 12; ctx.strokeRect(6, 6, 244, 244);
-    ctx.fillStyle = (number === 1) ? '#dc2626' : '#0f172a';
-
-    function drawDot(x, y, radius = 22) { ctx.beginPath(); ctx.arc(x, y, radius, 0, Math.PI * 2); ctx.fill(); }
-    const c = 128, l = 68, r = 188, t = 68, b = 188;
-    if (number === 1) drawDot(c, c, 34);
-    else if (number === 2) { drawDot(l, t); drawDot(r, b); }
-    else if (number === 3) { drawDot(l, t); drawDot(c, c); drawDot(r, b); }
-    else if (number === 4) { drawDot(l, t); drawDot(r, t); drawDot(l, b); drawDot(r, b); }
-    else if (number === 5) { drawDot(l, t); drawDot(r, t); drawDot(c, c); drawDot(l, b); drawDot(r, b); }
-    else if (number === 6) { drawDot(l, t); drawDot(r, t); drawDot(l, c); drawDot(r, c); drawDot(l, b); drawDot(r, b); }
-
-    return new THREE.CanvasTexture(canvas);
-  }
-
-  const diceMaterials = [
-    new THREE.MeshStandardMaterial({ map: createDiceFaceTexture(1), roughness: 0.2 }),
-    new THREE.MeshStandardMaterial({ map: createDiceFaceTexture(6), roughness: 0.2 }),
-    new THREE.MeshStandardMaterial({ map: createDiceFaceTexture(2), roughness: 0.2 }),
-    new THREE.MeshStandardMaterial({ map: createDiceFaceTexture(5), roughness: 0.2 }),
-    new THREE.MeshStandardMaterial({ map: createDiceFaceTexture(3), roughness: 0.2 }),
-    new THREE.MeshStandardMaterial({ map: createDiceFaceTexture(4), roughness: 0.2 })
-  ];
-
-  function createSlotLine(count = 5, isLocal = true) {
-    cardSlots.forEach(slot => scene.remove(slot));
-    cardSlots = [];
-
-    const slotGeo = new THREE.PlaneGeometry(1.0, 1.45);
-    const spacing = 1.15;
-    const startX = -((count - 1) * spacing) / 2;
-
-    for (let i = 0; i < count; i++) {
-      const canvas = document.createElement('canvas'); canvas.width = 128; canvas.height = 184;
-      const ctx = canvas.getContext('2d');
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.15)'; ctx.fillRect(0, 0, 128, 184);
-      ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 6; ctx.strokeRect(3, 3, 122, 178);
-      ctx.fillStyle = '#38bdf8'; ctx.font = 'bold 42px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText(i + 1, 64, 92);
-
-      const tex = new THREE.CanvasTexture(canvas);
-      const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0.85 });
-      const slotMesh = new THREE.Mesh(slotGeo, mat);
-      slotMesh.rotation.x = -Math.PI / 2;
-      slotMesh.position.set(startX + i * spacing, 0.27, 2.0);
-      scene.add(slotMesh);
-      cardSlots.push(slotMesh);
+    case 'steal': { const from=resolveWho(fx.from,ev), to=resolveWho(fx.to,ev); doSteal(from,to,fx.n); (extraTargetIds||[]).forEach(t=>doSteal(t,to,fx.n)); break; }
+    case 'stealAll': { doSteal(resolveWho(fx.from,ev), resolveWho(fx.to,ev), 'all'); break; }
+    case 'giveAll': {
+      const from=resolveWho(fx.from,ev), to=resolveWho(fx.to,ev);
+      const p=findPlayer(from), t=findPlayer(to);
+      t.hand.push(...p.hand); p.hand=[];
+      addLog(nameOf(from)+'님이 손패 전부를 '+nameOf(to)+'님에게 넘겼습니다.');
+      checkCardSick(to);
+      break;
     }
-
-    if (isLocal) broadcastData({ type: 'create_slots', count: count });
+    case 'giveN': { enqueuePrompt({forId:resolveWho(fx.from,ev),type:'chooseGive',payload:{n:fx.n,toId:resolveWho(fx.to,ev)}}); break; }
+    case 'swap': {
+      const a=ev.sourceId,b=ev.targetId; const pa=findPlayer(a),pb=findPlayer(b);
+      const tmp=pa.hand; pa.hand=pb.hand; pb.hand=tmp;
+      addLog(nameOf(a)+'님과 '+nameOf(b)+'님의 손패가 서로 바뀌었습니다.');
+      checkCardSick(a); checkCardSick(b);
+      break;
+    }
+    case 'skip': { const pid=resolveWho(fx.who,ev); markSkip(pid); addLog(nameOf(pid)+'님은 다음 차례를 쉽니다.'); break; }
+    case 'reverse': { state.direction*=-1; addLog('🔁 게임 진행 방향이 반대로 바뀌었습니다.'); break; }
+    case 'removeTraps': {
+      if(fx.who==='all') state.players.forEach(p=>{ state.discard.push(...p.traps); p.traps=[]; });
+      else { const pid=resolveWho(fx.who,ev); const p=findPlayer(pid); state.discard.push(...p.traps); p.traps=[]; }
+      addLog('💣 함정 카드가 모두 버려졌습니다.');
+      break;
+    }
+    case 'revealTrap': { const pid=resolveWho(fx.who,ev); const p=findPlayer(pid); state.discard.push(...p.traps); p.traps=[]; addLog(nameOf(pid)+'님의 함정 카드가 모두 무효화되었습니다.'); break; }
+    case 'stealTrap': {
+      const pid=resolveWho(fx.who,ev); const victim=findPlayer(pid);
+      if(victim.traps.length===0){ addLog(nameOf(pid)+'님은 설치한 함정이 없습니다.'); break; }
+      enqueuePrompt({forId:ev.sourceId,type:'pickTrapSlot',payload:{victimId:pid,slotCount:victim.traps.length}});
+      break;
+    }
+    case 'viewTopTake1': {
+      const opts=[];
+      for(let i=0;i<fx.n;i++){ if(state.deck.length===0) reshuffleDiscardIntoDeck(); if(state.deck.length===0) break; opts.push(fx.fromBottom?state.deck.shift():state.deck.pop()); }
+      if(opts.length===0) break;
+      enqueuePrompt({forId:ev.sourceId,type:'pickFromReveal',payload:{options:opts}});
+      break;
+    }
+    case 'redistributeTwo': {
+      const a=ev.sourceId,b=ev.targetId; const pa=findPlayer(a),pb=findPlayer(b);
+      const pool=shuffle([...pa.hand,...pb.hand]); const half=Math.ceil(pool.length/2);
+      pa.hand=pool.slice(0,half); pb.hand=pool.slice(half);
+      addLog(nameOf(a)+'님과 '+nameOf(b)+'님이 손패를 합쳐 다시 나눠 가졌습니다.');
+      checkCardSick(a); checkCardSick(b);
+      break;
+    }
+    case 'restart': { doRestartGame(); ev.skipAdvance=true; break; }
+    case 'setWinRuleAt': { state.ruleFlags.winRuleAt={who:ev.sourceId,rule:fx.rule}; addLog(nameOf(ev.sourceId)+'님의 다음 차례에 특수 승리 조건이 적용됩니다.'); break; }
+    case 'custom': { applyCustom(fx.id,fx,ev); break; }
+    default: break;
   }
-
-  function createCard(x = 0, z = 0, isLocal = true, customSuit = null, customValue = null, customId = null) {
-    const id = customId || ('card_' + (++objectIdCounter));
-    if (objects.some(o => o.userData.id === id)) return;
-
-    const suit = customSuit || suits[Math.floor(Math.random() * suits.length)];
-    const value = customValue || values[Math.floor(Math.random() * values.length)];
-
-    const geo = new THREE.BoxGeometry(0.9, 0.02, 1.35);
-    const frontTex = createTrumpCardTexture(suit, value);
-    const backTex = cardBackTexture;
-
-    const materials = [
-      new THREE.MeshStandardMaterial({ color: 0xdddddd }),
-      new THREE.MeshStandardMaterial({ color: 0xdddddd }),
-      new THREE.MeshStandardMaterial({ map: frontTex }),
-      new THREE.MeshStandardMaterial({ map: backTex }),
-      new THREE.MeshStandardMaterial({ color: 0xdddddd }),
-      new THREE.MeshStandardMaterial({ color: 0xdddddd })
-    ];
-
-    const card = new THREE.Mesh(geo, materials);
-    card.position.set(x, CARD_BASE_Y, z);
-    card.rotation.z = Math.PI;
-    card.castShadow = true;
-    card.userData = { id: id, type: 'card', cardType: 'trump', suit: suit, value: value, isFlipped: true, isLocked: false, isAnimating: false, lastMovedTime: Date.now() };
-    
-    scene.add(card);
-    objects.push(card);
-
-    alignCardRotationBySeat(card);
-    updateHandVisibility(card);
-    updateStacking();
-    updateDynamicActionBar();
-
-    if (isLocal) broadcastData({ type: 'spawn', propType: 'card', id: id, x: x, z: z, suit: suit, value: value });
-    return card;
-  }
-
-  function createMuffinCard(x = 0, z = 0, isLocal = true, customData = null, customId = null) {
-    const id = customId || ('mcard_' + (++objectIdCounter));
-    if (objects.some(o => o.userData.id === id)) return;
-
-    const cardData = customData || muffinCardDB[Math.floor(Math.random() * muffinCardDB.length)];
-
-    const geo = new THREE.BoxGeometry(0.95, 0.02, 1.4);
-    const frontTex = createMuffinCardTexture(cardData);
-    const backTex = muffinBackTexture;
-
-    const materials = [
-      new THREE.MeshStandardMaterial({ color: 0xffffff }),
-      new THREE.MeshStandardMaterial({ color: 0xffffff }),
-      new THREE.MeshStandardMaterial({ map: frontTex }),
-      new THREE.MeshStandardMaterial({ map: backTex }),
-      new THREE.MeshStandardMaterial({ color: 0xffffff }),
-      new THREE.MeshStandardMaterial({ color: 0xffffff })
-    ];
-
-    const card = new THREE.Mesh(geo, materials);
-    card.position.set(x, CARD_BASE_Y, z);
-    card.rotation.z = Math.PI;
-    card.castShadow = true;
-    card.userData = { id: id, type: 'card', cardType: 'muffin', cardData: cardData, isFlipped: true, isLocked: false, isAnimating: false, lastMovedTime: Date.now() };
-
-    scene.add(card);
-    objects.push(card);
-
-    alignCardRotationBySeat(card);
-    updateHandVisibility(card);
-    updateStacking();
-    updateDynamicActionBar();
-
-    if (isLocal) broadcastData({ type: 'spawn', propType: 'muffin_card', id: id, x: x, z: z, cardData: cardData });
-    return card;
-  }
-
-  function startMuffinTimeGame(isLocal = true) {
-    objects.forEach(obj => scene.remove(obj));
-    objects = [];
-    clearSelectionGroup();
-
-    addChatMessage('시스템', '🧁 머핀타임 풀 커스텀 8인 게임 시작! 80여 종 이상의 카드 중에서 덱이 무작위 세팅됩니다.', false, true);
-
-    let fullDeck = [...muffinCardDB, ...muffinCardDB];
-    fullDeck.sort(() => Math.random() - 0.5);
-
-    fullDeck.forEach((cardData) => { createMuffinCard(0, 0, false, cardData); });
-
-    const cards = objects.filter(o => o.userData.type === 'card');
-    let cardIdx = 0;
-
-    for (let seat = 1; seat <= 8; seat++) {
-      const center = SEAT_CENTERS[seat];
-      const isHorizontalSide = (seat === 1 || seat === 2 || seat === 5 || seat === 6);
-      for (let i = 0; i < 3; i++) {
-        if (cardIdx < cards.length) {
-          const card = cards[cardIdx++];
-          const offset = (i - 1) * 1.25;
-          const dx = isHorizontalSide ? offset : 0;
-          const dz = isHorizontalSide ? 0 : offset;
-          card.position.set(center.x + dx, CARD_BASE_Y, center.z + dz);
-          alignCardRotationBySeat(card);
-          updateHandVisibility(card);
+}
+function doRestartGame(){
+  let all=[];
+  state.players.forEach(p=>{ all.push(...p.hand,...p.traps); p.hand=[]; p.traps=[]; });
+  all.push(...state.deck,...state.discard);
+  state.deck=shuffle(all); state.discard=[];
+  state.players.forEach(p=>{ p.hand=state.deck.splice(state.deck.length-3,3); });
+  state.winThreshold=10;
+  state.ruleFlags={winRuleAt:null,lockActionsUntil:null,lockWinUntil:null,extraActionsFor:null,extraActionsCount:0};
+  state.skipSet={};
+  state.turnIndex=0; state.currentId=state.order[0]; state.direction=1;
+  addLog('💥 모든 카드를 모아 다시 섞고, 게임을 처음부터 다시 시작합니다!');
+}
+function applyCustom(id,fx,ev){
+  switch(id){
+    case 'bigBee': {
+      const m=maxHand(); if(m.length!==1){ addLog('손패가 가장 많은 사람이 동률이라 효과가 무산되었습니다.'); break; }
+      const target=m[0].id; otherPlayers(target).forEach(p=>doSteal(target,p.id,1));
+      break;
+    }
+    case 'iLikeTrains': {
+      const n=state.order.length; const snap=state.order.map(id=>findPlayer(id).hand);
+      state.order.forEach((id,i)=>{ findPlayer(id).hand=snap[(i-1+n)%n].slice(); });
+      state.order.forEach(id=>checkCardSick(id));
+      addLog('🚂 모두의 손패가 이전 사람과 통째로 뒤바뀌었습니다.');
+      break;
+    }
+    case 'skateboards': {
+      const n=state.order.length; const snap=state.order.map(id=>findPlayer(id).hand);
+      state.order.forEach((id,i)=>{ findPlayer(id).hand=snap[(i+1)%n].slice(); });
+      state.order.forEach(id=>checkCardSick(id));
+      addLog('🛹 모두의 손패가 다음 사람과 통째로 뒤바뀌었습니다.');
+      break;
+    }
+    case 'hereItComes': {
+      const n=state.order.length; const original=state.order.map(id=>findPlayer(id).hand.slice());
+      state.order.forEach((id,i)=>{
+        const prevIdx=(i-1+n)%n; if(prevIdx===i) return;
+        if(original[prevIdx].length>0){
+          const card=original[prevIdx][Math.floor(Math.random()*original[prevIdx].length)];
+          const pf=findPlayer(state.order[prevIdx]); const pt=findPlayer(id);
+          const idx=pf.hand.indexOf(card); if(idx>=0){ pf.hand.splice(idx,1); pt.hand.push(card); }
         }
-      }
-    }
-
-    updateStacking();
-    updateDynamicActionBar();
-
-    if (isLocal) broadcastData({ type: 'muffin_start' });
-  }
-
-  function createDice(x = (Math.random() - 0.5) * 4, z = (Math.random() - 0.5) * 4, isLocal = true, customId = null) {
-    const id = customId || ('dice_' + (++objectIdCounter));
-    if (objects.some(o => o.userData.id === id)) return;
-
-    const geo = new THREE.BoxGeometry(0.7, 0.7, 0.7);
-    const dice = new THREE.Mesh(geo, diceMaterials);
-    dice.position.set(x, 0.61, z);
-    dice.castShadow = true;
-    dice.userData = { id: id, type: 'dice', isRolling: false, isLocked: false };
-    scene.add(dice);
-    objects.push(dice);
-
-    updateDynamicActionBar();
-    if (isLocal) broadcastData({ type: 'spawn', propType: 'dice', id: id, x: x, z: z });
-    return dice;
-  }
-
-  function isPositionInSeatZone(x, z, seat) {
-    const center = SEAT_CENTERS[seat];
-    if (!center) return false;
-    
-    const isHorizontalSide = (seat === 1 || seat === 2 || seat === 5 || seat === 6);
-    const dx = Math.abs(x - center.x);
-    const dz = Math.abs(z - center.z);
-
-    if (isHorizontalSide) {
-      return dx <= 3.5 && dz <= 1.35;
-    } else {
-      return dz <= 3.5 && dx <= 1.35;
-    }
-  }
-
-  function getSeatFromPosition(x, z) {
-    for (let s = 1; s <= 8; s++) {
-      if (isPositionInSeatZone(x, z, s)) return s;
-    }
-    return 0;
-  }
-
-  function alignCardRotationBySeat(card) {
-    const seat = getSeatFromPosition(card.position.x, card.position.z);
-    if (seat !== 0) {
-      card.rotation.y = SEAT_CENTERS[seat].angle;
-    } else {
-      card.rotation.y = 0;
-    }
-  }
-
-  function updateHandVisibility(card) {
-    const isInsideMyZone = isPositionInSeatZone(card.position.x, card.position.z, mySeat);
-    if (isInsideMyZone) {
-      card.rotation.z = 0;
-      card.userData.isFlipped = false;
-    } else {
-      const seat = getSeatFromPosition(card.position.x, card.position.z);
-      if (seat !== 0) {
-        card.rotation.z = Math.PI;
-        card.userData.isFlipped = true;
-      } else {
-        card.rotation.z = card.userData.isFlipped ? Math.PI : 0;
-      }
-    }
-  }
-
-  function snapCardsToSlots(movedCards) {
-    const SNAP_DISTANCE = 0.8;
-    const cardsToSnap = Array.isArray(movedCards) ? movedCards : [movedCards];
-
-    cardsToSnap.forEach((card, idx) => {
-      card.userData.lastMovedTime = Date.now() + idx;
-      
-      const sortedSlots = [...cardSlots].sort((a, b) => {
-        const distA = Math.hypot(card.position.x - a.position.x, card.position.z - a.position.z);
-        const distB = Math.hypot(card.position.x - b.position.x, card.position.z - b.position.z);
-        return distA - distB;
       });
-
-      for (let slot of sortedSlots) {
-        const dist = Math.hypot(card.position.x - slot.position.x, card.position.z - slot.position.z);
-        if (dist < SNAP_DISTANCE) {
-          let progress = 0;
-          const startX = card.position.x, startZ = card.position.z;
-          const targetX = slot.position.x, targetZ = slot.position.z;
-          card.userData.isAnimating = true;
-
-          function animateSnap() {
-            progress += 0.2;
-            card.position.x = THREE.MathUtils.lerp(startX, targetX, progress);
-            card.position.z = THREE.MathUtils.lerp(startZ, targetZ, progress);
-
-            if (progress < 1) {
-              requestAnimationFrame(animateSnap);
-            } else {
-              card.position.x = targetX;
-              card.position.z = targetZ;
-              card.rotation.y = 0;
-              card.userData.isAnimating = false;
-              updateStacking();
-              sendMoveData(card);
-            }
-          }
-          animateSnap();
-          return;
-        }
-      }
-      sendMoveData(card);
-    });
-
-    updateStacking();
-  }
-
-  function updateStacking() {
-    const cards = objects.filter(o => o.userData.type === 'card' && !o.userData.isAnimating);
-    const LAYER_HEIGHT = 0.025;
-
-    cards.sort((a, b) => (a.userData.lastMovedTime || 0) - (b.userData.lastMovedTime || 0));
-
-    cards.forEach((card, index) => {
-      let stackIndex = 0;
-      for (let i = 0; i < index; i++) {
-        const other = cards[i];
-        if (Math.hypot(card.position.x - other.position.x, card.position.z - other.position.z) < 0.8) {
-          stackIndex++;
-        }
-      }
-      card.position.y = CARD_BASE_Y + stackIndex * LAYER_HEIGHT;
-      card.renderOrder = stackIndex + 1;
-      alignCardRotationBySeat(card);
-      updateHandVisibility(card);
-    });
-  }
-
-  function spawnFullDeck(isLocal = true) {
-    objects.forEach(obj => scene.remove(obj));
-    objects = [];
-    suits.forEach(s => values.forEach(v => createCard(0, 0, false, s, v)));
-    shuffleCards(false);
-    updateDynamicActionBar();
-    if (isLocal) broadcastData({ type: 'reset_deck' });
-  }
-
-  function clearSelectionGroup() {
-    selectedGroup.forEach(obj => {
-      if (obj.userData.outlineMesh) {
-        obj.remove(obj.userData.outlineMesh);
-        obj.userData.outlineMesh = null;
-      }
-    });
-    selectedGroup = [];
-  }
-
-  function gatherCards(isLocal = true) {
-    const targetCards = objects.filter(o => o.userData.type === 'card' && getSeatFromPosition(o.position.x, o.position.z) === 0);
-    if (targetCards.length === 0) return;
-
-    const now = Date.now();
-    targetCards.forEach((card, i) => {
-      card.userData.lastMovedTime = now + i;
-      card.position.set(0, CARD_BASE_Y, 0);
-      card.rotation.y = 0;
-      card.rotation.z = Math.PI;
-      card.userData.isFlipped = true;
-      sendMoveData(card);
-    });
-
-    updateStacking();
-    if (isLocal) broadcastData({ type: 'gather' });
-  }
-
-  function spreadCards(isLocal = true) {
-    const deckCards = objects.filter(o => o.userData.type === 'card' && Math.hypot(o.position.x, o.position.z) < 1.5);
-    if (deckCards.length === 0) return;
-
-    const startX = -((deckCards.length - 1) * 0.2) / 2;
-    const now = Date.now();
-    deckCards.forEach((card, i) => {
-      card.userData.lastMovedTime = now + i;
-      card.position.set(startX + i * 0.2, CARD_BASE_Y, 0);
-      card.rotation.y = 0;
-      sendMoveData(card);
-    });
-    updateStacking();
-    if (isLocal) broadcastData({ type: 'spread' });
-  }
-
-  function cutDeck(isLocal = true) {
-    const deckCards = objects.filter(o => o.userData.type === 'card' && Math.hypot(o.position.x, o.position.z) < 1.5);
-    if (deckCards.length < 2) return;
-
-    const input = prompt(`몇 장의 카드를 떼어내시겠습니까? (최대 ${deckCards.length - 1}장)`, '5');
-    const cutCount = parseInt(input, 10);
-    if (isNaN(cutCount) || cutCount < 1 || cutCount >= deckCards.length) return;
-
-    deckCards.sort((a, b) => b.position.y - a.position.y);
-    const cutCards = deckCards.slice(0, cutCount);
-
-    const now = Date.now();
-    cutCards.forEach((card, i) => {
-      card.userData.lastMovedTime = now + i;
-      card.position.set(1.8, CARD_BASE_Y, 0);
-      card.rotation.y = 0;
-      sendMoveData(card);
-    });
-    updateStacking();
-    if (isLocal) broadcastData({ type: 'cut', cutCount: cutCount });
-  }
-
-  function shuffleCards(isLocal = true) {
-    const allCards = objects.filter(o => o.userData.type === 'card');
-    const deckCards = allCards.filter(c => Math.hypot(c.position.x, c.position.z) < 1.5);
-    if (deckCards.length === 0) return;
-
-    for (let i = deckCards.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [deckCards[i], deckCards[j]] = [deckCards[j], deckCards[i]];
+      addLog('👋 모두가 이전 사람에게서 카드를 1장씩 빼앗았습니다.');
+      break;
     }
-
-    const LAYER_HEIGHT = 0.025;
-    const now = Date.now();
-
-    deckCards.forEach((card, index) => {
-      card.userData.isAnimating = true;
-      card.userData.isFlipped = true;
-      card.userData.lastMovedTime = now + index;
-
-      const targetX = (Math.random() - 0.5) * 0.05;
-      const targetZ = (Math.random() - 0.5) * 0.05;
-      const targetY = CARD_BASE_Y + index * LAYER_HEIGHT;
-
-      let progress = 0;
-      const startX = card.position.x, startY = card.position.y, startZ = card.position.z;
-      const startRotY = card.rotation.y;
-
-      function animateShuffle() {
-        progress += 0.08;
-        card.position.x = THREE.MathUtils.lerp(startX, targetX, progress);
-        card.position.z = THREE.MathUtils.lerp(startZ, targetZ, progress);
-        card.position.y = THREE.MathUtils.lerp(startY, targetY, progress) + Math.sin(progress * Math.PI) * 1.5;
-        card.rotation.y = THREE.MathUtils.lerp(startRotY, 0, progress);
-        card.rotation.z = THREE.MathUtils.lerp(card.rotation.z, Math.PI, progress);
-
-        if (progress < 1) {
-          requestAnimationFrame(animateShuffle);
-        } else {
-          card.position.set(targetX, targetY, targetZ);
-          card.rotation.y = 0;
-          card.rotation.z = Math.PI;
-          card.userData.isAnimating = false;
-          updateStacking();
-        }
-      }
-      animateShuffle();
-    });
-
-    if (isLocal) broadcastData({ type: 'shuffle' });
+    case 'yayCookies': { otherPlayers(ev.sourceId).forEach(p=>doSteal(p.id,ev.sourceId,1)); break; }
+    case 'killedUsAll': {
+      enqueuePrompt({forId:ev.sourceId,type:'chooseDiscard',payload:{n:2}});
+      otherPlayers(ev.sourceId).forEach(p=>enqueuePrompt({forId:p.id,type:'chooseDiscard',payload:{n:1}}));
+      break;
+    }
+    case 'levelUp': { drawCards(ev.sourceId,2); otherPlayers(ev.sourceId).forEach(p=>drawCards(p.id,1)); break; }
+    case 'noLlama': {
+      const all=state.players.map(p=>p.id); const half=Math.max(1,Math.floor(all.length/2));
+      shuffle(all).slice(0,half).forEach(id=>enqueuePrompt({forId:id,type:'chooseDiscard',payload:{n:1}}));
+      break;
+    }
+    case 'cakeDay': {
+      const all=state.players.map(p=>p.id); const lucky=all[Math.floor(Math.random()*all.length)];
+      addLog('🎂 '+nameOf(lucky)+'님이 오늘의 생일 주인공입니다!');
+      otherPlayers(lucky).forEach(p=>enqueuePrompt({forId:p.id,type:'chooseGive',payload:{n:1,toId:lucky}}));
+      break;
+    }
+    case 'newYou': {
+      const p=findPlayer(ev.sourceId); const n=p.hand.length;
+      state.discard.push(...p.hand); p.hand=[];
+      drawCards(ev.sourceId,n);
+      addLog(nameOf(ev.sourceId)+'님이 손패를 완전히 새로 갈아치웠습니다.');
+      break;
+    }
+    case 'fewestDraw3': { minHand().forEach(p=>drawCards(p.id,3)); break; }
+    case 'timeMachine': {
+      if(state.discard.length===0){ addLog('버린 카드 더미가 비어있습니다.'); break; }
+      const idx=Math.floor(Math.random()*state.discard.length); const c=state.discard.splice(idx,1)[0];
+      findPlayer(ev.sourceId).hand.push(c);
+      addLog(nameOf(ev.sourceId)+'님이 버린 카드 더미에서 ['+CARD_MAP[c].name+']를 되찾았습니다.');
+      checkCardSick(ev.sourceId);
+      break;
+    }
+    case 'adoptTop3': {
+      const n=Math.min(3,state.discard.length); const taken=state.discard.splice(state.discard.length-n,n);
+      findPlayer(ev.sourceId).hand.push(...taken);
+      addLog(nameOf(ev.sourceId)+'님이 버린 카드 더미에서 '+n+'장을 가져왔습니다.');
+      checkCardSick(ev.sourceId);
+      break;
+    }
+    case 'extraActions': { state.ruleFlags.extraActionsFor=ev.sourceId; state.ruleFlags.extraActionsCount=fx.n; addLog(nameOf(ev.sourceId)+'님은 이번 차례에 행동 카드를 '+fx.n+'번 더 사용할 수 있습니다.'); break; }
+    case 'lockActions': { state.ruleFlags.lockActionsUntil=ev.sourceId; addLog(nameOf(ev.sourceId)+'님의 다음 차례까지 아무도 행동 카드를 사용할 수 없습니다.'); break; }
+    case 'lockWin': { state.ruleFlags.lockWinUntil=ev.sourceId; addLog(nameOf(ev.sourceId)+'님의 다음 차례까지 아무도 승리할 수 없습니다.'); break; }
+    case 'stealOrDraw': { enqueuePrompt({forId:ev.sourceId,type:'stealOrDraw',payload:{n:fx.n,targetId:ev.targetId}}); break; }
+    default: break;
   }
+}
 
-  function declareMuffinTime() {
-    const myCards = objects.filter(o => o.userData.type === 'card' && isPositionInSeatZone(o.position.x, o.position.z, mySeat));
-    addChatMessage('시스템', `🎉 P${mySeat} 님이 "MUFFIN TIME!" 을 외쳤습니다! (보유 카드: ${myCards.length}장)`, false, true);
-    broadcastData({ type: 'muffin_announce', seat: mySeat, count: myCards.length });
+/* ---- 카운터 처리 ---- */
+function applyCounterFx(card,counterPlayerId,chosenTargetId){
+  const ev=state.pendingEvent; const fx=card.fx;
+  switch(fx.k){
+    case 'counterCancel': ev.cancelled=true; break;
+    case 'counterCancelReturn': ev.cancelled=true; ev.returnToSource=true; break;
+    case 'counterNegateSelf': ev.negatedFor.push(counterPlayerId); break;
+    case 'counterHijack': ev.sourceId=counterPlayerId; break;
+    case 'counterCancelSteal': ev.cancelled=true; ev.stolenBy=counterPlayerId; break;
+    case 'counterCancelCounterSteal': ev.cancelled=true; ev.stolenBy=counterPlayerId; break;
+    case 'counterRedirect': ev.targetId=chosenTargetId||ev.targetId; break;
+    case 'counterShare': ev.extraTargets.push(fx.addTarget==='source'?ev.sourceId:(chosenTargetId||null)); break;
+    case 'counterReverseSteal': {
+      ev.cancelled=true;
+      const baseFx=CARD_MAP[ev.cardId].fx; const n=(baseFx&&baseFx.n)||1;
+      doSteal(ev.sourceId,counterPlayerId,n);
+      break;
+    }
+    default: break;
   }
+}
+function applyImmediateSub(subFx,counterPlayerId){
+  const ev=state.pendingEvent;
+  const rw=(w)=> w==='self'?counterPlayerId:(w==='sourceOfEvent'?ev.sourceId:w);
+  if(subFx.k==='passTurnTo') ev.forceNextTurnTo=rw(subFx.who);
+  else if(subFx.k==='discard') enqueuePrompt({forId:rw(subFx.who),type:'chooseDiscard',payload:{n:subFx.n}});
+  else if(subFx.k==='removeTraps'){ const pid2=rw(subFx.who); const p2=findPlayer(pid2); state.discard.push(...p2.traps); p2.traps=[]; }
+  else if(subFx.k==='skip') markSkip(rw(subFx.who));
+  else if(subFx.k==='draw') drawCards(rw(subFx.who),subFx.n);
+  else if(subFx.k==='drawFromEventN'){ const baseFx=CARD_MAP[ev.cardId].fx; const n=(baseFx&&baseFx.n)||1; drawCards(rw(subFx.who),n); }
+}
+function openCounterWindow(){
+  state.phase='counterWindow';
+  const ev=state.pendingEvent; const card=CARD_MAP[ev.cardId];
+  ev.deadline=Date.now()+9000;
+  if(!ev.announced){
+    ev.announced=true;
+    if(ev.isTrap) addLog('⚠️ 함정 발동: '+nameOf(ev.sourceId)+'님의 ['+card.name+']!'+(ev.targetId?' (대상: '+nameOf(ev.targetId)+')':''));
+    else addLog('▶ '+nameOf(ev.sourceId)+'님이 ['+card.name+'] 카드를 사용했습니다.'+(ev.targetId?' (대상: '+nameOf(ev.targetId)+')':''));
+  }
+  broadcastAll();
+  const mySeq=++state._counterSeq_val;
+  state.counterTimer=setTimeout(()=>{ if(state._counterSeq_val===mySeq && state.phase==='counterWindow') resolveEventNow(); },9000);
+}
+function hostPlayCounter(pid,cardId,chosenTargetId){
+  if(state.phase!=='counterWindow'||!state.pendingEvent) return;
+  const p=findPlayer(pid); const idx=p.hand.indexOf(cardId); if(idx<0) return;
+  const card=CARD_MAP[cardId]; if(!card||card.type!=='counter') return;
+  clearTimeout(state.counterTimer);
+  p.hand.splice(idx,1); state.discard.push(cardId);
+  addLog('🛡 '+nameOf(pid)+'님이 카운터 ['+card.name+']를 사용했습니다!');
+  applyCounterFx(card,pid,chosenTargetId);
+  if(card.then) applyImmediateSub(card.then,pid);
+  state.pendingEvent.depth=(state.pendingEvent.depth||0)+1;
+  if(state.pendingEvent.cancelled || state.pendingEvent.depth>=4) resolveEventNow();
+  else openCounterWindow();
+}
+function resolveEventNow(){
+  const ev=state.pendingEvent; const card=CARD_MAP[ev.cardId];
+  if(ev.cancelled){
+    if(ev.returnToSource){ findPlayer(ev.sourceId).hand.push(ev.cardId); addLog('['+card.name+'] 카드가 취소되어 손으로 돌아갔습니다.'); }
+    else if(ev.stolenBy){ findPlayer(ev.stolenBy).hand.push(ev.cardId); addLog('['+card.name+'] 카드가 취소되어 다른 사람이 가져갔습니다.'); }
+    else { state.discard.push(ev.cardId); addLog('['+card.name+'] 효과가 취소되었습니다.'); }
+    finalizeEvent();
+    return;
+  }
+  state.discard.push(ev.cardId);
+  const targets=[ev.targetId].concat(ev.extraTargets||[]).filter(Boolean);
+  applyBaseEffect(card.fx||{k:'noop'},ev,targets);
+  finalizeEvent();
+}
+function finalizeEvent(){
+  const ev=state.pendingEvent;
+  const wasTrap=ev.isTrap, skipAdvance=ev.skipAdvance, priorPhase=ev.priorPhase, autoChainDeclarer=ev.autoChainDeclarer;
+  state.forceNextTurnTo = ev.forceNextTurnTo || state.forceNextTurnTo || null;
+  state.pendingEvent=null;
+  processPromptQueue(()=>{
+    if(state.phase==='gameover') return;
+    if(skipAdvance){ startTurn(); return; }
+    if(wasTrap){
+      state.phase=priorPhase||'main';
+      if(state.autoTrapQueue && state.autoTrapQueue.length>0){ pumpAutoTrapQueue(autoChainDeclarer); return; }
+      broadcastAll();
+    } else finishMainAction();
+  });
+}
 
-  const dynamicActionBar = document.getElementById('dynamic-action-bar');
-  function updateDynamicActionBar() {
-    const hasCards = objects.some(o => o.userData.type === 'card');
-    const hasDice = objects.some(o => o.userData.type === 'dice');
+/* ---- 함정 설치/발동 ---- */
+function hostInstallTrap(pid,cardId){
+  if(!state||state.phase!=='trap'||state.currentId!==pid) return;
+  const p=findPlayer(pid); const idx=p.hand.indexOf(cardId); if(idx<0) return;
+  const card=CARD_MAP[cardId]; if(!card||card.type!=='trap') return;
+  if(p.traps.length>=3){ toastTo(pid,'함정은 최대 3장까지 설치할 수 있어요.'); return; }
+  p.hand.splice(idx,1); p.traps.push(cardId);
+  addLog('🔻 '+nameOf(pid)+'님이 함정 카드를 설치했습니다.');
+  state.phase='main';
+  broadcastAll();
+}
+function hostPassTrap(pid){ if(!state||state.phase!=='trap'||state.currentId!==pid) return; state.phase='main'; broadcastAll(); }
+function hostMainDraw(pid){
+  if(!state||state.phase!=='main'||state.currentId!==pid) return;
+  drawCards(pid,1);
+  finishMainAction();
+}
+function hostPlayCard(pid,cardId,targetId,targetId2){
+  if(!state||state.phase!=='main'||state.currentId!==pid) return;
+  if(state.ruleFlags.lockActionsUntil){ toastTo(pid,'지금은 행동 카드를 사용할 수 없습니다.'); return; }
+  const p=findPlayer(pid); const idx=p.hand.indexOf(cardId); if(idx<0) return;
+  const card=CARD_MAP[cardId]; if(!card||(card.type!=='action'&&card.type!=='minigame')) return;
+  if(cardNeedsTarget(card) && !targetId){ toastTo(pid,'대상을 선택하세요.'); return; }
+  if(cardNeedsTarget2(card) && !targetId2){ toastTo(pid,'대상을 선택하세요.'); return; }
+  p.hand.splice(idx,1);
+  const ev={cardId,sourceId:pid,targetId:targetId||null,targetId2:targetId2||null,isTrap:false,uncounterable:!!card.uncounterable,cancelled:false,returnToSource:false,negatedFor:[],extraTargets:[],depth:0};
+  state.pendingEvent=ev;
+  if(card.type==='minigame'){ startMinigame(card,ev); return; }
+  if(card.uncounterable){ addLog('▶ '+nameOf(pid)+'님이 ['+card.name+'] 카드를 사용했습니다.'+(targetId?' (대상: '+nameOf(targetId)+')':'')); resolveEventNow(); }
+  else openCounterWindow();
+}
+function hostTriggerTrap(pid,trapCardId,targetId){
+  if(!state) return;
+  if(state.phase==='counterWindow'||state.phase==='promptWait'||state.phase==='minigame'||state.phase==='gameover'){ toastTo(pid,'지금은 다른 이벤트가 진행 중이에요. 잠시 후 다시 시도하세요.'); return; }
+  const p=findPlayer(pid); if(!p) return;
+  const idx=p.traps.indexOf(trapCardId); if(idx<0) return;
+  const card=CARD_MAP[trapCardId]; if(!card||card.type!=='trap'||card.trigger==='passive') return;
+  if(card.condition==='handEmpty' && p.hand.length!==0){ toastTo(pid,'이 함정은 손패가 0장일 때만 발동할 수 있어요.'); return; }
+  const needsT=cardNeedsTarget(card);
+  if(needsT && !targetId){ toastTo(pid,'대상을 선택하세요.'); return; }
+  if(needsT && targetId===pid){ toastTo(pid,'자기 자신은 지목할 수 없어요.'); return; }
+  p.traps.splice(idx,1);
+  const priorPhase=state.phase;
+  state.pendingEvent={cardId:trapCardId,sourceId:pid,targetId:needsT?targetId:null,targetId2:null,isTrap:true,uncounterable:false,cancelled:false,returnToSource:false,negatedFor:[],extraTargets:[],depth:0,priorPhase};
+  openCounterWindow();
+}
+function hostDeclareMuffinTime(pid){
+  if(!state) return;
+  if(state.phase==='counterWindow'||state.phase==='promptWait'||state.phase==='minigame') return;
+  const p=findPlayer(pid); if(!p||p.hand.length!==state.winThreshold) return;
+  addLog('🧁 '+nameOf(pid)+'님이 "머핀 타임!"을 외쳤습니다!');
+  const owners=[];
+  state.players.forEach(pl=>{ if(pl.id!==pid) pl.traps.forEach(tid=>{ if(CARD_MAP[tid].hookOn==='declareMuffinTime') owners.push({ownerId:pl.id,trapCardId:tid}); }); });
+  state.autoTrapQueue=owners;
+  pumpAutoTrapQueue(pid);
+}
+function pumpAutoTrapQueue(declarerId){
+  if(!state.autoTrapQueue || state.autoTrapQueue.length===0){ broadcastAll(); return; }
+  const next=state.autoTrapQueue.shift();
+  const owner=findPlayer(next.ownerId); if(!owner){ pumpAutoTrapQueue(declarerId); return; }
+  const idx=owner.traps.indexOf(next.trapCardId); if(idx<0){ pumpAutoTrapQueue(declarerId); return; }
+  owner.traps.splice(idx,1);
+  const priorPhase=state.phase;
+  state.pendingEvent={cardId:next.trapCardId,sourceId:next.ownerId,targetId:declarerId,targetId2:null,isTrap:true,uncounterable:false,cancelled:false,returnToSource:false,negatedFor:[],extraTargets:[],depth:0,priorPhase,autoChainDeclarer:declarerId};
+  openCounterWindow();
+}
 
-    if (!hasCards && !hasDice) {
-      dynamicActionBar.style.display = 'none';
-      dynamicActionBar.innerHTML = '';
-      return;
+/* ---- 네트워크 브로드캐스트 ---- */
+function toastTo(pid,text){ if(pid===myId) showToast(text); else if(guestConns[pid]&&guestConns[pid].open) guestConns[pid].send({type:'TOAST',text}); }
+function broadcastToast(text){ state.players.forEach(p=>toastTo(p.id,text)); }
+function buildView(pid){
+  return {
+    myId: pid,
+    players: state.players.map(p=>({id:p.id,name:p.name,handCount:p.hand.length,trapCount:p.traps.length,connected:p.connected!==false})),
+    myHand: (findPlayer(pid)||{hand:[]}).hand.slice(),
+    myTraps: (findPlayer(pid)||{traps:[]}).traps.slice(),
+    order: state.order.slice(), turnIndex: state.turnIndex, direction: state.direction, currentId: state.currentId,
+    deckCount: state.deck.length,
+    discardTopId: state.discard.length ? state.discard[state.discard.length-1] : null,
+    discardCount: state.discard.length,
+    winThreshold: state.winThreshold,
+    phase: state.phase,
+    pendingEvent: state.pendingEvent ? {cardId:state.pendingEvent.cardId,sourceId:state.pendingEvent.sourceId,targetId:state.pendingEvent.targetId,isTrap:state.pendingEvent.isTrap,uncounterableFlag:state.pendingEvent.uncounterable,deadline:state.pendingEvent.deadline} : null,
+    myPrompt: (state.pendingPrompt && state.pendingPrompt.forId===pid) ? state.pendingPrompt : null,
+    myMultiPrompt: (state.pendingMultiPrompt && state.pendingMultiPrompt.forIds.indexOf(pid)>=0 && !(pid in state.pendingMultiPrompt.responses)) ? {id:state.pendingMultiPrompt.id,type:state.pendingMultiPrompt.type,payload:state.pendingMultiPrompt.payload,deadline:state.pendingMultiPrompt.deadline} : null,
+    waitingOnOthers: !!((state.pendingPrompt && state.pendingPrompt.forId!==pid) || (state.pendingMultiPrompt && Object.keys(state.pendingMultiPrompt.responses).length < state.pendingMultiPrompt.forIds.length)),
+    log: state.log.slice(-60),
+    winnerId: state.winnerId
+  };
+}
+function broadcastAll(){
+  state.players.forEach(p=>{
+    const view=buildView(p.id);
+    if(p.id===myId) applyView(view);
+    else if(guestConns[p.id] && guestConns[p.id].open) guestConns[p.id].send({type:'STATE',view});
+  });
+}
+function hostHandleMessage(fromId,msg){
+  if(msg.type==='HELLO'){
+    if(state){ const p=findPlayer(fromId); if(p){ p.connected=true; broadcastAll(); } return; }
+    if(!lobbyPlayers.find(p=>p.id===fromId)) lobbyPlayers.push({id:fromId,name:msg.name||'게스트'});
+    broadcastLobby();
+  } else if(msg.type==='ACTION'){
+    hostHandleAction(fromId,msg.action);
+  }
+}
+function hostHandleAction(pid,action){
+  if(!state) return;
+  switch(action.type){
+    case 'INSTALL_TRAP': hostInstallTrap(pid,action.cardId); break;
+    case 'PASS_TRAP': hostPassTrap(pid); break;
+    case 'DRAW_CARD': hostMainDraw(pid); break;
+    case 'PLAY_ACTION': hostPlayCard(pid,action.cardId,action.targetId,action.targetId2); break;
+    case 'TRIGGER_TRAP': hostTriggerTrap(pid,action.trapCardId,action.targetId); break;
+    case 'PLAY_COUNTER': hostPlayCounter(pid,action.cardId,action.chosenTargetId); break;
+    case 'PROMPT_RESPONSE': hostPromptResponse(pid,action.requestId,action.payload); break;
+    case 'MULTI_RESPONSE': hostMultiResponse(pid,action.requestId,action.payload); break;
+    case 'DECLARE_MT': hostDeclareMuffinTime(pid); break;
+    default: break;
+  }
+}
+function hostInit(playersInfo){
+  const deck=buildDeck();
+  const players=playersInfo.map(pi=>({id:pi.id,name:pi.name,hand:[],traps:[],connected:true}));
+  players.forEach(p=>{ p.hand=deck.splice(deck.length-3,3); });
+  state={
+    players, order:players.map(p=>p.id), turnIndex:0, direction:1, currentId:players[0].id,
+    deck, discard:[], winThreshold:10, phase:'trap',
+    pendingEvent:null, pendingPrompt:null, pendingMultiPrompt:null, promptQueue:[], onQueueDrained:null,
+    ruleFlags:{winRuleAt:null,lockActionsUntil:null,lockWinUntil:null,extraActionsFor:null,extraActionsCount:0},
+    skipSet:{}, log:[], winnerId:null, _counterSeq_val:0, autoTrapQueue:[], forceNextTurnTo:null
+  };
+  addLog('🎮 게임을 시작합니다! 첫 차례: '+nameOf(state.currentId));
+  document.getElementById('lobby').style.display='none';
+  document.getElementById('game').style.display='flex';
+  broadcastAll();
+}
+function dispatchAction(action){
+  if(isHost) hostHandleAction(myId,action);
+  else if(hostConn && hostConn.open) hostConn.send({type:'ACTION',action});
+}
+
+/* =========================================================================
+   5) 게스트 메시지 처리
+   ========================================================================= */
+function guestHandleMessage(msg){
+  if(msg.type==='LOBBY'){ renderLobbyPlayers(msg.players); }
+  else if(msg.type==='STATE'){
+    if(document.getElementById('game').style.display!=='flex'){
+      document.getElementById('lobby').style.display='none';
+      document.getElementById('game').style.display='flex';
     }
+    applyView(msg.view);
+  } else if(msg.type==='TOAST'){ showToast(msg.text); }
+}
 
-    let html = `<button class="ui-btn btn-muffin" id="dyn-muffin-shout-btn">🧁 MUFFIN TIME!</button>`;
-
-    if (hasCards) {
-      html += `
-        <button class="ui-btn btn-green" id="dyn-shuffle-btn">🔲 섞기</button>
-        <button class="ui-btn btn-purple" id="dyn-gather-btn">📥 모으기</button>
-        <button class="ui-btn btn-teal" id="dyn-spread-btn">↔️ 펼치기</button>
-        <button class="ui-btn btn-orange" id="dyn-cut-btn">✂️ 떼어내기</button>
-      `;
-    }
-    if (hasDice) {
-      html += `<button class="ui-btn btn-orange" id="dyn-roll-btn">🎲 주사위 굴리기</button>`;
-    }
-    html += `<button class="ui-btn btn-red" id="dyn-clear-btn">판 비우기</button>`;
-
-    dynamicActionBar.innerHTML = html;
-    dynamicActionBar.style.display = 'flex';
-
-    document.getElementById('dyn-muffin-shout-btn').onclick = declareMuffinTime;
-
-    if (hasCards) {
-      document.getElementById('dyn-shuffle-btn').onclick = () => shuffleCards(true);
-      document.getElementById('dyn-gather-btn').onclick = () => gatherCards(true);
-      document.getElementById('dyn-spread-btn').onclick = () => spreadCards(true);
-      document.getElementById('dyn-cut-btn').onclick = () => cutDeck(true);
-    }
-    if (hasDice) {
-      document.getElementById('dyn-roll-btn').onclick = () => {
-        objects.filter(o => o.userData.type === 'dice').forEach(d => rollDice(d, true));
-      };
-    }
-    document.getElementById('dyn-clear-btn').onclick = () => {
-      objects.forEach(obj => scene.remove(obj));
-      cardSlots.forEach(slot => scene.remove(slot));
-      objects = []; cardSlots = [];
-      clearSelectionGroup();
-      updateDynamicActionBar();
-      broadcastData({ type: 'clear' });
+/* =========================================================================
+   6) UI 렌더링
+   ========================================================================= */
+function showToast(text){
+  const t=document.getElementById('toast'); t.textContent=text; t.style.display='block';
+  clearTimeout(showToast._h);
+  showToast._h=setTimeout(()=>{ t.style.display='none'; },4800);
+}
+function closeModal(){ document.getElementById('modalOverlay').style.display='none'; }
+function animateTimerBar(ms){
+  const inner=document.getElementById('timerBarInner'); if(!inner) return;
+  inner.style.transition='none'; inner.style.width='100%';
+  requestAnimationFrame(()=>{ inner.style.transition='width '+ms+'ms linear'; inner.style.width='0%'; });
+}
+function showModal(title,desc,options,onPick,opts){
+  opts=opts||{};
+  const box=document.getElementById('modalBox'); box.innerHTML='';
+  const h=document.createElement('h3'); h.textContent=title; box.appendChild(h);
+  if(desc){ const d=document.createElement('div'); d.className='desc'; d.textContent=desc; box.appendChild(d); }
+  if(opts.timerMs){ const bar=document.createElement('div'); bar.id='timerBar'; bar.innerHTML='<div id="timerBarInner"></div>'; box.appendChild(bar); animateTimerBar(opts.timerMs); }
+  const list=document.createElement('div'); list.className='choice-list';
+  options.forEach(o=>{
+    const b=document.createElement('button'); b.className='choice-btn'; b.textContent=o.label;
+    b.onclick=()=>{ closeModal(); onPick(o.value); };
+    list.appendChild(b);
+  });
+  box.appendChild(list);
+  if(opts.cancelable!==false){
+    const actions=document.createElement('div'); actions.className='modal-actions';
+    const cb=document.createElement('button'); cb.style.background='#334155'; cb.style.color='#fff'; cb.textContent='취소';
+    cb.onclick=closeModal;
+    actions.appendChild(cb); box.appendChild(actions);
+  }
+  document.getElementById('modalOverlay').style.display='flex';
+}
+function openMultiSelectCards(title,minN,maxN,onDone){
+  const box=document.getElementById('modalBox'); box.innerHTML='';
+  const h=document.createElement('h3'); h.textContent=title; box.appendChild(h);
+  const d=document.createElement('div'); d.className='desc'; d.textContent='카드 '+maxN+'장을 선택하세요.'; box.appendChild(d);
+  let picked=[];
+  const list=document.createElement('div'); list.className='choice-list';
+  myView.myHand.forEach(cid=>{
+    const card=CARD_MAP[cid];
+    const b=document.createElement('button'); b.className='choice-btn'; b.textContent=card.name+' ('+typeLabel(card.type)+')';
+    b.onclick=()=>{
+      const i=picked.indexOf(cid);
+      if(i>=0){ picked.splice(i,1); b.classList.remove('picked'); }
+      else { if(picked.length>=maxN) return; picked.push(cid); b.classList.add('picked'); }
     };
-  }
-  updateDynamicActionBar();
-
-  function createLineMesh(points, colorHex, radius) {
-    if (!points || points.length < 2) return null;
-    const curvePoints = points.map(p => new THREE.Vector3(p.x, 0.28, p.z));
-    const curve = new THREE.CatmullRomCurve3(curvePoints);
-    const geometry = new THREE.TubeGeometry(curve, Math.max(points.length * 2, 8), radius, 6, false);
-    const material = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.4 });
-    return new THREE.Mesh(geometry, material);
-  }
-
-  function addRenderedLine(points, colorHex, radius, customId = null) {
-    const id = customId || ('line_' + (++lineIdCounter));
-    const mesh = createLineMesh(points, colorHex, radius);
-    if (!mesh) return null;
-
-    mesh.userData = { id: id, points: points };
-    scene.add(mesh);
-
-    const lineObj = { id: id, mesh: mesh, points: points };
-    drawnLines.push(lineObj);
-    return lineObj;
-  }
-
-  function deleteSingleLine(lineId, isLocal = true) {
-    const index = drawnLines.findIndex(l => l.id === lineId);
-    if (index !== -1) {
-      scene.remove(drawnLines[index].mesh);
-      if (drawnLines[index].mesh.geometry) drawnLines[index].mesh.geometry.dispose();
-      if (drawnLines[index].mesh.material) drawnLines[index].mesh.material.dispose();
-      drawnLines.splice(index, 1);
-      if (isLocal) broadcastData({ type: 'delete_line', id: lineId });
-    }
-  }
-
-  function clearAllLines(isLocal = true) {
-    drawnLines.forEach(l => {
-      scene.remove(l.mesh);
-      if (l.mesh.geometry) l.mesh.geometry.dispose();
-      if (l.mesh.material) l.mesh.material.dispose();
-    });
-    drawnLines = [];
-    if (isLocal) broadcastData({ type: 'clear_lines' });
-  }
-
-  document.getElementById('muffin-start-btn').addEventListener('click', () => {
-    startMuffinTimeGame(true);
-    propModal.style.display = 'none';
+    list.appendChild(b);
   });
-
-  const penBtn = document.getElementById('pen-mode-btn');
-  const eraserBtn = document.getElementById('eraser-mode-btn');
-  const penToolsPanel = document.getElementById('pen-tools-panel');
-
-  const cursorGeo = new THREE.RingGeometry(0.77, 0.8, 32);
-  cursorGeo.rotateX(-Math.PI / 2);
-  const cursorMat = new THREE.MeshBasicMaterial({ color: 0xff0000, side: THREE.DoubleSide });
-  eraserCursorMesh = new THREE.Mesh(cursorGeo, cursorMat);
-  eraserCursorMesh.position.set(0, 0.29, 0);
-  eraserCursorMesh.visible = false;
-  scene.add(eraserCursorMesh);
-
-  penBtn.addEventListener('click', () => {
-    isPenMode = !isPenMode;
-    penBtn.innerText = isPenMode ? '✏️ 펜 [ON]' : '✏️ 펜 [OFF]';
-    penBtn.classList.toggle('active', isPenMode);
-    penToolsPanel.style.display = isPenMode ? 'flex' : 'none';
-
-    if (isPenMode) {
-      isEraserMode = false; eraserBtn.innerText = '🧹 지우개 [OFF]'; eraserBtn.classList.remove('active');
-      eraserCursorMesh.visible = false;
-      isSelectMode = false; document.getElementById('select-mode-btn').innerText = '🟦 영역 선택 [OFF]'; document.getElementById('select-mode-btn').classList.remove('active');
+  box.appendChild(list);
+  const actions=document.createElement('div'); actions.className='modal-actions';
+  const ok=document.createElement('button'); ok.style.background='#f59e0b'; ok.style.color='#000'; ok.textContent='확인';
+  ok.onclick=()=>{ if(picked.length<Math.min(maxN,myView.myHand.length)){ alert(maxN+'장을 모두 선택하세요.'); return; } closeModal(); onDone(picked); };
+  actions.appendChild(ok); box.appendChild(actions);
+  document.getElementById('modalOverlay').style.display='flex';
+}
+function openTargetPicker(card,callback){
+  const poolFinal=myView.players.filter(p=>p.id!==myView.myId);
+  showModal('대상을 선택하세요','['+card.name+'] '+card.desc, poolFinal.map(p=>({label:p.name,value:p.id})), (picked)=>{
+    if(cardNeedsTarget2(card)){
+      const remain=poolFinal.filter(p=>p.id!==picked);
+      showModal('두 번째 대상을 선택하세요','카드를 받을 사람을 고르세요', remain.map(p=>({label:p.name,value:p.id})), (picked2)=>{ callback(picked,picked2); });
+    } else callback(picked);
+  });
+}
+function tryPlayAction(cid){
+  const card=CARD_MAP[cid];
+  if(!cardNeedsTarget(card)){ dispatchAction({type:'PLAY_ACTION',cardId:cid}); selectedCardForPlay=null; renderHand(); return; }
+  openTargetPicker(card,(t1,t2)=>{ dispatchAction({type:'PLAY_ACTION',cardId:cid,targetId:t1,targetId2:t2}); selectedCardForPlay=null; });
+}
+function openTriggerTrapModal(cid){
+  const card=CARD_MAP[cid];
+  if(card.trigger==='passive') return;
+  if(!cardNeedsTarget(card)){ dispatchAction({type:'TRIGGER_TRAP',trapCardId:cid}); selectedCardForPlay=null; return; }
+  openTargetPicker(card,(t1)=>{ dispatchAction({type:'TRIGGER_TRAP',trapCardId:cid,targetId:t1}); selectedCardForPlay=null; });
+}
+function tryPlayCounter(cid){
+  const card=CARD_MAP[cid];
+  if(card.needsChoiceTarget){
+    openTargetPicker(card,(t1)=>{ dispatchAction({type:'PLAY_COUNTER',cardId:cid,chosenTargetId:t1}); selectedCardForPlay=null; });
+  } else { dispatchAction({type:'PLAY_COUNTER',cardId:cid}); selectedCardForPlay=null; renderHand(); }
+}
+function onHandCardClick(cid){ selectedCardForPlay=(selectedCardForPlay===cid)?null:cid; renderHand(); }
+function addBtn(container,label,cls,fn){
+  const b=document.createElement('button'); b.className='big-btn '+cls; b.style.fontSize='11px'; b.style.padding='9px 10px';
+  b.textContent=label; b.onclick=fn; container.appendChild(b);
+}
+function renderHandActions(){
+  const el=document.getElementById('handActions'); el.innerHTML='';
+  const myTurn=myView.currentId===myView.myId;
+  const busy=myView.phase==='counterWindow'||myView.phase==='promptWait'||myView.phase==='minigame';
+  if(myTurn && myView.phase==='trap' && !busy) addBtn(el,'⏭ 함정 설치 안 함','btn-gray',()=>dispatchAction({type:'PASS_TRAP'}));
+  if(myTurn && myView.phase==='main' && !busy) addBtn(el,'🎴 덱에서 뽑기','btn-teal',()=>dispatchAction({type:'DRAW_CARD'}));
+  if(selectedCardForPlay){
+    const card=CARD_MAP[selectedCardForPlay];
+    if(card.type==='trap' && myTurn && myView.phase==='trap' && !busy){
+      addBtn(el,'🔻 설치하기','btn-red',()=>{ dispatchAction({type:'INSTALL_TRAP',cardId:selectedCardForPlay}); selectedCardForPlay=null; });
+    } else if(card.type==='trap' && card.trigger!=='passive' && !busy){
+      addBtn(el,'⚡ 함정 발동(고발!)','btn-red',()=>openTriggerTrapModal(selectedCardForPlay));
+    } else if((card.type==='action'||card.type==='minigame') && myTurn && myView.phase==='main' && !busy){
+      addBtn(el,'▶ 사용하기','btn-purple',()=>tryPlayAction(selectedCardForPlay));
+    } else if(card.type==='counter' && myView.phase==='counterWindow'){
+      addBtn(el,'🛡 카운터로 막기','btn-teal',()=>tryPlayCounter(selectedCardForPlay));
     }
-  });
-
-  eraserBtn.addEventListener('click', () => {
-    isEraserMode = !isEraserMode;
-    eraserBtn.innerText = isEraserMode ? '🧹 지우개 [ON]' : '🧹 지우개 [OFF]';
-    eraserBtn.classList.toggle('active', isEraserMode);
-    eraserCursorMesh.visible = isEraserMode; 
-
-    if (isEraserMode) {
-      isPenMode = false; penBtn.innerText = '✏️ 펜 [OFF]'; penBtn.classList.remove('active');
-      penToolsPanel.style.display = 'none';
-      isSelectMode = false; document.getElementById('select-mode-btn').innerText = '🟦 영역 선택 [OFF]'; document.getElementById('select-mode-btn').classList.remove('active');
-    }
-  });
-
-  document.querySelectorAll('.color-dot').forEach(dot => {
-    dot.addEventListener('click', () => {
-      document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('selected'));
-      dot.classList.add('selected');
-      selectedPenColor = parseInt(dot.getAttribute('data-color'), 16);
-    });
-  });
-
-  document.querySelectorAll('.size-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('selected'));
-      btn.classList.add('selected');
-      selectedPenRadius = parseFloat(btn.getAttribute('data-size'));
-    });
-  });
-
-  document.getElementById('clear-lines-btn').addEventListener('click', () => clearAllLines(true));
-
-  const chatHeader = document.getElementById('chat-header');
-  const chatBody = document.getElementById('chat-body');
-  const chatToggleIcon = document.getElementById('chat-toggle-icon');
-  const chatInput = document.getElementById('chat-input');
-  const chatSendBtn = document.getElementById('chat-send-btn');
-  const chatMessages = document.getElementById('chat-messages');
-
-  let isChatExpanded = true;
-  chatHeader.addEventListener('click', () => {
-    isChatExpanded = !isChatExpanded;
-    chatBody.style.height = isChatExpanded ? '180px' : '0px';
-    chatToggleIcon.innerText = isChatExpanded ? '▼' : '▲';
-  });
-
-  function addChatMessage(sender, text, isMe = false, isSystem = false) {
-    const div = document.createElement('div');
-    div.classList.add('chat-msg');
-    if (isSystem) {
-      div.classList.add('system');
-      div.innerText = text;
-    } else {
-      if (isMe) div.classList.add('me');
-      div.innerHTML = `<span class="sender">${sender}:</span><span>${escapeHtml(text)}</span>`;
-    }
-    chatMessages.appendChild(div);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
+    addBtn(el,'선택 취소','btn-gray',()=>{ selectedCardForPlay=null; renderHand(); });
   }
-
-  function escapeHtml(str) { return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
-
-  function handleSendChat() {
-    const text = chatInput.value.trim();
-    if (!text) return;
-    const myLabel = `P${mySeat}`;
-    addChatMessage(myLabel, text, true);
-    broadcastData({ type: 'chat', sender: myLabel, text: text });
-    chatInput.value = '';
-  }
-
-  chatSendBtn.addEventListener('click', handleSendChat);
-  chatInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') handleSendChat(); });
-
-  const propModal = document.getElementById('prop-modal');
-  document.getElementById('prop-menu-btn').addEventListener('click', (e) => {
-    e.stopPropagation();
-    propModal.style.display = (propModal.style.display === 'flex') ? 'none' : 'flex';
+  if(myView.myHand.length===myView.winThreshold && !busy) addBtn(el,'🧁 머핀타임 선언!','btn-amber',()=>dispatchAction({type:'DECLARE_MT'}));
+}
+function renderHand(){
+  const el=document.getElementById('hand'); el.innerHTML='';
+  myView.myHand.forEach(cid=>{
+    const card=CARD_MAP[cid];
+    const d=document.createElement('div');
+    d.className='card '+card.type+(selectedCardForPlay===cid?' selected':'');
+    d.innerHTML='<div class="tag">'+typeLabel(card.type)+'</div><div class="cname">'+esc(card.name)+'</div><div class="cen">'+esc(card.en)+'</div><div class="cdesc">'+esc(card.desc)+'</div>';
+    d.onclick=()=>onHandCardClick(cid);
+    el.appendChild(d);
   });
-  document.addEventListener('click', () => { propModal.style.display = 'none'; });
-
-  document.getElementById('add-card-btn').addEventListener('click', () => createCard());
-  document.getElementById('add-muffin-card-btn').addEventListener('click', () => createMuffinCard());
-  document.getElementById('add-deck-btn').addEventListener('click', () => spawnFullDeck(true));
-  document.getElementById('add-dice-btn').addEventListener('click', () => createDice());
-
-  document.getElementById('add-slot-btn').addEventListener('click', () => {
-    const input = prompt('생성할 슬롯(순서 칸)의 개수를 입력하세요:', '5');
-    const count = parseInt(input, 10);
-    if (!isNaN(count) && count > 0) createSlotLine(count, true);
-  });
-
-  document.getElementById('player-seat-select').addEventListener('change', (e) => {
-    mySeat = parseInt(e.target.value, 10);
-    updateCameraPosition();
-    controls.target.set(0, 0.2, 0);
-    objects.filter(o => o.userData.type === 'card').forEach(c => {
-      alignCardRotationBySeat(c);
-      updateHandVisibility(c);
-    });
-  });
-
-  let isSelectMode = false;
-  const selectBtn = document.getElementById('select-mode-btn');
-  selectBtn.addEventListener('click', () => {
-    isSelectMode = !isSelectMode;
-    selectBtn.innerText = isSelectMode ? '🟦 영역 선택 [ON]' : '🟦 영역 선택 [OFF]';
-    selectBtn.classList.toggle('active', isSelectMode);
-    if (isSelectMode) {
-      isPenMode = false; penBtn.innerText = '✏️ 펜 [OFF]'; penBtn.classList.remove('active'); penToolsPanel.style.display = 'none';
-      isEraserMode = false; eraserBtn.innerText = '🧹 지우개 [OFF]'; eraserBtn.classList.remove('active'); eraserCursorMesh.visible = false;
-    }
-  });
-
-  let isCamModeAlwaysOn = false;
-  const camBtn = document.getElementById('cam-mode-btn');
-  camBtn.addEventListener('click', () => {
-    isCamModeAlwaysOn = !isCamModeAlwaysOn;
-    camBtn.classList.toggle('active', isCamModeAlwaysOn);
-  });
-
-  const raycaster = new THREE.Raycaster();
-  const touch = new THREE.Vector2();
-  let selectedObj = null;
-  let groupDragOffsets = [];
-  const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -CARD_BASE_Y);
-  const boardPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -0.28);
-
-  let touchStartTime = 0;
-  let touchStartPos = { x: 0, y: 0 };
-  let isBoxSelecting = false;
-  const selectBox = document.getElementById('select-box');
-
-  function checkEraserAtPoint(touchVec) {
-    raycaster.setFromCamera(touchVec, camera);
-    const hitPoint = new THREE.Vector3();
-    if (raycaster.ray.intersectPlane(boardPlane, hitPoint)) {
-      eraserCursorMesh.position.set(hitPoint.x, 0.29, hitPoint.z);
-      const ERASER_RADIUS = 0.8;
-      let checkPoints = [hitPoint.clone()];
-      if (lastEraserPoint) {
-        const dist = hitPoint.distanceTo(lastEraserPoint);
-        const steps = Math.ceil(dist / 0.15);
-        for (let s = 1; s <= steps; s++) {
-          checkPoints.push(new THREE.Vector3().lerpVectors(lastEraserPoint, hitPoint, s / steps));
-        }
-      }
-      lastEraserPoint = hitPoint.clone();
-
-      for (let i = drawnLines.length - 1; i >= 0; i--) {
-        const line = drawnLines[i];
-        const isTouched = line.points.some(pt => checkPoints.some(cPt => Math.hypot(pt.x - cPt.x, pt.z - cPt.z) < ERASER_RADIUS));
-        if (isTouched) deleteSingleLine(line.id, true);
-      }
-    }
+  renderHandActions();
+}
+function renderTrapRow(){
+  const el=document.getElementById('trapRow'); el.innerHTML='';
+  for(let i=0;i<3;i++){
+    const cid=myView.myTraps[i]; const d=document.createElement('div');
+    if(cid){ d.className='trap-slot'; d.textContent=CARD_MAP[cid].name; d.onclick=()=>openTriggerTrapModal(cid); }
+    else { d.className='trap-slot empty'; d.textContent='빈 슬롯'; }
+    el.appendChild(d);
   }
-
-  function showCardPreview(card) {
-    const modal = document.getElementById('card-preview-modal');
-    const canvas = document.getElementById('preview-canvas');
-    const ctx = canvas.getContext('2d');
-
-    if (card.userData.cardType === 'muffin' && card.userData.cardData) {
-      const data = card.userData.cardData;
-      ctx.fillStyle = '#1e293b'; ctx.fillRect(0, 0, 200, 280);
-      ctx.fillStyle = data.color; ctx.fillRect(8, 8, 184, 264);
-      ctx.fillStyle = '#ffffff'; ctx.fillRect(14, 14, 172, 252);
-
-      ctx.fillStyle = data.color; ctx.fillRect(14, 14, 172, 40);
-      ctx.fillStyle = '#ffffff'; ctx.font = 'bold 15px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText(data.title, 100, 34);
-
-      ctx.font = '36px sans-serif'; ctx.fillText('🧁', 100, 110);
-
-      ctx.fillStyle = '#0f172a'; ctx.font = 'bold 12px sans-serif';
-      wrapText(ctx, data.desc, 100, 160, 150, 16);
-
-      document.getElementById('preview-title').innerText = data.title;
-      document.getElementById('preview-desc').innerText = `유형: ${data.type.toUpperCase()}`;
-    } else {
-      ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, 200, 280);
-      ctx.fillStyle = (card.userData.suit === '♥' || card.userData.suit === '♦') ? '#dc2626' : '#1e293b';
-      ctx.font = 'bold 30px sans-serif'; ctx.textAlign = 'center';
-      ctx.fillText(`${card.userData.value} ${card.userData.suit}`, 100, 140);
-
-      document.getElementById('preview-title').innerText = `${card.userData.value} ${card.userData.suit}`;
-      document.getElementById('preview-desc').innerText = '일반 트럼프 카드';
-    }
-    modal.style.display = 'flex';
+}
+function renderPlayersStrip(){
+  const el=document.getElementById('playersStrip'); el.innerHTML='';
+  myView.players.forEach(p=>{
+    const div=document.createElement('div');
+    div.className='player-chip'+(p.id===myView.myId?' me':'')+(p.id===myView.currentId?' current':'');
+    div.innerHTML='<div class="nm">'+(p.id===myView.myId?'⭐':'')+esc(p.name)+'</div><div class="stat">🎴'+p.handCount+' 🔺'+p.trapCount+(p.connected===false?' ⚠️':'')+'</div>';
+    el.appendChild(div);
+  });
+}
+function renderLog(){
+  const el=document.getElementById('logPanel');
+  el.innerHTML=myView.log.map(t=>'<div>'+esc(t)+'</div>').join('');
+  el.scrollTop=el.scrollHeight;
+}
+function openHoldDuelModal(mp){
+  const box=document.getElementById('modalBox'); box.innerHTML='';
+  const h=document.createElement('h3'); h.textContent='😤 숨참기 대결!'; box.appendChild(h);
+  const d=document.createElement('div'); d.className='desc'; d.textContent='버튼을 최대한 오래 누르고 있다가 떼세요.'; box.appendChild(d);
+  const btn=document.createElement('button'); btn.className='big-btn btn-red'; btn.style.width='100%'; btn.style.padding='34px 10px'; btn.textContent='꾹 누르고 있기';
+  let startTs=null, done=false;
+  const startFn=(e)=>{ if(e.cancelable) e.preventDefault(); if(done) return; startTs=Date.now(); btn.textContent='버티는 중...'; };
+  const endFn=()=>{ if(done||!startTs) return; done=true; const dur=Date.now()-startTs; closeModal(); dispatchAction({type:'MULTI_RESPONSE',requestId:mp.id,payload:{duration:dur}}); };
+  btn.addEventListener('touchstart',startFn,{passive:false}); btn.addEventListener('mousedown',startFn);
+  btn.addEventListener('touchend',endFn); btn.addEventListener('mouseup',endFn);
+  box.appendChild(btn);
+  document.getElementById('modalOverlay').style.display='flex';
+}
+function openReactionModal(mp){
+  const box=document.getElementById('modalBox'); box.innerHTML='';
+  const h=document.createElement('h3'); h.textContent='⏳ 준비...!'; box.appendChild(h);
+  const d=document.createElement('div'); d.className='desc'; d.textContent='버튼이 활성화되면 최대한 빨리 누르세요!'; box.appendChild(d);
+  const btn=document.createElement('button'); btn.className='big-btn btn-gray'; btn.style.width='100%'; btn.style.padding='34px 10px'; btn.textContent='대기...'; btn.disabled=true;
+  box.appendChild(btn);
+  document.getElementById('modalOverlay').style.display='flex';
+  const wait=600+Math.random()*1600;
+  setTimeout(()=>{
+    if(document.getElementById('modalOverlay').style.display!=='flex') return;
+    btn.disabled=false; btn.className='big-btn btn-amber'; btn.textContent='지금 탭!';
+    let tapped=false;
+    const tapFn=()=>{ if(tapped) return; tapped=true; closeModal(); dispatchAction({type:'MULTI_RESPONSE',requestId:mp.id,payload:{ts:Date.now()}}); };
+    btn.addEventListener('touchstart',tapFn); btn.addEventListener('click',tapFn);
+  },wait);
+}
+function openMultiPromptModal(mp){
+  if(mp.type==='rpsChoice'){
+    showModal('✊✋✌️ 가위바위보!','상대와 동시에 낼 것을 고르세요.', [{label:'✊ 바위',value:'rock'},{label:'✋ 보',value:'paper'},{label:'✌️ 가위',value:'scissors'}], (v)=>dispatchAction({type:'MULTI_RESPONSE',requestId:mp.id,payload:{choice:v}}), {cancelable:false});
+  } else if(mp.type==='holdDuel'){ openHoldDuelModal(mp); }
+  else if(mp.type==='reactionRace'){ openReactionModal(mp); }
+  else if(mp.type==='secretVote'){
+    const opts=myView.players.map(p=>({label:p.name,value:p.id}));
+    showModal('🤫 한 명을 몰래 지목하세요','다른 사람에게는 결과가 보이지 않아요.', opts, (v)=>dispatchAction({type:'MULTI_RESPONSE',requestId:mp.id,payload:{votedId:v}}), {cancelable:false});
   }
-
-  document.getElementById('card-preview-modal').onclick = () => {
-    document.getElementById('card-preview-modal').style.display = 'none';
-  };
-
-  function onTouchStart(e) {
-    if (e.target.closest('#top-bar, #bottom-info, #prop-modal, #dynamic-action-bar, #chat-container, #pen-tools-panel, #card-preview-modal')) return;
-
-    if (isCamModeAlwaysOn || (e.touches && e.touches.length > 1)) {
-      selectedObj = null; controls.enabled = true; return;
-    }
-
-    const pos = getTouchPos(e);
-    touch.x = pos.x; touch.y = pos.y;
-    touchStartTime = Date.now();
-    touchStartPos = { x: pos.rawX, y: pos.rawY };
-
-    if (isEraserMode) {
-      controls.enabled = false; lastEraserPoint = null; checkEraserAtPoint(touch); return;
-    }
-
-    if (isPenMode) {
-      controls.enabled = false;
-      raycaster.setFromCamera(touch, camera);
-      const hitPoint = new THREE.Vector3();
-      if (raycaster.ray.intersectPlane(boardPlane, hitPoint)) {
-        currentLinePoints = [{ x: hitPoint.x, z: hitPoint.z }];
-        currentLineMesh = createLineMesh([{ x: hitPoint.x, z: hitPoint.z }, { x: hitPoint.x + 0.001, z: hitPoint.z + 0.001 }], selectedPenColor, selectedPenRadius);
-        if (currentLineMesh) scene.add(currentLineMesh);
-      }
-      return;
-    }
-
-    if (isSelectMode) {
-      isBoxSelecting = true; controls.enabled = false;
-      selectBox.style.left = pos.rawX + 'px'; selectBox.style.top = pos.rawY + 'px';
-      selectBox.style.width = '0px'; selectBox.style.height = '0px'; selectBox.style.display = 'block';
-      return;
-    }
-
-    raycaster.setFromCamera(touch, camera);
-    const intersects = raycaster.intersectObjects(objects);
-
-    if (intersects.length > 0) {
-      const hitObj = intersects[0].object;
-      if (hitObj.userData.isLocked) { controls.enabled = true; return; }
-
-      selectedObj = hitObj;
-      selectedObj.userData.lastMovedTime = Date.now();
-
-      if (selectedGroup.includes(selectedObj)) {
-        groupDragOffsets = selectedGroup.map(obj => ({
-          obj: obj, offsetX: obj.position.x - selectedObj.position.x, offsetZ: obj.position.z - selectedObj.position.z
-        }));
-      } else {
-        clearSelectionGroup();
-        groupDragOffsets = [{ obj: selectedObj, offsetX: 0, offsetZ: 0 }];
-      }
-      controls.enabled = false;
-    } else {
-      clearSelectionGroup(); selectedObj = null; controls.enabled = true;
-    }
+}
+function openPromptModal(p){
+  if(p.type==='chooseDiscard'){
+    let n=p.payload.n; if(n==='all') n=myView.myHand.length; if(n==='allButOne') n=Math.max(0,myView.myHand.length-1);
+    if(n<=0){ dispatchAction({type:'PROMPT_RESPONSE',requestId:p.id,payload:{cardIds:[]}}); return; }
+    openMultiSelectCards('🗑 카드 '+n+'장 버리기', n, n, (chosen)=>dispatchAction({type:'PROMPT_RESPONSE',requestId:p.id,payload:{cardIds:chosen}}));
+  } else if(p.type==='chooseGive'){
+    openMultiSelectCards('🎁 카드 '+p.payload.n+'장 건네주기', p.payload.n, p.payload.n, (chosen)=>dispatchAction({type:'PROMPT_RESPONSE',requestId:p.id,payload:{cardIds:chosen}}));
+  } else if(p.type==='pickFromReveal'){
+    showModal('👀 카드 1장 선택','아래 카드 중 1장을 가져가세요.', p.payload.options.map(cid=>({label:CARD_MAP[cid].name+' ('+CARD_MAP[cid].en+')',value:cid})), (v)=>dispatchAction({type:'PROMPT_RESPONSE',requestId:p.id,payload:{cardId:v}}), {cancelable:false});
+  } else if(p.type==='pickTrapSlot'){
+    const opts=[]; for(let i=0;i<p.payload.slotCount;i++) opts.push({label:'함정 슬롯 '+(i+1)+' (비공개)',value:i});
+    showModal('🔻 가져올 함정 카드 선택','내용은 모르지만 하나를 골라 가져옵니다.', opts, (v)=>dispatchAction({type:'PROMPT_RESPONSE',requestId:p.id,payload:{slot:v}}), {cancelable:false});
+  } else if(p.type==='selfJudge'){
+    showModal('🙋 판정', p.payload.judgeText||'조건이 성립했나요?', [{label:'✅ 성공(조건 불충족)',value:true},{label:'❌ 실패(조건 충족)',value:false}], (v)=>dispatchAction({type:'PROMPT_RESPONSE',requestId:p.id,payload:{success:v}}), {cancelable:false});
+  } else if(p.type==='selfJudgeWinner'){
+    const ev=myView.pendingEvent||{};
+    const meName=(myView.players.find(x=>x.id===myView.myId)||{}).name||'나';
+    const oppName=(myView.players.find(x=>x.id===ev.targetId)||{}).name||'상대';
+    showModal('🏅 승자 선택','실제로 이긴 사람을 정직하게 골라주세요.', [{label:'나 ('+meName+')',value:myView.myId},{label:oppName,value:ev.targetId},{label:'무승부',value:null}], (v)=>dispatchAction({type:'PROMPT_RESPONSE',requestId:p.id,payload:{winnerId:v}}), {cancelable:false});
+  } else if(p.type==='guessCount'){
+    const opts=[]; for(let i=0;i<=8;i++) opts.push({label:i+'장',value:i});
+    showModal('🎯 행동 카드 개수 맞히기','상대의 행동/미니게임 카드가 몇 장인지 맞혀보세요.', opts, (v)=>dispatchAction({type:'PROMPT_RESPONSE',requestId:p.id,payload:{guess:v}}), {cancelable:false});
+  } else if(p.type==='stealOrDraw'){
+    showModal('🤔 선택하세요','상대 카드를 빼앗을까요, 덱에서 뽑을까요?', [{label:'🃏 상대에게서 '+p.payload.n+'장 빼앗기',value:'steal'},{label:'🎴 덱에서 '+p.payload.n+'장 뽑기',value:'draw'}], (v)=>dispatchAction({type:'PROMPT_RESPONSE',requestId:p.id,payload:{choice:v}}), {cancelable:false});
   }
-
-  function onTouchMove(e) {
-    if (e.target.closest('#top-bar, #bottom-info, #prop-modal, #dynamic-action-bar, #chat-container, #pen-tools-panel, #card-preview-modal')) return;
-    const pos = getTouchPos(e);
-
-    if (isEraserMode) { touch.x = pos.x; touch.y = pos.y; checkEraserAtPoint(touch); return; }
-
-    if (isPenMode && currentLineMesh) {
-      touch.x = pos.x; touch.y = pos.y;
-      raycaster.setFromCamera(touch, camera);
-      const hitPoint = new THREE.Vector3();
-      if (raycaster.ray.intersectPlane(boardPlane, hitPoint)) {
-        const lastPt = currentLinePoints[currentLinePoints.length - 1];
-        if (Math.hypot(hitPoint.x - lastPt.x, hitPoint.z - lastPt.z) > 0.08) {
-          currentLinePoints.push({ x: hitPoint.x, z: hitPoint.z });
-          scene.remove(currentLineMesh);
-          currentLineMesh = createLineMesh(currentLinePoints, selectedPenColor, selectedPenRadius);
-          if (currentLineMesh) scene.add(currentLineMesh);
-        }
-      }
-      return;
+}
+function renderPrompts(){
+  if(myView.phase==='counterWindow' && myView.pendingEvent){
+    const key=myView.pendingEvent.cardId+'|'+myView.pendingEvent.sourceId+'|'+(myView.pendingEvent.targetId||'');
+    if(lastCounterEventKey!==key){
+      lastCounterEventKey=key;
+      const myCounters=myView.myHand.filter(c=>CARD_MAP[c].type==='counter');
+      if(myCounters.length>0) showToast('⚠️ ['+CARD_MAP[myView.pendingEvent.cardId].name+']에 카운터를 낼 수 있어요! 카드 선택 후 "카운터로 막기"를 누르세요.');
+      else showToast('⏳ ['+CARD_MAP[myView.pendingEvent.cardId].name+'] 처리 대기 중...');
     }
+  } else lastCounterEventKey=null;
 
-    if (isBoxSelecting) {
-      const left = Math.min(touchStartPos.x, pos.rawX);
-      const top = Math.min(touchStartPos.y, pos.rawY);
-      const width = Math.abs(pos.rawX - touchStartPos.x);
-      const height = Math.abs(pos.rawY - touchStartPos.y);
-      selectBox.style.left = left + 'px'; selectBox.style.top = top + 'px';
-      selectBox.style.width = width + 'px'; selectBox.style.height = height + 'px';
-      return;
-    }
-
-    if (!selectedObj || selectedObj.userData.isLocked) return;
-
-    touch.x = pos.x; touch.y = pos.y;
-    raycaster.setFromCamera(touch, camera);
-    const target = new THREE.Vector3();
-    raycaster.ray.intersectPlane(plane, target);
-
-    groupDragOffsets.forEach(item => {
-      item.obj.position.x = target.x + item.offsetX;
-      item.obj.position.z = target.z + item.offsetZ;
-
-      if (item.obj.userData.type === 'card') {
-        alignCardRotationBySeat(item.obj);
-        updateHandVisibility(item.obj);
-      }
-      sendMoveData(item.obj);
-    });
-
-    updateStacking();
+  if(myView.myPrompt && myView.myPrompt.id!==lastHandledPromptId){ lastHandledPromptId=myView.myPrompt.id; openPromptModal(myView.myPrompt); }
+  if(myView.myMultiPrompt && myView.myMultiPrompt.id!==lastHandledMultiId){ lastHandledMultiId=myView.myMultiPrompt.id; openMultiPromptModal(myView.myMultiPrompt); }
+}
+function renderAll(){
+  if(!myView) return;
+  document.getElementById('deckCount').textContent=myView.deckCount;
+  document.getElementById('discardTop').textContent=myView.discardTopId?CARD_MAP[myView.discardTopId].name:'-';
+  document.getElementById('winThresholdView').textContent=myView.winThreshold;
+  document.getElementById('myHandCount').textContent=myView.myHand.length;
+  document.getElementById('myTrapCount').textContent=myView.myTraps.length;
+  const cur=myView.players.find(p=>p.id===myView.currentId);
+  document.getElementById('turnIndicator').textContent=(myView.currentId===myView.myId)?'🔥 내 차례!':(cur?cur.name+'님 차례':'대기중');
+  renderPlayersStrip();
+  renderTrapRow();
+  renderHand();
+  renderLog();
+  renderPrompts();
+  if(myView.winnerId){
+    const w=myView.players.find(p=>p.id===myView.winnerId);
+    document.getElementById('winText').textContent='🎉 '+(w?w.name:'???')+' 승리! 🎉';
+    document.getElementById('winOverlay').style.display='flex';
   }
+}
+function applyView(view){ myView=view; renderAll(); }
 
-  function onTouchEnd(e) {
-    const pos = getTouchPos(e);
-
-    if (isEraserMode) { lastEraserPoint = null; controls.enabled = true; return; }
-
-    if (isPenMode && currentLineMesh) {
-      scene.remove(currentLineMesh);
-      if (currentLinePoints.length >= 2) {
-        const lineObj = addRenderedLine(currentLinePoints, selectedPenColor, selectedPenRadius);
-        if (lineObj) {
-          broadcastData({ type: 'draw_line', id: lineObj.id, points: currentLinePoints, color: selectedPenColor, radius: selectedPenRadius });
-        }
-      }
-      currentLineMesh = null; currentLinePoints = []; controls.enabled = true; return;
-    }
-
-    if (isBoxSelecting) {
-      isBoxSelecting = false; selectBox.style.display = 'none'; controls.enabled = true; clearSelectionGroup();
-      const minX = Math.min(touchStartPos.x, pos.rawX), maxX = Math.max(touchStartPos.x, pos.rawX);
-      const minY = Math.min(touchStartPos.y, pos.rawY), maxY = Math.max(touchStartPos.y, pos.rawY);
-
-      objects.forEach(obj => {
-        const screenPos = obj.position.clone().project(camera);
-        const x = (screenPos.x * 0.5 + 0.5) * window.innerWidth;
-        const y = (-screenPos.y * 0.5 + 0.5) * window.innerHeight;
-        if (x >= minX && x <= maxX && y >= minY && y <= maxY) {
-          selectedGroup.push(obj);
-          const outlineMesh = new THREE.Mesh(new THREE.BoxGeometry(0.99, 0.04, 1.44), new THREE.MeshBasicMaterial({ color: 0x10b981, wireframe: true }));
-          obj.add(outlineMesh); obj.userData.outlineMesh = outlineMesh;
-        }
+/* =========================================================================
+   7) 로비 / 부트스트랩
+   ========================================================================= */
+function genShortId(){ const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let r=''; for(let i=0;i<4;i++) r+=chars.charAt(Math.floor(Math.random()*chars.length)); return r; }
+function renderLobbyPlayers(list){
+  const el=document.getElementById('lobbyPlayers'); el.innerHTML='';
+  list.forEach(p=>{ const d=document.createElement('div'); d.className='lobby-player-row'; d.innerHTML='<span>'+esc(p.name)+'</span><span>'+(p.id===myId?'(나)':'')+'</span>'; el.appendChild(d); });
+}
+function broadcastLobby(){
+  Object.keys(guestConns).forEach(pid=>{ if(guestConns[pid].open) guestConns[pid].send({type:'LOBBY',players:lobbyPlayers}); });
+  renderLobbyPlayers(lobbyPlayers);
+}
+document.getElementById('createRoomBtn').onclick=()=>{
+  myName=(document.getElementById('nickInput').value||'호스트').slice(0,8) || '호스트';
+  isHost=true;
+  peer=new Peer(genShortId());
+  peer.on('open',id=>{
+    myId=id;
+    document.getElementById('myRoomIdBox').style.display='block';
+    document.getElementById('myRoomIdBox').textContent=id;
+    document.getElementById('createRoomBtn').style.display='none';
+    document.getElementById('startGameBtn').style.display='block';
+    lobbyPlayers=[{id:myId,name:myName}];
+    broadcastLobby();
+  });
+  peer.on('connection',conn=>{
+    conn.on('open',()=>{
+      guestConns[conn.peer]=conn;
+      conn.on('data',data=>hostHandleMessage(conn.peer,data));
+      conn.on('close',()=>{
+        delete guestConns[conn.peer];
+        lobbyPlayers=lobbyPlayers.filter(p=>p.id!==conn.peer);
+        broadcastLobby();
       });
-      return;
-    }
-
-    if (selectedObj && !selectedObj.userData.isLocked) {
-      const touchDuration = Date.now() - touchStartTime;
-      const lastPos = e.changedTouches ? e.changedTouches[0] : e;
-      const dist = Math.hypot(lastPos.clientX - touchStartPos.x, lastPos.clientY - touchStartPos.y);
-
-      if (selectedGroup.length > 0) {
-        snapCardsToSlots(selectedGroup.filter(o => o.userData.type === 'card'));
-      } else if (selectedObj.userData.type === 'card') {
-        snapCardsToSlots(selectedObj);
-      }
-
-      if (touchDuration < 300 && dist < 10) {
-        if (selectedObj.userData.type === 'card') {
-          showCardPreview(selectedObj);
-        } else if (selectedObj.userData.type === 'dice') {
-          rollDice(selectedObj, true);
-        }
-      }
-
-      updateStacking();
-    }
-    selectedObj = null; controls.enabled = true;
-  }
-
-  function getTouchPos(e) {
-    const t = e.touches ? e.touches[0] : e;
-    return { x: (t.clientX / window.innerWidth) * 2 - 1, y: -(t.clientY / window.innerHeight) * 2 + 1, rawX: t.clientX, rawY: t.clientY };
-  }
-
-  window.addEventListener('touchstart', onTouchStart, { passive: false });
-  window.addEventListener('touchmove', onTouchMove, { passive: false });
-  window.addEventListener('touchend', onTouchEnd, false);
-  window.addEventListener('mousedown', onTouchStart, false);
-  window.addEventListener('mousemove', onTouchMove, false);
-  window.addEventListener('mouseup', onTouchEnd, false);
-
-  function sendMoveData(obj) {
-    const isInsideMyZone = isPositionInSeatZone(obj.position.x, obj.position.z, mySeat);
-    let isFlippedForOthers = obj.userData.isFlipped;
-    
-    if (obj.userData.type === 'card') {
-      if (isInsideMyZone) {
-        isFlippedForOthers = true;
-      } else {
-        const seat = getSeatFromPosition(obj.position.x, obj.position.z);
-        if (seat !== 0 && seat !== mySeat) isFlippedForOthers = true;
-      }
-    }
-
-    broadcastData({ 
-      type: 'move', id: obj.userData.id, 
-      x: obj.position.x, z: obj.position.z, 
-      rotY: obj.rotation.y, isFlipped: isFlippedForOthers 
     });
-  }
-
-  function rollDice(dice, isLocal = false, targetRot = null) {
-    if (dice.userData.isRolling) return;
-    dice.userData.isRolling = true;
-    const rotX = targetRot ? targetRot.x : Math.floor(Math.random() * 4) * (Math.PI / 2) + Math.PI * 4;
-    const rotY = targetRot ? targetRot.y : Math.floor(Math.random() * 4) * (Math.PI / 2) + Math.PI * 4;
-    const rotZ = targetRot ? targetRot.z : Math.floor(Math.random() * 4) * (Math.PI / 2) + Math.PI * 4;
-    const startRot = { x: dice.rotation.x, y: dice.rotation.y, z: dice.rotation.z };
-    let progress = 0;
-
-    function animateRoll() {
-      progress += 0.04;
-      dice.rotation.x = THREE.MathUtils.lerp(startRot.x, rotX, progress);
-      dice.rotation.y = THREE.MathUtils.lerp(startRot.y, rotY, progress);
-      dice.rotation.z = THREE.MathUtils.lerp(startRot.z, rotZ, progress);
-      dice.position.y = 0.61 + Math.abs(Math.sin(progress * Math.PI * 2)) * (1 - progress) * 2;
-      if (progress < 1) requestAnimationFrame(animateRoll);
-      else { dice.position.y = 0.61; dice.userData.isRolling = false; }
-    }
-    animateRoll();
-    if (isLocal) broadcastData({ type: 'roll', id: dice.userData.id, targetRot: { x: rotX, y: rotY, z: rotZ } });
-  }
-
-  function generateShortId() {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    let result = '';
-    for (let i = 0; i < 4; i++) result += chars.charAt(Math.floor(Math.random() * chars.length));
-    return result;
-  }
-
-  const shortId = generateShortId();
-  const peer = new Peer(shortId);
-  const connections = [];
-
-  peer.on('open', id => document.getElementById('my-id').innerText = id);
-  peer.on('connection', conn => {
-    connections.push(conn);
-    setupConnection(conn);
-    addChatMessage('시스템', '새 플레이어가 멀티플레이어 테이블에 입장했습니다.', false, true);
   });
+};
 
-  document.getElementById('connect-btn').addEventListener('click', () => {
-    const targetId = document.getElementById('join-id').value.toUpperCase().trim();
-    if (targetId) {
-      const conn = peer.connect(targetId);
-      connections.push(conn);
-      setupConnection(conn);
-    }
-  });
-
-  function setupConnection(conn) {
-    document.getElementById('status').innerText = `(${connections.length}명 연결됨)`;
-    document.getElementById('status').style.color = '#10b981';
-
-    conn.on('data', data => handleNetworkData(data));
-    conn.on('close', () => {
-      const idx = connections.indexOf(conn);
-      if (idx !== -1) connections.splice(idx, 1);
-      document.getElementById('status').innerText = connections.length > 0 ? `(${connections.length}명 연결됨)` : '(대기중)';
-      addChatMessage('시스템', '플레이어 한 명이 퇴장했습니다.', false, true);
+document.getElementById('joinRoomBtn').onclick=()=>{
+  const targetId=(document.getElementById('joinIdInput').value||'').toUpperCase().trim();
+  if(!targetId) return;
+  myName=(document.getElementById('nickInput').value||'게스트').slice(0,8) || '게스트';
+  isHost=false;
+  peer=new Peer();
+  peer.on('open',id=>{
+    myId=id;
+    hostConn=peer.connect(targetId);
+    hostConn.on('open',()=>{
+      hostConn.send({type:'HELLO',name:myName});
+      document.getElementById('lobbyStatus').textContent='방에 연결되었습니다. 호스트가 게임을 시작하길 기다리는 중...';
     });
-  }
-
-  function broadcastData(data) {
-    connections.forEach(conn => { if (conn.open) conn.send(data); });
-  }
-
-  function handleNetworkData(data) {
-    if (data.type === 'chat') {
-      addChatMessage(data.sender, data.text, false);
-    } else if (data.type === 'muffin_start') {
-      startMuffinTimeGame(false);
-    } else if (data.type === 'muffin_announce') {
-      addChatMessage('시스템', `🎉 P${data.seat} 님이 "MUFFIN TIME!" 을 외쳤습니다! (${data.count}장 보유)`, false, true);
-    } else if (data.type === 'draw_line') {
-      addRenderedLine(data.points, data.color, data.radius, data.id);
-    } else if (data.type === 'delete_line') {
-      deleteSingleLine(data.id, false);
-    } else if (data.type === 'clear_lines') {
-      clearAllLines(false);
-    } else if (data.type === 'clear') {
-      objects.forEach(obj => scene.remove(obj));
-      cardSlots.forEach(slot => scene.remove(slot));
-      objects = []; cardSlots = [];
-      clearSelectionGroup();
-      updateDynamicActionBar();
-    } else if (data.type === 'create_slots') {
-      createSlotLine(data.count, false);
-    } else if (data.type === 'reset_deck') {
-      spawnFullDeck(false);
-    } else if (data.type === 'spawn') {
-      if (data.propType === 'muffin_card') createMuffinCard(data.x, data.z, false, data.cardData, data.id);
-      else if (data.propType === 'card') createCard(data.x, data.z, false, data.suit, data.value, data.id);
-      else if (data.propType === 'dice') createDice(data.x, data.z, false, data.id);
-    } else if (data.type === 'shuffle') {
-      shuffleCards(false);
-    } else if (data.type === 'gather') {
-      gatherCards(false);
-    } else if (data.type === 'spread') {
-      spreadCards(false);
-    } else if (data.type === 'cut') {
-      cutDeck(false);
-    } else {
-      const targetObj = objects.find(o => o.userData.id === data.id);
-      if (!targetObj) return;
-      if (data.type === 'move') {
-        targetObj.position.x = data.x;
-        targetObj.position.z = data.z;
-        if (data.rotY !== undefined) targetObj.rotation.y = data.rotY;
-        if (targetObj.userData.type === 'card' && data.isFlipped !== undefined) {
-          targetObj.userData.isFlipped = data.isFlipped;
-          updateHandVisibility(targetObj);
-        }
-        updateStacking();
-      } else if (data.type === 'roll') rollDice(targetObj, false, data.targetRot);
-    }
-  }
-
-  function animate() {
-    requestAnimationFrame(animate);
-    controls.update();
-    renderer.render(scene, camera);
-  }
-  animate();
-
-  window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
+    hostConn.on('data',msg=>guestHandleMessage(msg));
   });
+};
+
+document.getElementById('startGameBtn').onclick=()=>{
+  if(!isHost) return;
+  if(lobbyPlayers.length<2){ alert('최소 2명 이상 모여야 시작할 수 있습니다.'); return; }
+  hostInit(lobbyPlayers);
+};
+
+window.MuffinTime={ mount: function(){ /* 웹 단독 실행 모드 지원 */ } };
+})();
 </script>
 </body>
 </html>
