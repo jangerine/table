@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Mobile Tabletop Simulator - Wide Non-Overlapping 8P Zones</title>
+  <title>Mobile Tabletop Simulator - Fixed Card Rotation</title>
   <style>
     * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
     body { margin: 0; overflow: hidden; touch-action: none; font-family: 'Pretendard', sans-serif; background-color: #0f172a; }
@@ -204,7 +204,7 @@
     </select>
     <span id="status" style="color:#f59e0b;">(대기중)</span>
   </div>
-  <div>🧁 <b>영역 확충 완료:</b> 옆 구역과 겹침 없이 각 플레이어 공간을 옆으로 넓게 확대했습니다!</div>
+  <div>🧁 <b>카드 방향 수정 완료:</b> 모으거나 섞을 때 카드가 90도 돌아가지 않고 올바른 정방향으로 재정렬됩니다!</div>
 </div>
 
 <div id="chat-container">
@@ -214,7 +214,7 @@
   </div>
   <div id="chat-body">
     <div id="chat-messages">
-      <div class="chat-msg system">확장된 8인 전용 보드에 오신 것을 환영합니다!</div>
+      <div class="chat-msg system">4개 변 × 2구역 레이아웃 보드에 오신 것을 환영합니다!</div>
     </div>
     <div id="chat-input-box">
       <input type="text" id="chat-input" placeholder="메시지 입력..." maxlength="100">
@@ -232,7 +232,6 @@
 
   const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1000);
 
-  // 구역 간격을 넓힘에 따른 카메라 시점 미세 조정 (간격 4.8 반영)
   const seatCameraPositions = {
     1: { x: -4.8, y: 19, z: -18 },
     2: { x: 4.8, y: 19, z: -18 },
@@ -244,7 +243,6 @@
     8: { x: -18, y: 19, z: -4.8 }
   };
 
-  // 구역 중심점 정의 (OFFSET = 4.8 로 넓혀 확장된 구역 간 겹침 방지)
   const R_SIDE = 8.5;
   const OFFSET = 4.8;
 
@@ -296,7 +294,6 @@
     return new THREE.CanvasTexture(canvas);
   }
 
-  // 플레이어 구역 폭을 확장(w = 560)하여 그린 펠트 매트
   function createFeltMatTexture8P() {
     const canvas = document.createElement('canvas'); canvas.width = 2048; canvas.height = 2048;
     const ctx = canvas.getContext('2d');
@@ -324,7 +321,6 @@
       const cx = mapCoord(center.x);
       const cy = mapCoord(center.z);
       
-      // 폭을 기존 420에서 560으로 크게 확대 (서로 안 겹치도록 정밀 조율)
       const w = 560; const h = 180;
 
       ctx.save();
@@ -338,7 +334,6 @@
     return new THREE.CanvasTexture(canvas);
   }
 
-  // 기본 테이블 규격
   const tableShape = new THREE.Shape();
   const w = 11.0, h = 11.0, r = 1.8;
   tableShape.moveTo(-w + r, -h); tableShape.lineTo(w - r, -h);
@@ -353,7 +348,6 @@
   tableMesh.position.y = -0.15;
   scene.add(tableMesh);
 
-  // 보드판 매트 (20.0 x 20.0)
   const matGeo = new THREE.PlaneGeometry(20.0, 20.0);
   const boardMatMesh = new THREE.Mesh(matGeo, new THREE.MeshStandardMaterial({ map: createFeltMatTexture8P(), roughness: 0.8 }));
   boardMatMesh.rotation.x = -Math.PI / 2;
@@ -648,7 +642,6 @@
     for (let seat = 1; seat <= 8; seat++) {
       const center = SEAT_CENTERS[seat];
       const isHorizontalSide = (seat === 1 || seat === 2 || seat === 5 || seat === 6);
-      // 구역이 옆으로 확장되었으므로 카드를 1.1 간격으로 시원하게 배치
       for (let i = 0; i < 3; i++) {
         if (cardIdx < cards.length) {
           const card = cards[cardIdx++];
@@ -685,7 +678,6 @@
     return dice;
   }
 
-  // 옆으로 넓어진 구역 크기(560px)에 대응하도록 감지 반경 조정 (가로 2.8, 세로 1.25)
   function isPositionInSeatZone(x, z, seat) {
     const center = SEAT_CENTERS[seat];
     if (!center) return false;
@@ -712,6 +704,9 @@
     const seat = getSeatFromPosition(card.position.x, card.position.z);
     if (seat !== 0) {
       card.rotation.y = SEAT_CENTERS[seat].angle;
+    } else {
+      // 보드 중앙 구역에서는 기본 정방향(0) 유지
+      card.rotation.y = 0;
     }
   }
 
@@ -818,6 +813,7 @@
     selectedGroup = [];
   }
 
+  // 모으기 시 Y축 회전값을 0(정방향)으로 강제 초기화
   function gatherCards(isLocal = true) {
     const targetCards = objects.filter(o => o.userData.type === 'card' && getSeatFromPosition(o.position.x, o.position.z) === 0);
     if (targetCards.length === 0) return;
@@ -826,7 +822,7 @@
     targetCards.forEach((card, i) => {
       card.userData.lastMovedTime = now + i;
       card.position.set(0, CARD_BASE_Y, 0);
-      alignCardRotationBySeat(card);
+      card.rotation.y = 0;
       card.rotation.z = Math.PI;
       card.userData.isFlipped = true;
       sendMoveData(card);
@@ -836,6 +832,7 @@
     if (isLocal) broadcastData({ type: 'gather' });
   }
 
+  // 펼치기 시에도 Y축 회전값을 0으로 유지
   function spreadCards(isLocal = true) {
     const deckCards = objects.filter(o => o.userData.type === 'card' && Math.hypot(o.position.x, o.position.z) < 1.5);
     if (deckCards.length === 0) return;
@@ -845,13 +842,14 @@
     deckCards.forEach((card, i) => {
       card.userData.lastMovedTime = now + i;
       card.position.set(startX + i * 0.2, CARD_BASE_Y, 0);
-      alignCardRotationBySeat(card);
+      card.rotation.y = 0;
       sendMoveData(card);
     });
     updateStacking();
     if (isLocal) broadcastData({ type: 'spread' });
   }
 
+  // 떼어내기 시 회전값 정방향 유지
   function cutDeck(isLocal = true) {
     const deckCards = objects.filter(o => o.userData.type === 'card' && Math.hypot(o.position.x, o.position.z) < 1.5);
     if (deckCards.length < 2) return;
@@ -867,13 +865,14 @@
     cutCards.forEach((card, i) => {
       card.userData.lastMovedTime = now + i;
       card.position.set(1.8, CARD_BASE_Y, 0);
-      alignCardRotationBySeat(card);
+      card.rotation.y = 0;
       sendMoveData(card);
     });
     updateStacking();
     if (isLocal) broadcastData({ type: 'cut', cutCount: cutCount });
   }
 
+  // 섞기 애니메이션 과정에서 Y축 회전값(rotation.y)을 0으로 복원
   function shuffleCards(isLocal = true) {
     const allCards = objects.filter(o => o.userData.type === 'card');
     const deckCards = allCards.filter(c => Math.hypot(c.position.x, c.position.z) < 1.5);
@@ -898,19 +897,21 @@
 
       let progress = 0;
       const startX = card.position.x, startY = card.position.y, startZ = card.position.z;
+      const startRotY = card.rotation.y;
 
       function animateShuffle() {
         progress += 0.08;
         card.position.x = THREE.MathUtils.lerp(startX, targetX, progress);
         card.position.z = THREE.MathUtils.lerp(startZ, targetZ, progress);
         card.position.y = THREE.MathUtils.lerp(startY, targetY, progress) + Math.sin(progress * Math.PI) * 1.5;
+        card.rotation.y = THREE.MathUtils.lerp(startRotY, 0, progress); // Y축 회전을 정방향(0)으로 복원
         card.rotation.z = THREE.MathUtils.lerp(card.rotation.z, Math.PI, progress);
 
         if (progress < 1) {
           requestAnimationFrame(animateShuffle);
         } else {
           card.position.set(targetX, targetY, targetZ);
-          alignCardRotationBySeat(card);
+          card.rotation.y = 0;
           card.rotation.z = Math.PI;
           card.userData.isAnimating = false;
           updateStacking();
@@ -1085,7 +1086,6 @@
 
   document.getElementById('clear-lines-btn').addEventListener('click', () => clearAllLines(true));
 
-  // 채팅 및 PeerJS 네트워킹
   const chatHeader = document.getElementById('chat-header');
   const chatBody = document.getElementById('chat-body');
   const chatToggleIcon = document.getElementById('chat-toggle-icon');
