@@ -209,7 +209,7 @@
     </select>
     <span id="status" style="color:#f59e0b;">(대기중)</span>
   </div>
-  <div>🛠 <b>야추 지원:</b> 최대 4인(P1~P4)까지 점수 기록 및 족보 계산을 지원하며 판 비우기 시 스코어보드가 초기화됩니다.</div>
+  <div>🛠 <b>야추 지원:</b> 주사위를 컵 주변에 두고 컵을 클릭하면 컵 속 주사위만 따로 굴릴 수 있습니다.</div>
 </div>
 
 <div id="chat-container">
@@ -624,7 +624,7 @@
     cupGroup.add(bottomMesh);
 
     cupGroup.position.set(x, 0.27, z);
-    cupGroup.userData = { id: id, type: 'cup', isLocked: false };
+    cupGroup.userData = { id: id, type: 'cup', isLocked: false, isShaking: false };
     scene.add(cupGroup);
     objects.push(cupGroup);
 
@@ -665,14 +665,102 @@
 
     resetYatzyScoreBoard();
 
-    for (let i = 0; i < 5; i++) {
-      createDice(-1.2 + i * 0.6, 1.5, false);
-    }
     createDiceCup(0, -1.8, false);
+    for (let i = 0; i < 5; i++) {
+      // 야추 세트 시작 시 컵 내부/주위에 주사위를배치
+      createDice((Math.random() - 0.5) * 0.4, -1.8 + (Math.random() - 0.5) * 0.4, false);
+    }
     createYatzyBoard(-3.5, 0, false);
 
     updateDynamicActionBar();
     if (isLocal) broadcastData({ type: 'setup_yatzy' });
+  }
+
+  /* --- [추가] 컵 속에 들어있는 주사위 감지 및 컵 굴리기 기믹 --- */
+  function getDiceInCup(cup) {
+    const CUP_RADIUS = 1.1; // 컵 내부로 볼 반경 거리
+    const diceList = objects.filter(o => o.userData.type === 'dice' && !o.userData.isKeep);
+    return diceList.filter(d => {
+      const dist = Math.hypot(d.position.x - cup.position.x, d.position.z - cup.position.z);
+      return dist <= CUP_RADIUS;
+    });
+  }
+
+  function shakeAndRollCup(cup, isLocal = true) {
+    if (!cup || cup.userData.isShaking) return;
+
+    const diceInCup = getDiceInCup(cup);
+    if (diceInCup.length === 0) {
+      if (isLocal) alert('컵 안에 주사위가 없습니다! 주사위를 컵 위나 안으로 옮겨주세요.');
+      return;
+    }
+
+    const hasYatzyBoard = objects.some(o => o.userData.type === 'board');
+    if (hasYatzyBoard && yatzyRollsLeft <= 0) {
+      if (isLocal) alert('남은 굴리기 기회가 없습니다! 점수를 기록해 주세요.');
+      return;
+    }
+
+    if (hasYatzyBoard && isLocal) {
+      yatzyRollsLeft--;
+      updateDynamicActionBar();
+    }
+
+    cup.userData.isShaking = true;
+    const startPos = cup.position.clone();
+    const startRot = cup.rotation.clone();
+    let progress = 0;
+
+    function animateCupShake() {
+      progress += 0.05;
+
+      if (progress < 0.6) {
+        // 1단계: 컵을 들어올리고 뒤집으며 컵 안의 주사위가 흩어짐
+        cup.position.y = 0.27 + Math.sin((progress / 0.6) * Math.PI) * 2.2;
+        cup.rotation.z = Math.sin((progress / 0.6) * Math.PI) * Math.PI;
+        cup.position.x = startPos.x + (Math.random() - 0.5) * 0.2;
+        cup.position.z = startPos.z + (Math.random() - 0.5) * 0.2;
+
+        // 주사위들을 컵 위치 근처에서 같이 흔듦
+        diceInCup.forEach(dice => {
+          dice.position.x = cup.position.x + (Math.random() - 0.5) * 0.4;
+          dice.position.z = cup.position.z + (Math.random() - 0.5) * 0.4;
+          dice.position.y = cup.position.y;
+        });
+      } else {
+        // 2단계: 컵이 원래대로 내려옴
+        const t = (progress - 0.6) / 0.4;
+        cup.position.y = THREE.MathUtils.lerp(startPos.y + 2.2, startPos.y, t);
+        cup.rotation.z = THREE.MathUtils.lerp(Math.PI, 0, t);
+        cup.position.x = THREE.MathUtils.lerp(cup.position.x, startPos.x, t);
+        cup.position.z = THREE.MathUtils.lerp(cup.position.z, startPos.z, t);
+      }
+
+      if (progress < 1) {
+        requestAnimationFrame(animateCupShake);
+      } else {
+        cup.position.copy(startPos);
+        cup.rotation.copy(startRot);
+        cup.userData.isShaking = false;
+
+        // 컵 안의 주사위들을 사방으로 바깥에 펼쳐 떨어트리며 굴림
+        diceInCup.forEach((dice, idx) => {
+          const angle = (idx / diceInCup.length) * Math.PI * 2;
+          const targetX = startPos.x + Math.cos(angle) * (1.2 + Math.random() * 0.6);
+          const targetZ = startPos.z + Math.sin(angle) * (1.2 + Math.random() * 0.6);
+
+          dice.position.x = targetX;
+          dice.position.z = targetZ;
+
+          rollDice(dice, isLocal);
+        });
+
+        if (isLocal) {
+          broadcastData({ type: 'cup_roll', cupId: cup.userData.id, rollsLeft: yatzyRollsLeft });
+        }
+      }
+    }
+    animateCupShake();
   }
 
   function isPositionInSeatZone(x, z, seat) {
@@ -1050,6 +1138,7 @@
   function updateDynamicActionBar() {
     const hasCards = objects.some(o => o.userData.type === 'card');
     const hasDice = objects.some(o => o.userData.type === 'dice');
+    const hasCup = objects.some(o => o.userData.type === 'cup');
     const hasYatzyBoard = objects.some(o => o.userData.type === 'board');
 
     if (objects.length === 0) {
@@ -1067,12 +1156,15 @@
         <button class="ui-btn btn-orange" id="dyn-cut-btn">✂️ 떼어내기</button>
       `;
     }
+    if (hasCup) {
+      html += `<button class="ui-btn btn-pink" id="dyn-cup-roll-btn">🥤 컵 속 주사위 굴리기</button>`;
+    }
     if (hasDice && !hasYatzyBoard) {
       html += `<button class="ui-btn btn-orange" id="dyn-roll-btn">🎲 전체 주사위 굴리기</button>`;
     }
     if (hasYatzyBoard) {
       html += `
-        <button class="ui-btn btn-orange" id="dyn-yatzy-roll-btn">🎲 주사위 굴리기 (${yatzyRollsLeft}/3)</button>
+        <button class="ui-btn btn-orange" id="dyn-yatzy-roll-btn">🎲 전체 굴리기 (${yatzyRollsLeft}/3)</button>
         <button class="ui-btn btn-green" id="dyn-yatzy-score-btn">📋 점수 기록하기</button>
       `;
     }
@@ -1086,6 +1178,12 @@
       document.getElementById('dyn-gather-btn').onclick = () => gatherCards(true);
       document.getElementById('dyn-spread-btn').onclick = () => spreadCards(true);
       document.getElementById('dyn-cut-btn').onclick = () => cutDeck(true);
+    }
+    if (hasCup) {
+      document.getElementById('dyn-cup-roll-btn').onclick = () => {
+        const cup = objects.find(o => o.userData.type === 'cup');
+        if (cup) shakeAndRollCup(cup, true);
+      };
     }
     if (hasDice && !hasYatzyBoard) {
       document.getElementById('dyn-roll-btn').onclick = () => {
@@ -1591,7 +1689,9 @@
 
       if (touchDuration < 300 && dist < 10) {
         if (selectedObj.userData.type === 'card') flipCard(selectedObj, true);
-        else if (selectedObj.userData.type === 'dice') {
+        else if (selectedObj.userData.type === 'cup') {
+          shakeAndRollCup(selectedObj, true);
+        } else if (selectedObj.userData.type === 'dice') {
           const hasYatzyBoard = objects.some(o => o.userData.type === 'board');
           if (hasYatzyBoard) {
             toggleDiceKeep(selectedObj, true);
@@ -1778,6 +1878,10 @@
     } else if (data.type === 'roll_yatzy_all') {
       yatzyRollsLeft = data.rollsLeft;
       rollYatzyDice(false);
+    } else if (data.type === 'cup_roll') {
+      yatzyRollsLeft = data.rollsLeft !== undefined ? data.rollsLeft : yatzyRollsLeft;
+      const cupObj = objects.find(o => o.userData.id === data.cupId);
+      if (cupObj) shakeAndRollCup(cupObj, false);
     } else if (data.type === 'toggle_keep') {
       const diceObj = objects.find(o => o.userData.id === data.id);
       if (diceObj) {
