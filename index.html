@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Mobile Tabletop Simulator - Yatzy Added</title>
+  <title>Mobile Tabletop Simulator - Yatzy Enhanced</title>
   <style>
     * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
     body { margin: 0; overflow: hidden; touch-action: none; font-family: 'Pretendard', sans-serif; background-color: #0f172a; }
@@ -125,6 +125,26 @@
       position: absolute; border: 2px dashed #60a5fa; background: rgba(96, 165, 250, 0.2);
       pointer-events: none; display: none; z-index: 150;
     }
+
+    /* Yatzy Score Modal Overlay */
+    #yatzy-modal {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      z-index: 300; display: none; flex-direction: column; width: 320px;
+      background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 16px;
+      padding: 16px; box-shadow: 0 20px 40px rgba(0,0,0,0.8); color: white; pointer-events: auto;
+    }
+    #yatzy-modal h3 { margin: 0 0 10px 0; font-size: 16px; text-align: center; color: #38bdf8; }
+    .score-list { display: flex; flex-direction: column; gap: 6px; max-height: 320px; overflow-y: auto; margin-bottom: 12px; }
+    .score-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 8px 12px; background: rgba(30, 41, 59, 0.8); border-radius: 8px; font-size: 13px;
+    }
+    .score-row button {
+      padding: 4px 10px; font-size: 11px; font-weight: bold; color: white;
+      background: #10b981; border: none; border-radius: 6px; cursor: pointer;
+    }
+    .score-row button:disabled { background: #475569; cursor: not-allowed; }
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -169,6 +189,13 @@
   <button id="add-yatzy-btn" style="background: linear-gradient(135deg, #10b981, #047857);">🎲 야추(Yatzy) 세트 생성</button>
 </div>
 
+<!-- Yatzy Auto Score Modal -->
+<div id="yatzy-modal">
+  <h3>🎲 야추 점수 기록</h3>
+  <div class="score-list" id="yatzy-score-list"></div>
+  <button class="ui-btn btn-red" style="width:100%; justify-content:center;" id="close-yatzy-modal">닫기</button>
+</div>
+
 <div id="bottom-info">
   <div id="peer-ui">
     <span>ID: <strong id="my-id" style="color:#60a5fa;">생성 중...</strong></span> | 
@@ -182,7 +209,7 @@
     </select>
     <span id="status" style="color:#f59e0b;">(대기중)</span>
   </div>
-  <div>🛠 <b>야추 지원:</b> 소품 메뉴에서 야추 세트(주사위 5개, 컵, 점수판)를 소환하여 펜 모드로 점수를 기록할 수 있습니다.</div>
+  <div>🛠 <b>야추 지원:</b> 야추 세트 생성 후 [주사위 5개 굴리기] 버튼과 [점수 기록 모달]을 통해 자동으로 족보를 계산하고 기록할 수 있습니다.</div>
 </div>
 
 <div id="chat-container">
@@ -319,6 +346,13 @@
   let lastEraserPoint = null;
   let eraserCursorMesh = null;
 
+  /* --- 야추 게임 데이터 상태 --- */
+  let yatzyRollsLeft = 3;
+  let yatzyScores = {
+    P1: { Aces: null, Twos: null, Threes: null, Fours: null, Fives: null, Sixes: null, Subtotal: 0, Bonus: 0, Choice: null, "4ofKind": null, FullHouse: null, SStraight: null, LStraight: null, Yatzy: null, Total: 0 },
+    P2: { Aces: null, Twos: null, Threes: null, Fours: null, Fives: null, Sixes: null, Subtotal: 0, Bonus: 0, Choice: null, "4ofKind": null, FullHouse: null, SStraight: null, LStraight: null, Yatzy: null, Total: 0 }
+  };
+
   const suits = ['♠', '♥', '♦', '♣'];
   const values = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 
@@ -397,7 +431,7 @@
     new THREE.MeshStandardMaterial({ map: createDiceFaceTexture(4), roughness: 0.2 })
   ];
 
-  /* --- [야추 전용] 점수판 텍스처 생성 --- */
+  /* --- [야추 전용] 점수판 텍스처 생성 및 갱신 --- */
   function createYatzyBoardTexture() {
     const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 768;
     const ctx = canvas.getContext('2d');
@@ -409,15 +443,26 @@
     ctx.fillText('YATZY SCOREBOARD', 256, 55);
 
     const categories = [
-      "Aces (1)", "Twos (2)", "Threes (3)", "Fours (4)", "Fives (5)", "Sixes (6)",
-      "Subtotal", "Bonus (+35)", "Choice", "4 of a Kind", "Full House",
-      "S. Straight", "L. Straight", "Yatzy (50)", "TOTAL"
+      { name: "Aces (1)", key: "Aces" },
+      { name: "Twos (2)", key: "Twos" },
+      { name: "Threes (3)", key: "Threes" },
+      { name: "Fours (4)", key: "Fours" },
+      { name: "Fives (5)", key: "Fives" },
+      { name: "Sixes (6)", key: "Sixes" },
+      { name: "Subtotal", key: "Subtotal" },
+      { name: "Bonus (+35)", key: "Bonus" },
+      { name: "Choice", key: "Choice" },
+      { name: "4 of a Kind", key: "4ofKind" },
+      { name: "Full House", key: "FullHouse" },
+      { name: "S. Straight", key: "SStraight" },
+      { name: "L. Straight", key: "LStraight" },
+      { name: "Yatzy (50)", key: "Yatzy" },
+      { name: "TOTAL", key: "Total" }
     ];
 
     ctx.lineWidth = 2; ctx.font = 'bold 20px sans-serif';
     ctx.beginPath(); ctx.moveTo(20, 80); ctx.lineTo(492, 80); ctx.stroke();
     
-    // 열 구분선
     ctx.beginPath(); ctx.moveTo(230, 80); ctx.lineTo(230, 740); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(360, 80); ctx.lineTo(360, 740); ctx.stroke();
 
@@ -427,17 +472,34 @@
 
     let y = 115;
     for (let i = 0; i < categories.length; i++) {
+      const cat = categories[i];
       ctx.beginPath(); ctx.moveTo(20, y); ctx.lineTo(492, y); ctx.stroke();
       ctx.textAlign = 'left';
-      if (categories[i] === "Subtotal" || categories[i] === "Bonus (+35)" || categories[i] === "TOTAL") {
+      if (cat.key === "Subtotal" || cat.key === "Bonus" || cat.key === "Total") {
         ctx.fillStyle = '#3b82f6';
       } else {
         ctx.fillStyle = '#0f172a';
       }
-      ctx.fillText(categories[i], 30, y + 28);
+      ctx.fillText(cat.name, 30, y + 28);
+
+      // P1, P2 점수 표시
+      ctx.textAlign = 'center';
+      const valP1 = yatzyScores.P1[cat.key];
+      const valP2 = yatzyScores.P2[cat.key];
+      if (valP1 !== null && valP1 !== undefined) ctx.fillText(valP1.toString(), 295, y + 28);
+      if (valP2 !== null && valP2 !== undefined) ctx.fillText(valP2.toString(), 426, y + 28);
+
       y += 40;
     }
     return new THREE.CanvasTexture(canvas);
+  }
+
+  function updateYatzyBoardTexture() {
+    const boardObj = objects.find(o => o.userData.type === 'board');
+    if (boardObj) {
+      boardObj.material[2].map = createYatzyBoardTexture();
+      boardObj.material[2].map.needsUpdate = true;
+    }
   }
 
   function createSlotLine(count = 5, isLocal = true) {
@@ -514,7 +576,7 @@
     const dice = new THREE.Mesh(geo, diceMaterials);
     dice.position.set(x, 0.61, z);
     dice.castShadow = true;
-    dice.userData = { id: id, type: 'dice', isRolling: false, isLocked: false };
+    dice.userData = { id: id, type: 'dice', value: 1, isRolling: false, isLocked: false, isKeep: false };
     scene.add(dice);
     objects.push(dice);
 
@@ -523,7 +585,6 @@
     return dice;
   }
 
-  /* --- [야추 전용] 주사위 컵 생성 --- */
   function createDiceCup(x = 0, z = -3, isLocal = true, customId = null) {
     const id = customId || ('cup_' + (++objectIdCounter));
     if (objects.some(o => o.userData.id === id)) return;
@@ -550,7 +611,6 @@
     if (isLocal) broadcastData({ type: 'spawn', propType: 'cup', id: id, x: x, z: z });
   }
 
-  /* --- [야추 전용] 점수판 생성 --- */
   function createYatzyBoard(x = -3.5, z = 0, isLocal = true, customId = null) {
     const id = customId || ('yatzy_board_' + (++objectIdCounter));
     if (objects.some(o => o.userData.id === id)) return;
@@ -577,20 +637,17 @@
     if (isLocal) broadcastData({ type: 'spawn', propType: 'yatzy_board', id: id, x: x, z: z });
   }
 
-  /* --- 야추 세트 전체 세팅 함수 --- */
   function setupYatzySet(isLocal = true) {
-    // 기존 오브젝트 정리 후 세팅
     objects.forEach(obj => scene.remove(obj));
     objects = [];
     clearSelectionGroup();
 
-    // 1. 주사위 5개 생성
+    yatzyRollsLeft = 3;
+
     for (let i = 0; i < 5; i++) {
       createDice(-1.2 + i * 0.6, 1.5, false);
     }
-    // 2. 주사위 컵 생성
     createDiceCup(0, -1.8, false);
-    // 3. 야추 점수판 생성
     createYatzyBoard(-3.5, 0, false);
 
     updateDynamicActionBar();
@@ -829,10 +886,150 @@
     if (isLocal) broadcastData({ type: 'shuffle' });
   }
 
+  /* --- [야추 전용] 야추 주사위 굴리기 & 계산 함수 --- */
+  function rollYatzyDice(isLocal = true) {
+    const diceList = objects.filter(o => o.userData.type === 'dice');
+    if (diceList.length === 0) return;
+
+    if (yatzyRollsLeft <= 0) {
+      alert('남은 기회가 없습니다! 점수를 기록하세요.');
+      return;
+    }
+
+    yatzyRollsLeft--;
+
+    diceList.forEach(dice => {
+      if (!dice.userData.isKeep) {
+        rollDice(dice, isLocal);
+      }
+    });
+
+    updateDynamicActionBar();
+    if (isLocal) broadcastData({ type: 'roll_yatzy_all', rollsLeft: yatzyRollsLeft });
+  }
+
+  function getDiceValues() {
+    return objects.filter(o => o.userData.type === 'dice').map(d => d.userData.value || 1);
+  }
+
+  function calculateYatzyScores(vals) {
+    const counts = [0, 0, 0, 0, 0, 0, 0];
+    let sum = 0;
+    vals.forEach(v => { counts[v]++; sum += v; });
+
+    const scoreMap = {};
+
+    scoreMap["Aces"] = counts[1] * 1;
+    scoreMap["Twos"] = counts[2] * 2;
+    scoreMap["Threes"] = counts[3] * 3;
+    scoreMap["Fours"] = counts[4] * 4;
+    scoreMap["Fives"] = counts[5] * 5;
+    scoreMap["Sixes"] = counts[6] * 6;
+    scoreMap["Choice"] = sum;
+
+    // 4 of a Kind
+    scoreMap["4ofKind"] = counts.some(c => c >= 4) ? sum : 0;
+
+    // Full House (3+2)
+    const has3 = counts.some(c => c === 3);
+    const has2 = counts.some(c => c === 2);
+    const has5 = counts.some(c => c === 5);
+    scoreMap["FullHouse"] = ((has3 && has2) || has5) ? sum : 0;
+
+    // Small Straight (4연속)
+    const unique = [...new Set(vals)].sort((a,b)=>a-b).join('');
+    const isSStraight = /1234|2345|3456/.test(unique);
+    scoreMap["SStraight"] = isSStraight ? 15 : 0;
+
+    // Large Straight (5연속)
+    const isLStraight = /12345|23456/.test(unique);
+    scoreMap["LStraight"] = isLStraight ? 30 : 0;
+
+    // Yatzy
+    scoreMap["Yatzy"] = counts.some(c => c === 5) ? 50 : 0;
+
+    return scoreMap;
+  }
+
+  function openYatzyScoreModal() {
+    const vals = getDiceValues();
+    const possibleScores = calculateYatzyScores(vals);
+    const playerKey = (mySeat === 2) ? 'P2' : 'P1';
+    const playerScores = yatzyScores[playerKey];
+
+    const container = document.getElementById('yatzy-score-list');
+    container.innerHTML = '';
+
+    const labelMap = {
+      Aces: "Aces (1)", Twos: "Twos (2)", Threes: "Threes (3)", Fours: "Fours (4)", Fives: "Fives (5)", Sixes: "Sixes (6)",
+      Choice: "Choice", "4ofKind": "4 of a Kind", FullHouse: "Full House", SStraight: "S. Straight", LStraight: "L. Straight", Yatzy: "Yatzy"
+    };
+
+    Object.keys(labelMap).forEach(key => {
+      const row = document.createElement('div');
+      row.className = 'score-row';
+      const isAlreadyUsed = playerScores[key] !== null;
+      const calcVal = possibleScores[key];
+
+      row.innerHTML = `
+        <span><b>${labelMap[key]}</b>: ${isAlreadyUsed ? playerScores[key] + 'pt (완료)' : '+' + calcVal + 'pt'}</span>
+        <button ${isAlreadyUsed ? 'disabled' : ''}>기록</button>
+      `;
+
+      if (!isAlreadyUsed) {
+        row.querySelector('button').onclick = () => {
+          recordYatzyScore(playerKey, key, calcVal, true);
+          document.getElementById('yatzy-modal').style.display = 'none';
+        };
+      }
+      container.appendChild(row);
+    });
+
+    document.getElementById('yatzy-modal').style.display = 'flex';
+  }
+
+  function recordYatzyScore(playerKey, category, score, isLocal = true) {
+    yatzyScores[playerKey][category] = score;
+
+    // Subtotal & Bonus 계산
+    let sub = 0;
+    ['Aces', 'Twos', 'Threes', 'Fours', 'Fives', 'Sixes'].forEach(k => {
+      sub += (yatzyScores[playerKey][k] || 0);
+    });
+    yatzyScores[playerKey].Subtotal = sub;
+    yatzyScores[playerKey].Bonus = (sub >= 63) ? 35 : 0;
+
+    // Total 계산
+    let tot = sub + yatzyScores[playerKey].Bonus;
+    ['Choice', '4ofKind', 'FullHouse', 'SStraight', 'LStraight', 'Yatzy'].forEach(k => {
+      tot += (yatzyScores[playerKey][k] || 0);
+    });
+    yatzyScores[playerKey].Total = tot;
+
+    updateYatzyBoardTexture();
+
+    // 주사위 Keep 초기화 및 턴 초기화
+    yatzyRollsLeft = 3;
+    objects.filter(o => o.userData.type === 'dice').forEach(d => {
+      d.userData.isKeep = false;
+      if (d.userData.keepMesh) {
+        d.remove(d.userData.keepMesh);
+        d.userData.keepMesh = null;
+      }
+    });
+
+    updateDynamicActionBar();
+    if (isLocal) {
+      broadcastData({ type: 'record_score', playerKey: playerKey, category: category, score: score });
+      addChatMessage('시스템', `${playerKey}님이 ${category} 카테고리에 ${score}점을 기록하셨습니다.`, false, true);
+    }
+  }
+
   const dynamicActionBar = document.getElementById('dynamic-action-bar');
   function updateDynamicActionBar() {
     const hasCards = objects.some(o => o.userData.type === 'card');
     const hasDice = objects.some(o => o.userData.type === 'dice');
+    const hasYatzyBoard = objects.some(o => o.userData.type === 'board');
 
     if (objects.length === 0) {
       dynamicActionBar.style.display = 'none';
@@ -849,8 +1046,14 @@
         <button class="ui-btn btn-orange" id="dyn-cut-btn">✂️ 떼어내기</button>
       `;
     }
-    if (hasDice) {
+    if (hasDice && !hasYatzyBoard) {
       html += `<button class="ui-btn btn-orange" id="dyn-roll-btn">🎲 전체 주사위 굴리기</button>`;
+    }
+    if (hasYatzyBoard) {
+      html += `
+        <button class="ui-btn btn-orange" id="dyn-yatzy-roll-btn">🎲 주사위 굴리기 (${yatzyRollsLeft}/3)</button>
+        <button class="ui-btn btn-green" id="dyn-yatzy-score-btn">📋 점수 기록하기</button>
+      `;
     }
     html += `<button class="ui-btn btn-red" id="dyn-clear-btn">판 비우기</button>`;
 
@@ -863,10 +1066,14 @@
       document.getElementById('dyn-spread-btn').onclick = () => spreadCards(true);
       document.getElementById('dyn-cut-btn').onclick = () => cutDeck(true);
     }
-    if (hasDice) {
+    if (hasDice && !hasYatzyBoard) {
       document.getElementById('dyn-roll-btn').onclick = () => {
         objects.filter(o => o.userData.type === 'dice').forEach(d => rollDice(d, true));
       };
+    }
+    if (hasYatzyBoard) {
+      document.getElementById('dyn-yatzy-roll-btn').onclick = () => rollYatzyDice(true);
+      document.getElementById('dyn-yatzy-score-btn').onclick = () => openYatzyScoreModal();
     }
     document.getElementById('dyn-clear-btn').onclick = () => {
       objects.forEach(obj => scene.remove(obj));
@@ -878,6 +1085,10 @@
     };
   }
   updateDynamicActionBar();
+
+  document.getElementById('close-yatzy-modal').onclick = () => {
+    document.getElementById('yatzy-modal').style.display = 'none';
+  };
 
   function createLineMesh(points, colorHex, radius) {
     if (!points || points.length < 2) return null;
@@ -1128,7 +1339,7 @@
   }
 
   function onTouchStart(e) {
-    if (e.target.closest('#top-bar, #bottom-info, #prop-modal, #dynamic-action-bar, #chat-container, #pen-tools-panel')) return;
+    if (e.target.closest('#top-bar, #bottom-info, #prop-modal, #dynamic-action-bar, #chat-container, #pen-tools-panel, #yatzy-modal')) return;
 
     if (isCamModeAlwaysOn || (e.touches && e.touches.length > 1)) {
       selectedObj = null; controls.enabled = true; return;
@@ -1202,7 +1413,7 @@
   }
 
   function onTouchMove(e) {
-    if (e.target.closest('#top-bar, #bottom-info, #prop-modal, #dynamic-action-bar, #chat-container, #pen-tools-panel')) return;
+    if (e.target.closest('#top-bar, #bottom-info, #prop-modal, #dynamic-action-bar, #chat-container, #pen-tools-panel, #yatzy-modal')) return;
 
     const pos = getTouchPos(e);
 
@@ -1260,6 +1471,28 @@
     });
 
     updateStacking();
+  }
+
+  function toggleDiceKeep(dice, isLocal = true) {
+    const hasYatzyBoard = objects.some(o => o.userData.type === 'board');
+    if (!hasYatzyBoard) return;
+
+    dice.userData.isKeep = !dice.userData.isKeep;
+    if (dice.userData.isKeep) {
+      const keepOutline = new THREE.Mesh(
+        new THREE.BoxGeometry(0.76, 0.76, 0.76),
+        new THREE.MeshBasicMaterial({ color: 0x10b981, wireframe: true })
+      );
+      dice.add(keepOutline);
+      dice.userData.keepMesh = keepOutline;
+    } else {
+      if (dice.userData.keepMesh) {
+        dice.remove(dice.userData.keepMesh);
+        dice.userData.keepMesh = null;
+      }
+    }
+
+    if (isLocal) broadcastData({ type: 'toggle_keep', id: dice.userData.id, isKeep: dice.userData.isKeep });
   }
 
   function onTouchEnd(e) {
@@ -1333,7 +1566,14 @@
 
       if (touchDuration < 300 && dist < 10) {
         if (selectedObj.userData.type === 'card') flipCard(selectedObj, true);
-        else if (selectedObj.userData.type === 'dice') rollDice(selectedObj, true);
+        else if (selectedObj.userData.type === 'dice') {
+          const hasYatzyBoard = objects.some(o => o.userData.type === 'board');
+          if (hasYatzyBoard) {
+            toggleDiceKeep(selectedObj, true);
+          } else {
+            rollDice(selectedObj, true);
+          }
+        }
       }
 
       updateStacking();
@@ -1400,12 +1640,31 @@
     if (isLocal) broadcastData({ type: 'flip', id: card.userData.id });
   }
 
-  function rollDice(dice, isLocal = false, targetRot = null) {
+  /* --- 정밀한 눈금 회전 각도 정의 --- */
+  const diceFaceRotations = {
+    1: { x: 0, y: 0, z: 0 },
+    6: { x: 0, y: Math.PI, z: 0 },
+    2: { x: 0, y: -Math.PI / 2, z: 0 },
+    5: { x: 0, y: Math.PI / 2, z: 0 },
+    3: { x: -Math.PI / 2, y: 0, z: 0 },
+    4: { x: Math.PI / 2, y: 0, z: 0 }
+  };
+
+  function rollDice(dice, isLocal = false, targetRot = null, targetValue = null) {
     if (dice.userData.isRolling) return;
     dice.userData.isRolling = true;
-    const rotX = targetRot ? targetRot.x : Math.floor(Math.random() * 4) * (Math.PI / 2) + Math.PI * 4;
-    const rotY = targetRot ? targetRot.y : Math.floor(Math.random() * 4) * (Math.PI / 2) + Math.PI * 4;
-    const rotZ = targetRot ? targetRot.z : Math.floor(Math.random() * 4) * (Math.PI / 2) + Math.PI * 4;
+
+    const finalVal = targetValue || (Math.floor(Math.random() * 6) + 1);
+    dice.userData.value = finalVal;
+
+    const baseRot = diceFaceRotations[finalVal];
+    const extraRotX = (Math.floor(Math.random() * 3) + 2) * Math.PI * 2;
+    const extraRotY = (Math.floor(Math.random() * 3) + 2) * Math.PI * 2;
+
+    const rotX = targetRot ? targetRot.x : baseRot.x + extraRotX;
+    const rotY = targetRot ? targetRot.y : baseRot.y + extraRotY;
+    const rotZ = targetRot ? targetRot.z : baseRot.z;
+
     const startRot = { x: dice.rotation.x, y: dice.rotation.y, z: dice.rotation.z };
     let progress = 0;
 
@@ -1415,11 +1674,15 @@
       dice.rotation.y = THREE.MathUtils.lerp(startRot.y, rotY, progress);
       dice.rotation.z = THREE.MathUtils.lerp(startRot.z, rotZ, progress);
       dice.position.y = 0.61 + Math.abs(Math.sin(progress * Math.PI * 2)) * (1 - progress) * 2;
+
       if (progress < 1) requestAnimationFrame(animateRoll);
-      else { dice.position.y = 0.61; dice.userData.isRolling = false; }
+      else {
+        dice.position.y = 0.61;
+        dice.userData.isRolling = false;
+      }
     }
     animateRoll();
-    if (isLocal) broadcastData({ type: 'roll', id: dice.userData.id, targetRot: { x: rotX, y: rotY, z: rotZ } });
+    if (isLocal) broadcastData({ type: 'roll', id: dice.userData.id, targetRot: { x: rotX, y: rotY, z: rotZ }, targetValue: finalVal });
   }
 
   function generateShortId() {
@@ -1487,6 +1750,27 @@
       spawnFullDeck(false);
     } else if (data.type === 'setup_yatzy') {
       setupYatzySet(false);
+    } else if (data.type === 'roll_yatzy_all') {
+      yatzyRollsLeft = data.rollsLeft;
+      rollYatzyDice(false);
+    } else if (data.type === 'toggle_keep') {
+      const diceObj = objects.find(o => o.userData.id === data.id);
+      if (diceObj) {
+        diceObj.userData.isKeep = data.isKeep;
+        if (data.isKeep && !diceObj.userData.keepMesh) {
+          const keepOutline = new THREE.Mesh(
+            new THREE.BoxGeometry(0.76, 0.76, 0.76),
+            new THREE.MeshBasicMaterial({ color: 0x10b981, wireframe: true })
+          );
+          diceObj.add(keepOutline);
+          diceObj.userData.keepMesh = keepOutline;
+        } else if (!data.isKeep && diceObj.userData.keepMesh) {
+          diceObj.remove(diceObj.userData.keepMesh);
+          diceObj.userData.keepMesh = null;
+        }
+      }
+    } else if (data.type === 'record_score') {
+      recordYatzyScore(data.playerKey, data.category, data.score, false);
     } else if (data.type === 'spawn') {
       if (data.propType === 'card') createCard(data.x, data.z, false, data.suit, data.value, data.id);
       else if (data.propType === 'dice') createDice(data.x, data.z, false, data.id);
@@ -1513,7 +1797,7 @@
         }
         updateStacking();
       } else if (data.type === 'flip') flipCard(targetObj, false);
-      else if (data.type === 'roll') rollDice(targetObj, false, data.targetRot);
+      else if (data.type === 'roll') rollDice(targetObj, false, data.targetRot, data.targetValue);
     }
   }
 
