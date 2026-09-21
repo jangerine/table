@@ -2231,21 +2231,36 @@
     } else if (data.type === 'spread') {
       spreadCards(false);
     } else if (data.type === 'cut') {
-      cutDeck(false);
-    } else {
-      const targetObj = objects.find(o => o.userData.id === data.id);
-      if (!targetObj) return;
-      if (data.type === 'move') {
-        targetObj.position.x = data.x;
-        targetObj.position.z = data.z;
-        if (data.rotY !== undefined) targetObj.rotation.y = data.rotY;
-        if (targetObj.userData.type === 'card' && data.isFlipped !== undefined) {
-          targetObj.userData.isFlipped = data.isFlipped;
-          updateHandVisibility(targetObj);
+      const deckCards = objects.filter(o => o.userData.type === 'card' && Math.hypot(o.position.x, o.position.z) < 1.5);
+      if (deckCards.length >= 2) {
+        deckCards.sort((a, b) => b.position.y - a.position.y);
+        const cutCards = deckCards.slice(0, data.cutCount);
+        const now = Date.now();
+        cutCards.forEach((card, i) => {
+          card.userData.lastMovedTime = now + i;
+          card.position.set(1.8, CARD_BASE_Y, 0);
+          alignCardRotationBySeat(card);
+        });
+        updateStacking();
+      }
+    } else if (data.type === 'flip') {
+      const obj = objects.find(o => o.userData.id === data.id);
+      if (obj) flipCard(obj, false);
+    } else if (data.type === 'roll') {
+      const obj = objects.find(o => o.userData.id === data.id);
+      if (obj) rollDice(obj, false, data.targetRot, data.targetValue);
+    } else if (data.type === 'move') {
+      const obj = objects.find(o => o.userData.id === data.id);
+      if (obj && !obj.userData.isAnimating) {
+        obj.position.x = data.x;
+        obj.position.z = data.z;
+        if (data.rotY !== undefined) obj.rotation.y = data.rotY;
+        if (data.isFlipped !== undefined && obj.userData.type === 'card') {
+          obj.userData.isFlipped = data.isFlipped;
+          obj.rotation.z = data.isFlipped ? Math.PI : 0;
         }
         updateStacking();
-      } else if (data.type === 'flip') flipCard(targetObj, false);
-      else if (data.type === 'roll') rollDice(targetObj, false, data.targetRot, data.targetValue);
+      }
     }
   }
 
