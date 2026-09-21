@@ -1564,6 +1564,7 @@
 
       selectedObj = hitObj;
       selectedObj.userData.lastMovedTime = Date.now();
+      if (selectedObj.userData.type === 'muffin_card') { selectedObj.position.y = .52; selectedObj.scale.set(1.06,1.06,1.06); }
 
       if (selectedGroup.includes(selectedObj)) {
         groupDragOffsets = selectedGroup.map(obj => ({
@@ -1637,8 +1638,12 @@
       if (item.obj.userData.type === 'card') {
         alignCardRotationBySeat(item.obj);
         updateHandVisibility(item.obj);
+        sendMoveData(item.obj);
+      } else if (item.obj.userData.type === 'muffin_card') {
+        muffin3DSavePosition(item.obj, true);
+      } else {
+        sendMoveData(item.obj);
       }
-      sendMoveData(item.obj);
     });
 
     updateStacking();
@@ -1730,8 +1735,10 @@
       const dist = Math.hypot(lastPos.clientX - touchStartPos.x, lastPos.clientY - touchStartPos.y);
 
       if (selectedObj.userData.type === 'muffin_card') {
+        selectedObj.position.y = .34; selectedObj.scale.set(1,1,1);
+        muffin3DSavePosition(selectedObj, true);
         if (muffin3DPlayAtCenter(selectedObj)) { selectedObj=null; controls.enabled=true; return; }
-        // 머핀 타임 카드는 테이블 위에서 실제 카드처럼 이동만 유지합니다.
+        // 머핀 타임 카드는 플라잉 카드처럼 한 장씩 독립적으로 이동합니다.
       } else if (selectedObj.userData.type === 'muffin_deck') {
         if (touchDuration < 300 && dist < 10) { muffin3DDeckTap(selectedObj); selectedObj=null; controls.enabled=true; return; }
       } else if (selectedGroup.length > 0) {
@@ -1967,6 +1974,10 @@
       spreadCards(false);
     } else if (data.type === 'cut') {
       cutDeck(false);
+    } else if (data.type === 'muffin_move') {
+      muffin3D.positions.set(data.id,{x:data.x,z:data.z,rot:data.rotY||0});
+      const targetObj = muffin3D.cards.get(data.id);
+      if (targetObj) { targetObj.position.x=data.x; targetObj.position.z=data.z; if(data.rotY!==undefined) targetObj.rotation.y=data.rotY; }
     } else {
       const targetObj = objects.find(o => o.userData.id === data.id);
       if (!targetObj) return;
@@ -2187,14 +2198,15 @@
   function mpStart(){MP.mode=document.getElementById('mm-mode').value;MP.pack=document.getElementById('mm-pack').value;mpResetState();MP.players.forEach(p=>{p.firstGame=true;mpDraw(p.seat,3);p.muffinAnnounced=false});mpLog('🧁 게임 시작 · 8인 · '+(MP.mode==='official'?'원본 턴':'자유 행동')+' · '+MP.deck.length+'장');mp3DRender();mpSync();mpRender()}
 
   // ----- 3D tabletop layer -----
-  const muffin3D={cards:new Map(),deck:null,discard:null};
+  const muffin3D={cards:new Map(),deck:null,discard:null,positions:new Map()};
   const muffinSeatPos=[{x:0,z:4.55,rot:0},{x:3.25,z:3.15,rot:-Math.PI/4},{x:4.35,z:0,rot:-Math.PI/2},{x:3.25,z:-3.15,rot:-3*Math.PI/4},{x:0,z:-4.55,rot:Math.PI},{x:-3.25,z:-3.15,rot:3*Math.PI/4},{x:-4.35,z:0,rot:Math.PI/2},{x:-3.25,z:3.15,rot:Math.PI/4}];
   function muffinCardTex(name,type,back=false){const c=document.createElement('canvas');c.width=360;c.height=520;const x=c.getContext('2d');x.fillStyle=back?'#7c2d12':(type==='trap'?'#fce7f3':type==='counter'?'#dcfce7':'#e0f2fe');x.fillRect(0,0,c.width,c.height);x.strokeStyle=back?'#fed7aa':(type==='trap'?'#ec4899':type==='counter'?'#22c55e':'#0284c7');x.lineWidth=14;x.strokeRect(8,8,c.width-16,c.height-16);x.textAlign='center';x.textBaseline='middle';if(back){x.fillStyle='#fff7ed';x.font='900 62px sans-serif';x.fillText('MUFFIN',180,205);x.fillText('TIME',180,285);x.font='900 34px sans-serif';x.fillText('TABLETOP',180,355)}else{x.fillStyle='#0f172a';x.font='900 25px sans-serif';x.fillText(type.toUpperCase(),180,52);x.font='900 31px sans-serif';const words=String(name).split(' ');let line='',yy=165;words.forEach(w=>{if((line+' '+w).trim().length>16){x.fillText(line.trim(),180,yy);yy+=44;line=''}line+=' '+w});if(line.trim())x.fillText(line.trim(),180,yy);x.font='bold 20px sans-serif';x.fillStyle='#475569';x.fillText(desc(name,type),180,430)}return new THREE.CanvasTexture(c)}
-  function createMuffin3DCard(c,x,z,rot,faceUp,local){const geo=new THREE.BoxGeometry(.86,.025,1.28),front=muffinCardTex(c.name,c.type,false),back=muffinCardTex(c.name,c.type,true),mats=[new THREE.MeshStandardMaterial({color:0xffffff}),new THREE.MeshStandardMaterial({color:0xffffff}),new THREE.MeshStandardMaterial({map:front}),new THREE.MeshStandardMaterial({map:back}),new THREE.MeshStandardMaterial({color:0xffffff}),new THREE.MeshStandardMaterial({color:0xffffff})];const m=new THREE.Mesh(geo,mats);m.position.set(x,.34,z);m.rotation.y=rot;m.rotation.z=Math.PI;m.castShadow=true;m.userData={id:'m3d_'+c.id,type:'muffin_card',muffinId:c.id,muffinType:c.type,owner:c.owner,isFlipped:!faceUp,isLocked:!local};m.material[2].visible=faceUp;m.material[3].visible=!faceUp;scene.add(m);objects.push(m);muffin3D.cards.set(c.id,m);return m}
+  function createMuffin3DCard(c,x,z,rot,faceUp,local){const geo=new THREE.BoxGeometry(.86,.025,1.28),front=muffinCardTex(c.name,c.type,false),back=muffinCardTex(c.name,c.type,true),mats=[new THREE.MeshStandardMaterial({color:0xffffff}),new THREE.MeshStandardMaterial({color:0xffffff}),new THREE.MeshStandardMaterial({map:front}),new THREE.MeshStandardMaterial({map:back}),new THREE.MeshStandardMaterial({color:0xffffff}),new THREE.MeshStandardMaterial({color:0xffffff})];const m=new THREE.Mesh(geo,mats);const saved=muffin3D.positions.get(c.id);m.position.set(saved?saved.x:x,.34,saved?saved.z:z);m.rotation.y=saved?saved.rot:rot;m.rotation.z=Math.PI;m.castShadow=true;m.userData={id:'m3d_'+c.id,type:'muffin_card',muffinId:c.id,muffinType:c.type,owner:c.owner,isFlipped:!faceUp,isLocked:!local,isFlyingCard:true};m.material[2].visible=faceUp;m.material[3].visible=!faceUp;scene.add(m);objects.push(m);muffin3D.cards.set(c.id,m);muffin3D.positions.set(c.id,{x:m.position.x,z:m.position.z,rot:m.rotation.y});return m}
   function clearMuffin3D(){muffin3D.cards.forEach(m=>{scene.remove(m);const i=objects.indexOf(m);if(i>=0)objects.splice(i,1)});muffin3D.cards.clear();[muffin3D.deck,muffin3D.discard].forEach(m=>{if(m){scene.remove(m);const i=objects.indexOf(m);if(i>=0)objects.splice(i,1)}});muffin3D.deck=muffin3D.discard=null}
   function createMuffinPile(type){const g=new THREE.Group();g.position.set(type==='deck'?-1.25:1.25,.34,0);g.userData={id:'muffin_'+type,type:'muffin_'+type,isLocked:false};const count=Math.min(16,type==='deck'?MP.deck.length:MP.discard.length);for(let i=0;i<count;i++){const tex=muffinCardTex('', 'action', type==='deck');const mat=[new THREE.MeshStandardMaterial({color:0xffffff}),new THREE.MeshStandardMaterial({color:0xffffff}),new THREE.MeshStandardMaterial({map:tex}),new THREE.MeshStandardMaterial({map:tex}),new THREE.MeshStandardMaterial({color:0xffffff}),new THREE.MeshStandardMaterial({color:0xffffff})];const m=new THREE.Mesh(new THREE.BoxGeometry(.86,.025,1.28),mat);m.position.y=i*.025;m.rotation.z=Math.PI;g.add(m)}scene.add(g);objects.push(g);return g}
   function mp3DRender(){clearMuffin3D();muffin3D.deck=createMuffinPile('deck');if(MP.discard.length)muffin3D.discard=createMuffinPile('discard');MP.players.forEach(p=>{const s=muffinSeatPos[p.seat-1];p.hand.forEach((c,i)=>{const spread=Math.min(.72,5.2/Math.max(1,p.hand.length)),off=(i-(p.hand.length-1)/2)*spread,dx=Math.cos(s.rot+Math.PI/2)*off,dz=Math.sin(s.rot+Math.PI/2)*off;createMuffin3DCard(c,s.x+dx,s.z+dz,s.rot,p.seat===mySeat,p.seat===mySeat)});p.traps.forEach((c,i)=>{const x=s.x+Math.cos(s.rot+Math.PI/2)*(i-1)*.95,z=s.z+Math.sin(s.rot+Math.PI/2)*(i-1)*.95;createMuffin3DCard(c,x,z,s.rot,false,p.seat===mySeat)})})}
   function muffin3DPlayAtCenter(obj){const c=MP.players[mySeat-1].hand.find(x=>x.id===obj.userData.muffinId);if(!c)return false;if(Math.hypot(obj.position.x,obj.position.z)<2){mpPlay(c.id);return true}return false}
+  function muffin3DSavePosition(obj,broadcast=true){if(!obj||obj.userData.type!=='muffin_card')return;const pos={x:obj.position.x,z:obj.position.z,rot:obj.rotation.y};muffin3D.positions.set(obj.userData.muffinId,pos);if(broadcast)broadcastData({type:'muffin_move',id:obj.userData.muffinId,x:pos.x,z:pos.z,rotY:pos.rot})}
   function muffin3DDeckTap(obj){if(obj.userData.type==='muffin_deck'){mpDrawLocal();return true}return false}
 
   function mpRender(){if(!MP.active)return;mp3DRender();const p=MP.players[mySeat-1];const pending=MP.pending;document.getElementById('muffin-status').innerHTML='<b>🧁 P'+mySeat+'</b> · 내 패 <b>'+p.hand.length+'</b> · 함정 <b>'+p.traps.length+'/3</b> · 덱 <b>'+MP.deck.length+'</b> · 버림 <b>'+MP.discard.length+'</b> · 목표 <b>'+MP.goal+'</b> · '+(MP.mode==='official'?'현재 P'+MP.turn+' 턴':'자유 행동')+(pending?' · <span style="color:#fbbf24">⚡ 카운터 가능</span>':'');const hand=document.getElementById('muffin-hands');hand.innerHTML='';p.hand.forEach(c=>{const d=document.createElement('button');d.className='mh-card '+c.type;d.innerHTML='<div class="badge">'+c.type.toUpperCase()+'</div><div class="ct">'+c.name+'</div><div class="ce">'+desc(c.name,c.type)+'</div>';d.onclick=()=>mpPlay(c.id);hand.appendChild(d)});const ps=document.getElementById('muffin-players');ps.innerHTML='';MP.players.forEach(q=>{const d=document.createElement('div');d.className='mp';d.innerHTML='<b>P'+q.seat+'</b> · 패 '+q.hand.length+' · 함정 '+q.traps.length+(q.seat===mySeat?' · YOU':'')+'<div class="mini">'+q.traps.map(x=>'🪤 '+x.name).join('<br>')+'</div>';ps.appendChild(d)});const box=document.getElementById('muffin-targets');if(pending){box.innerHTML='<b style="grid-column:1/-1;color:#fbbf24">⚡ '+pending.card.name+' 대응 중 — 4초</b>';const cs=p.hand.filter(x=>x.type==='counter');cs.forEach(c=>{const b=document.createElement('button');b.className='mtarget';b.style.background='#14532d';b.textContent='🟢 '+c.name;b.onclick=()=>mpPlayCounter(c.id);box.appendChild(b)})}}
