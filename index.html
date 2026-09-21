@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Mobile Tabletop Simulator - Fully Restored & Improved Eraser</title>
+  <title>Mobile Tabletop Simulator - Yatzy Added</title>
   <style>
     * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
     body { margin: 0; overflow: hidden; touch-action: none; font-family: 'Pretendard', sans-serif; background-color: #0f172a; }
@@ -120,16 +120,6 @@
       background: #334155; border: 1px solid #475569; border-radius: 8px; text-align: left;
     }
 
-    /* Card Preview Modal */
-    #card-preview-modal {
-      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-      width: 220px; height: 330px; z-index: 300; background: #1e293b;
-      border: 3px solid #60a5fa; border-radius: 16px; display: none;
-      flex-direction: column; justify-content: center; align-items: center;
-      box-shadow: 0 20px 50px rgba(0,0,0,0.8); color: white; text-align: center; padding: 10px; pointer-events: auto;
-    }
-    #preview-canvas { border-radius: 10px; margin-bottom: 10px; }
-
     /* Selection Box */
     #select-box {
       position: absolute; border: 2px dashed #60a5fa; background: rgba(96, 165, 250, 0.2);
@@ -175,13 +165,8 @@
 <div id="prop-modal">
   <button id="add-card-btn">🃏 무작위 카드 1장 추가</button>
   <button id="add-deck-btn">🎴 52장 전체 덱 리셋</button>
-  <button id="add-dice-btn">🎲 주사위 추가</button>
-</div>
-
-<div id="card-preview-modal">
-  <canvas id="preview-canvas" width="180" height="260"></canvas>
-  <div id="preview-title" style="font-size: 14px; font-weight: bold;">카드 정보</div>
-  <div style="font-size: 10px; color: #94a3b8; margin-top:4px;">(화면 탭 시 닫힘)</div>
+  <button id="add-dice-btn">🎲 주사위 1개 추가</button>
+  <button id="add-yatzy-btn" style="background: linear-gradient(135deg, #10b981, #047857);">🎲 야추(Yatzy) 세트 생성</button>
 </div>
 
 <div id="bottom-info">
@@ -197,7 +182,7 @@
     </select>
     <span id="status" style="color:#f59e0b;">(대기중)</span>
   </div>
-  <div>🛠 <b>최종 복원:</b> 확장된 대형 테이블 크기에 맞춰 전체 시야를 최적화했습니다.</div>
+  <div>🛠 <b>야추 지원:</b> 소품 메뉴에서 야추 세트(주사위 5개, 컵, 점수판)를 소환하여 펜 모드로 점수를 기록할 수 있습니다.</div>
 </div>
 
 <div id="chat-container">
@@ -223,9 +208,8 @@
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x0f172a);
 
-  // [수정] 확장된 판 크기에 맞춰 초기 카메라 거리 조절
   const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1000);
-  camera.position.set(-15, 16, 0); // 기본 좌석(P3) 구도
+  camera.position.set(-15, 16, 0);
 
   function updateCameraPosition() {
     if (mySeat === 1) camera.position.set(0, 16, 15);
@@ -247,7 +231,7 @@
   controls.dampingFactor = 0.05;
   controls.maxPolarAngle = Math.PI / 2 - 0.05;
   controls.minDistance = 4;
-  controls.maxDistance = 35; // [수정] 대형 판 조망을 위해 maxDistance 확대
+  controls.maxDistance = 35;
   controls.target.set(0, 0.2, 0);
 
   const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
@@ -266,7 +250,6 @@
     return new THREE.CanvasTexture(canvas);
   }
 
-  // [수정] 확장된 패브릭 매트에 맞춰 2048x2048 해상도 및 핸드존 비율 수정
   function createFeltMatTexture4P() {
     const canvas = document.createElement('canvas'); canvas.width = 2048; canvas.height = 2048;
     const ctx = canvas.getContext('2d');
@@ -300,7 +283,6 @@
     return new THREE.CanvasTexture(canvas);
   }
 
-  // [수정] 판의 크기 대폭 확장 (기존 w=7.5 -> 11.0)
   const tableShape = new THREE.Shape();
   const w = 11.0, h = 11.0, r = 1.8;
   tableShape.moveTo(-w + r, -h); tableShape.lineTo(w - r, -h);
@@ -315,7 +297,6 @@
   tableMesh.position.y = -0.15;
   scene.add(tableMesh);
 
-  // [수정] 보드 매트 크기 확장 (기존 13.5 -> 20.0)
   const matGeo = new THREE.PlaneGeometry(20.0, 20.0);
   const boardMatMesh = new THREE.Mesh(matGeo, new THREE.MeshStandardMaterial({ map: createFeltMatTexture4P(), roughness: 0.8 }));
   boardMatMesh.rotation.x = -Math.PI / 2;
@@ -327,7 +308,6 @@
   let selectedGroup = [];
   let objectIdCounter = 0;
 
-  // 펜/지우개 관련 변수
   let drawnLines = [];
   let isPenMode = false;
   let isEraserMode = false;
@@ -417,6 +397,49 @@
     new THREE.MeshStandardMaterial({ map: createDiceFaceTexture(4), roughness: 0.2 })
   ];
 
+  /* --- [야추 전용] 점수판 텍스처 생성 --- */
+  function createYatzyBoardTexture() {
+    const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 768;
+    const ctx = canvas.getContext('2d');
+
+    ctx.fillStyle = '#f8fafc'; ctx.fillRect(0, 0, 512, 768);
+    ctx.lineWidth = 4; ctx.strokeStyle = '#0f172a'; ctx.strokeRect(10, 10, 492, 748);
+
+    ctx.fillStyle = '#0f172a'; ctx.font = 'bold 36px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('YATZY SCOREBOARD', 256, 55);
+
+    const categories = [
+      "Aces (1)", "Twos (2)", "Threes (3)", "Fours (4)", "Fives (5)", "Sixes (6)",
+      "Subtotal", "Bonus (+35)", "Choice", "4 of a Kind", "Full House",
+      "S. Straight", "L. Straight", "Yatzy (50)", "TOTAL"
+    ];
+
+    ctx.lineWidth = 2; ctx.font = 'bold 20px sans-serif';
+    ctx.beginPath(); ctx.moveTo(20, 80); ctx.lineTo(492, 80); ctx.stroke();
+    
+    // 열 구분선
+    ctx.beginPath(); ctx.moveTo(230, 80); ctx.lineTo(230, 740); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(360, 80); ctx.lineTo(360, 740); ctx.stroke();
+
+    ctx.fillText("CATEGORY", 125, 105);
+    ctx.fillText("P1", 295, 105);
+    ctx.fillText("P2", 426, 105);
+
+    let y = 115;
+    for (let i = 0; i < categories.length; i++) {
+      ctx.beginPath(); ctx.moveTo(20, y); ctx.lineTo(492, y); ctx.stroke();
+      ctx.textAlign = 'left';
+      if (categories[i] === "Subtotal" || categories[i] === "Bonus (+35)" || categories[i] === "TOTAL") {
+        ctx.fillStyle = '#3b82f6';
+      } else {
+        ctx.fillStyle = '#0f172a';
+      }
+      ctx.fillText(categories[i], 30, y + 28);
+      y += 40;
+    }
+    return new THREE.CanvasTexture(canvas);
+  }
+
   function createSlotLine(count = 5, isLocal = true) {
     cardSlots.forEach(slot => scene.remove(slot));
     cardSlots = [];
@@ -500,7 +523,80 @@
     return dice;
   }
 
-  // [수정] 확장된 매트 크기 영역에 맞추어 Seat 영역 판정 임계치 확대 (4.2 -> 6.8)
+  /* --- [야추 전용] 주사위 컵 생성 --- */
+  function createDiceCup(x = 0, z = -3, isLocal = true, customId = null) {
+    const id = customId || ('cup_' + (++objectIdCounter));
+    if (objects.some(o => o.userData.id === id)) return;
+
+    const cupGroup = new THREE.Group();
+    const cupGeo = new THREE.CylinderGeometry(1.0, 0.7, 1.8, 24, 1, true);
+    const cupMat = new THREE.MeshStandardMaterial({ color: 0x7c2d12, roughness: 0.5, side: THREE.DoubleSide });
+    const cupMesh = new THREE.Mesh(cupGeo, cupMat);
+    cupMesh.position.y = 0.9;
+    cupMesh.castShadow = true;
+    cupGroup.add(cupMesh);
+
+    const bottomGeo = new THREE.CylinderGeometry(0.7, 0.7, 0.1, 24);
+    const bottomMesh = new THREE.Mesh(bottomGeo, cupMat);
+    bottomMesh.position.y = 0.05;
+    cupGroup.add(bottomMesh);
+
+    cupGroup.position.set(x, 0.27, z);
+    cupGroup.userData = { id: id, type: 'cup', isLocked: false };
+    scene.add(cupGroup);
+    objects.push(cupGroup);
+
+    updateDynamicActionBar();
+    if (isLocal) broadcastData({ type: 'spawn', propType: 'cup', id: id, x: x, z: z });
+  }
+
+  /* --- [야추 전용] 점수판 생성 --- */
+  function createYatzyBoard(x = -3.5, z = 0, isLocal = true, customId = null) {
+    const id = customId || ('yatzy_board_' + (++objectIdCounter));
+    if (objects.some(o => o.userData.id === id)) return;
+
+    const geo = new THREE.BoxGeometry(3.0, 0.05, 4.5);
+    const boardTex = createYatzyBoardTexture();
+    const mats = [
+      new THREE.MeshStandardMaterial({ color: 0x334155 }),
+      new THREE.MeshStandardMaterial({ color: 0x334155 }),
+      new THREE.MeshStandardMaterial({ map: boardTex }),
+      new THREE.MeshStandardMaterial({ color: 0x1e293b }),
+      new THREE.MeshStandardMaterial({ color: 0x334155 }),
+      new THREE.MeshStandardMaterial({ color: 0x334155 })
+    ];
+    const board = new THREE.Mesh(geo, mats);
+    board.position.set(x, 0.28, z);
+    board.castShadow = true;
+    board.userData = { id: id, type: 'board', isLocked: false };
+
+    scene.add(board);
+    objects.push(board);
+
+    updateDynamicActionBar();
+    if (isLocal) broadcastData({ type: 'spawn', propType: 'yatzy_board', id: id, x: x, z: z });
+  }
+
+  /* --- 야추 세트 전체 세팅 함수 --- */
+  function setupYatzySet(isLocal = true) {
+    // 기존 오브젝트 정리 후 세팅
+    objects.forEach(obj => scene.remove(obj));
+    objects = [];
+    clearSelectionGroup();
+
+    // 1. 주사위 5개 생성
+    for (let i = 0; i < 5; i++) {
+      createDice(-1.2 + i * 0.6, 1.5, false);
+    }
+    // 2. 주사위 컵 생성
+    createDiceCup(0, -1.8, false);
+    // 3. 야추 점수판 생성
+    createYatzyBoard(-3.5, 0, false);
+
+    updateDynamicActionBar();
+    if (isLocal) broadcastData({ type: 'setup_yatzy' });
+  }
+
   function isPositionInSeatZone(x, z, seat) {
     if (seat === 1) return z > 6.8 && x >= -6.8 && x <= 6.8;
     if (seat === 2) return z < -6.8 && x >= -6.8 && x <= 6.8;
@@ -738,7 +834,7 @@
     const hasCards = objects.some(o => o.userData.type === 'card');
     const hasDice = objects.some(o => o.userData.type === 'dice');
 
-    if (!hasCards && !hasDice) {
+    if (objects.length === 0) {
       dynamicActionBar.style.display = 'none';
       dynamicActionBar.innerHTML = '';
       return;
@@ -754,7 +850,7 @@
       `;
     }
     if (hasDice) {
-      html += `<button class="ui-btn btn-orange" id="dyn-roll-btn">🎲 주사위 굴리기</button>`;
+      html += `<button class="ui-btn btn-orange" id="dyn-roll-btn">🎲 전체 주사위 굴리기</button>`;
     }
     html += `<button class="ui-btn btn-red" id="dyn-clear-btn">판 비우기</button>`;
 
@@ -783,7 +879,6 @@
   }
   updateDynamicActionBar();
 
-  // 3D 펜 선 생성 함수
   function createLineMesh(points, colorHex, radius) {
     if (!points || points.length < 2) return null;
     const curvePoints = points.map(p => new THREE.Vector3(p.x, 0.28, p.z));
@@ -832,7 +927,6 @@
   const eraserBtn = document.getElementById('eraser-mode-btn');
   const penToolsPanel = document.getElementById('pen-tools-panel');
 
-  // 지우개 범위 시각화 원형 커서 생성 (초기 숨김)
   const cursorGeo = new THREE.RingGeometry(0.77, 0.8, 32);
   cursorGeo.rotateX(-Math.PI / 2);
   const cursorMat = new THREE.MeshBasicMaterial({ color: 0xff0000, side: THREE.DoubleSide });
@@ -896,7 +990,6 @@
 
   document.getElementById('clear-lines-btn').addEventListener('click', () => clearAllLines(true));
 
-  // 채팅 시스템
   const chatHeader = document.getElementById('chat-header');
   const chatBody = document.getElementById('chat-body');
   const chatToggleIcon = document.getElementById('chat-toggle-icon');
@@ -949,6 +1042,7 @@
   document.getElementById('add-card-btn').addEventListener('click', () => createCard());
   document.getElementById('add-deck-btn').addEventListener('click', () => spawnFullDeck(true));
   document.getElementById('add-dice-btn').addEventListener('click', () => createDice());
+  document.getElementById('add-yatzy-btn').addEventListener('click', () => setupYatzySet(true));
 
   document.getElementById('add-slot-btn').addEventListener('click', () => {
     const input = prompt('생성할 슬롯(순서 칸)의 개수를 입력하세요:', '5');
@@ -1034,7 +1128,7 @@
   }
 
   function onTouchStart(e) {
-    if (e.target.closest('#top-bar, #bottom-info, #prop-modal, #card-preview-modal, #dynamic-action-bar, #chat-container, #pen-tools-panel')) return;
+    if (e.target.closest('#top-bar, #bottom-info, #prop-modal, #dynamic-action-bar, #chat-container, #pen-tools-panel')) return;
 
     if (isCamModeAlwaysOn || (e.touches && e.touches.length > 1)) {
       selectedObj = null; controls.enabled = true; return;
@@ -1076,10 +1170,14 @@
     }
 
     raycaster.setFromCamera(touch, camera);
-    const intersects = raycaster.intersectObjects(objects);
+    const intersects = raycaster.intersectObjects(objects, true);
 
     if (intersects.length > 0) {
-      const hitObj = intersects[0].object;
+      let hitObj = intersects[0].object;
+      while (hitObj.parent && hitObj.parent.type === 'Group') {
+        hitObj = hitObj.parent;
+      }
+
       if (hitObj.userData.isLocked) { controls.enabled = true; return; }
 
       selectedObj = hitObj;
@@ -1104,7 +1202,7 @@
   }
 
   function onTouchMove(e) {
-    if (e.target.closest('#top-bar, #bottom-info, #prop-modal, #card-preview-modal, #dynamic-action-bar, #chat-container, #pen-tools-panel')) return;
+    if (e.target.closest('#top-bar, #bottom-info, #prop-modal, #dynamic-action-bar, #chat-container, #pen-tools-panel')) return;
 
     const pos = getTouchPos(e);
 
@@ -1212,7 +1310,7 @@
         if (x >= minX && x <= maxX && y >= minY && y <= maxY) {
           selectedGroup.push(obj);
           const outlineMesh = new THREE.Mesh(
-            new THREE.BoxGeometry(0.94, 0.04, 1.39),
+            new THREE.BoxGeometry(1.0, 0.04, 1.4),
             new THREE.MeshBasicMaterial({ color: 0x10b981, wireframe: true })
           );
           obj.add(outlineMesh);
@@ -1387,9 +1485,13 @@
       createSlotLine(data.count, false);
     } else if (data.type === 'reset_deck') {
       spawnFullDeck(false);
+    } else if (data.type === 'setup_yatzy') {
+      setupYatzySet(false);
     } else if (data.type === 'spawn') {
       if (data.propType === 'card') createCard(data.x, data.z, false, data.suit, data.value, data.id);
       else if (data.propType === 'dice') createDice(data.x, data.z, false, data.id);
+      else if (data.propType === 'cup') createDiceCup(data.x, data.z, false, data.id);
+      else if (data.propType === 'yatzy_board') createYatzyBoard(data.x, data.z, false, data.id);
     } else if (data.type === 'shuffle') {
       shuffleCards(false);
     } else if (data.type === 'gather') {
