@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Mobile Tabletop Simulator - Yatzy Enhanced (4P)</title>
+  <title>Mobile Tabletop Simulator - Yatzy & Halli Galli Enhanced (4P)</title>
   <style>
     * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
     body { margin: 0; overflow: hidden; touch-action: none; font-family: 'Pretendard', sans-serif; background-color: #0f172a; }
@@ -32,6 +32,7 @@
     .btn-red { background: linear-gradient(135deg, #ef4444, #dc2626); }
     .btn-blue { background: linear-gradient(135deg, #3b82f6, #2563eb); }
     .btn-pink { background: linear-gradient(135deg, #ec4899, #db2777); }
+    .btn-yellow { background: linear-gradient(135deg, #eab308, #ca8a04); }
 
     /* Pen/Eraser Tools Panel */
     #pen-tools-panel {
@@ -205,6 +206,7 @@
   <button id="add-card-btn">🃏 무작위 카드 1장 추가</button>
   <button id="add-deck-btn">🎴 52장 전체 덱 리셋</button>
   <button id="add-dice-btn">🎲 주사위 1개 추가</button>
+  <button id="add-halli-galli-btn" style="background: linear-gradient(135deg, #eab308, #ca8a04);">🔔 할리갈리(Halli Galli) 세트 생성</button>
   <button id="add-yatzy-btn" style="background: linear-gradient(135deg, #10b981, #047857);">🎲 야추(Yatzy) 세트 생성</button>
 </div>
 
@@ -320,6 +322,15 @@
       gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
       osc.start(now);
       osc.stop(now + 0.25);
+    } else if (type === 'bell') {
+      // 할리갈리 종 소리 (맑은 금속성 벨 소리)
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(1200, now);
+      osc.frequency.exponentialRampToValueAtTime(800, now + 0.4);
+      gain.gain.setValueAtTime(0.4, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+      osc.start(now);
+      osc.stop(now + 0.4);
     }
   }
 
@@ -500,6 +511,34 @@
 
     ctx.font = '84px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(suit, 128, 192);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.center.set(0.5, 0.5);
+    return texture;
+  }
+
+  /* --- [할리갈리 전용] 과일 카드 텍스처 생성 --- */
+  const halliFruits = ['🍓', '🍌', '🍋', '🍇'];
+  function createHalliGalliCardTexture(fruit, count) {
+    const canvas = document.createElement('canvas'); canvas.width = 256; canvas.height = 384;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, 256, 384);
+    ctx.strokeStyle = '#e2e8f0'; ctx.lineWidth = 6; ctx.strokeRect(6, 6, 244, 372);
+
+    ctx.font = '56px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+
+    const positionsMap = {
+      1: [{ x: 128, y: 192 }],
+      2: [{ x: 128, y: 110 }, { x: 128, y: 274 }],
+      3: [{ x: 80, y: 100 }, { x: 128, y: 192 }, { x: 176, y: 284 }],
+      4: [{ x: 80, y: 110 }, { x: 176, y: 110 }, { x: 80, y: 274 }, { x: 176, y: 274 }],
+      5: [{ x: 75, y: 100 }, { x: 181, y: 100 }, { x: 128, y: 192 }, { x: 75, y: 284 }, { x: 181, y: 284 }]
+    };
+
+    const posList = positionsMap[count] || positionsMap[1];
+    posList.forEach(p => {
+      ctx.fillText(fruit, p.x, p.y);
+    });
 
     const texture = new THREE.CanvasTexture(canvas);
     texture.center.set(0.5, 0.5);
@@ -693,7 +732,7 @@
     if (isLocal) broadcastData({ type: 'create_slots', count: count });
   }
 
-  function createCard(x = 0, z = 0, isLocal = true, customSuit = null, customValue = null, customId = null) {
+  function createCard(x = 0, z = 0, isLocal = true, customSuit = null, customValue = null, customId = null, isHalliGalli = false) {
     const id = customId || ('card_' + (++objectIdCounter));
     if (objects.some(o => o.userData.id === id)) return;
 
@@ -701,7 +740,9 @@
     const value = customValue || values[Math.floor(Math.random() * values.length)];
 
     const geo = new THREE.BoxGeometry(0.9, 0.02, 1.35);
-    const frontTex = createTrumpCardTexture(suit, value);
+    
+    // 할리갈리 전용 카드 여부 판별
+    const frontTex = isHalliGalli ? createHalliGalliCardTexture(suit, value) : createTrumpCardTexture(suit, value);
     const backTex = cardBackTexture.clone();
 
     const materials = [
@@ -717,7 +758,7 @@
     card.position.set(x, CARD_BASE_Y, z);
     card.rotation.z = Math.PI;
     card.castShadow = true;
-    card.userData = { id: id, type: 'card', suit: suit, value: value, isFlipped: true, isLocked: false, isAnimating: false, lastMovedTime: Date.now() };
+    card.userData = { id: id, type: 'card', suit: suit, value: value, isHalliGalli: isHalliGalli, isFlipped: true, isLocked: false, isAnimating: false, lastMovedTime: Date.now() };
     
     scene.add(card);
     objects.push(card);
@@ -729,7 +770,7 @@
 
     if (isLocal) {
       playSound('card');
-      broadcastData({ type: 'spawn', propType: 'card', id: id, x: x, z: z, suit: suit, value: value });
+      broadcastData({ type: 'spawn', propType: 'card', id: id, x: x, z: z, suit: suit, value: value, isHalliGalli: isHalliGalli });
     }
     return card;
   }
@@ -778,6 +819,111 @@
 
     updateDynamicActionBar();
     if (isLocal) broadcastData({ type: 'spawn', propType: 'cup', id: id, x: x, z: z });
+  }
+
+  /* --- [할리갈리 전용] 종(Bell) 생성 및 조작 --- */
+  function createHalliGalliBell(x = 0, z = 0, isLocal = true, customId = null) {
+    const id = customId || ('bell_' + (++objectIdCounter));
+    if (objects.some(o => o.userData.id === id)) return;
+
+    const bellGroup = new THREE.Group();
+
+    // 종 받침대 (검은색/어두운 금속 바닥)
+    const baseGeo = new THREE.CylinderGeometry(1.1, 1.2, 0.2, 32);
+    const baseMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.3, metalness: 0.8 });
+    const baseMesh = new THREE.Mesh(baseGeo, baseMat);
+    baseMesh.position.y = 0.1;
+    baseMesh.castShadow = true;
+    bellGroup.add(baseMesh);
+
+    // 종 돔 (황금빛/은빛 반구)
+    const domeGeo = new THREE.SphereGeometry(0.9, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2);
+    const domeMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.1, metalness: 0.9 });
+    const domeMesh = new THREE.Mesh(domeGeo, domeMat);
+    domeMesh.position.y = 0.2;
+    domeMesh.castShadow = true;
+    bellGroup.add(domeMesh);
+
+    // 상단 푸시 버튼 (상단 버튼)
+    const btnGeo = new THREE.CylinderGeometry(0.25, 0.25, 0.25, 24);
+    const btnMat = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.2 });
+    const btnMesh = new THREE.Mesh(btnGeo, btnMat);
+    btnMesh.position.y = 1.1;
+    btnMesh.castShadow = true;
+    bellGroup.add(btnMesh);
+
+    bellGroup.position.set(x, 0.26, z);
+    bellGroup.userData = { id: id, type: 'bell', isLocked: false, isRinging: false };
+
+    scene.add(bellGroup);
+    objects.push(bellGroup);
+
+    updateDynamicActionBar();
+    if (isLocal) {
+      playSound('bell');
+      broadcastData({ type: 'spawn', propType: 'bell', id: id, x: x, z: z });
+    }
+  }
+
+  function ringBell(bellObj, isLocal = true) {
+    if (!bellObj || bellObj.userData.isRinging) return;
+
+    playSound('bell');
+    bellObj.userData.isRinging = true;
+
+    // 종 누르는 애니메이션
+    const startY = bellObj.position.y;
+    let progress = 0;
+
+    function animateRing() {
+      progress += 0.15;
+      if (progress < 0.5) {
+        bellObj.position.y = startY - 0.08;
+      } else {
+        bellObj.position.y = startY;
+      }
+
+      if (progress < 1) {
+        requestAnimationFrame(animateRing);
+      } else {
+        bellObj.position.y = startY;
+        bellObj.userData.isRinging = false;
+      }
+    }
+    animateRing();
+
+    if (isLocal) {
+      broadcastData({ type: 'ring_bell', id: bellObj.userData.id });
+      addChatMessage('시스템', `🔔 P${mySeat}님이 종을 쳤습니다!`, false, true);
+    }
+  }
+
+  function setupHalliGalliSet(isLocal = true) {
+    objects.forEach(obj => scene.remove(obj));
+    objects = [];
+    clearSelectionGroup();
+
+    // 1. 중앙에 할리갈리 종 생성
+    createHalliGalliBell(0, 0, false);
+
+    // 2. 56장 할리갈리 카드 표준 구성 생성
+    // 과일 4종류 x (1개:5장, 2개:3장, 3개:3장, 4개:2장, 5개:1장 = 총 14장/종류 x 4 = 56장)
+    const countsDistribution = [1,1,1,1,1, 2,2,2, 3,3,3, 4,4, 5];
+
+    halliFruits.forEach(fruit => {
+      countsDistribution.forEach(cnt => {
+        createCard((Math.random() - 0.5) * 0.1, (Math.random() - 0.5) * 0.1, false, fruit, cnt, null, true);
+      });
+    });
+
+    // 덱 셔플
+    shuffleCards(false);
+
+    updateDynamicActionBar();
+    if (isLocal) {
+      broadcastData({ type: 'setup_halli_galli' });
+      addChatMessage('시스템', '🔔 할리갈리 세트가 추가되었습니다! (56장 과일 카드 & 종)', false, true);
+    }
   }
 
   function createYatzyBoard(x = -3.5, z = 0, isLocal = true, customId = null) {
@@ -1278,6 +1424,7 @@
     const hasDice = objects.some(o => o.userData.type === 'dice');
     const hasCup = objects.some(o => o.userData.type === 'cup');
     const hasYatzyBoard = objects.some(o => o.userData.type === 'board');
+    const hasBell = objects.some(o => o.userData.type === 'bell');
 
     updateYatzyHintText();
 
@@ -1288,6 +1435,9 @@
     }
 
     let html = '';
+    if (hasBell) {
+      html += `<button class="ui-btn btn-yellow" id="dyn-bell-btn">🔔 종 치기!</button>`;
+    }
     if (hasCards) {
       html += `
         <button class="ui-btn btn-green" id="dyn-shuffle-btn">🔲 섞기</button>
@@ -1314,6 +1464,12 @@
     dynamicActionBar.innerHTML = html;
     dynamicActionBar.style.display = 'flex';
 
+    if (hasBell) {
+      document.getElementById('dyn-bell-btn').onclick = () => {
+        const bell = objects.find(o => o.userData.type === 'bell');
+        if (bell) ringBell(bell, true);
+      };
+    }
     if (hasCards) {
       document.getElementById('dyn-shuffle-btn').onclick = () => shuffleCards(true);
       document.getElementById('dyn-gather-btn').onclick = () => gatherCards(true);
@@ -1523,6 +1679,7 @@
   document.getElementById('add-card-btn').addEventListener('click', () => createCard());
   document.getElementById('add-deck-btn').addEventListener('click', () => spawnFullDeck(true));
   document.getElementById('add-dice-btn').addEventListener('click', () => createDice());
+  document.getElementById('add-halli-galli-btn').addEventListener('click', () => setupHalliGalliSet(true));
   document.getElementById('add-yatzy-btn').addEventListener('click', () => setupYatzySet(true));
 
   document.getElementById('add-slot-btn').addEventListener('click', () => {
@@ -1839,6 +1996,8 @@
         if (selectedObj.userData.type === 'card') flipCard(selectedObj, true);
         else if (selectedObj.userData.type === 'cup') {
           shakeAndRollCup(selectedObj, true);
+        } else if (selectedObj.userData.type === 'bell') {
+          ringBell(selectedObj, true);
         } else if (selectedObj.userData.type === 'dice') {
           const hasYatzyBoard = objects.some(o => o.userData.type === 'board');
           if (hasYatzyBoard) {
@@ -2027,6 +2186,11 @@
       createSlotLine(data.count, false);
     } else if (data.type === 'reset_deck') {
       spawnFullDeck(false);
+    } else if (data.type === 'setup_halli_galli') {
+      setupHalliGalliSet(false);
+    } else if (data.type === 'ring_bell') {
+      const bellObj = objects.find(o => o.userData.id === data.id);
+      if (bellObj) ringBell(bellObj, false);
     } else if (data.type === 'setup_yatzy') {
       setupYatzySet(false);
     } else if (data.type === 'roll_yatzy_all') {
@@ -2055,9 +2219,10 @@
     } else if (data.type === 'record_score') {
       recordYatzyScore(data.playerKey, data.category, data.score, false);
     } else if (data.type === 'spawn') {
-      if (data.propType === 'card') createCard(data.x, data.z, false, data.suit, data.value, data.id);
+      if (data.propType === 'card') createCard(data.x, data.z, false, data.suit, data.value, data.id, data.isHalliGalli);
       else if (data.propType === 'dice') createDice(data.x, data.z, false, data.id);
       else if (data.propType === 'cup') createDiceCup(data.x, data.z, false, data.id);
+      else if (data.propType === 'bell') createHalliGalliBell(data.x, data.z, false, data.id);
       else if (data.propType === 'yatzy_board') createYatzyBoard(data.x, data.z, false, data.id);
     } else if (data.type === 'shuffle') {
       shuffleCards(false);
