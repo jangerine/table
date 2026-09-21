@@ -145,6 +145,20 @@
       background: #10b981; border: none; border-radius: 6px; cursor: pointer;
     }
     .score-row button:disabled { background: #475569; cursor: not-allowed; }
+
+    /* Yatzy Rules Modal Overlay */
+    #yatzy-rules-modal {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      z-index: 310; display: none; flex-direction: column; width: 360px; max-height: 80vh;
+      background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 16px;
+      padding: 16px; box-shadow: 0 20px 40px rgba(0,0,0,0.8); color: white; pointer-events: auto;
+    }
+    #yatzy-rules-modal h3 { margin: 0 0 10px 0; font-size: 16px; text-align: center; color: #38bdf8; }
+    .rules-content { overflow-y: auto; font-size: 12px; line-height: 1.6; color: #cbd5e1; padding-right: 6px; margin-bottom: 12px; }
+    .rules-content h4 { color: #f59e0b; margin: 10px 0 4px 0; font-size: 13px; }
+    .rules-content ul { margin: 0; padding-left: 18px; }
+    .rules-content li { margin-bottom: 4px; }
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -194,6 +208,31 @@
   <h3>🎲 야추 점수 기록 (최대 4인)</h3>
   <div class="score-list" id="yatzy-score-list"></div>
   <button class="ui-btn btn-red" style="width:100%; justify-content:center;" id="close-yatzy-modal">닫기</button>
+</div>
+
+<!-- Yatzy Rules Modal -->
+<div id="yatzy-rules-modal">
+  <h3>📖 야추(Yatzy) 게임 규칙</h3>
+  <div class="rules-content">
+    <h4>🎮 진행 방법</h4>
+    <ul>
+      <li>턴마다 5개의 주사위를 최대 3번까지 굴릴 수 있습니다.</li>
+      <li>원하는 주사위를 클릭하여 Keep(고정)하거나 컵 속에 넣어 지정 굴리기를 진행하세요.</li>
+      <li>굴리기가 끝나면 점수판 항목 중 하나를 선택해 점수를 기록합니다.</li>
+      <li>모든 카테고리가 차면 최고 득점자가 승리합니다.</li>
+    </ul>
+    <h4>📋 점수 족보 설명</h4>
+    <ul>
+      <li><b>Aces~Sixes</b>: 해당 눈금의 합 (상단 총합 63점 이상 시 <b>+35점 보너스</b>)</li>
+      <li><b>Choice</b>: 모든 주사위 눈금의 총합</li>
+      <li><b>4 of a Kind</b>: 동일한 눈금 4개 이상 (주사위 전체 합)</li>
+      <li><b>Full House</b>: 동일한 눈금 3개 + 2개 (주사위 전체 합)</li>
+      <li><b>S. Straight</b>: 연속된 눈금 4개 이상 (15점 fixed)</li>
+      <li><b>L. Straight</b>: 연속된 눈금 5개 (30점 fixed)</li>
+      <li><b>Yatzy</b>: 동일한 눈금 5개 (50점 fixed)</li>
+    </ul>
+  </div>
+  <button class="ui-btn btn-blue" style="width:100%; justify-content:center;" id="close-yatzy-rules-modal">확인</button>
 </div>
 
 <div id="bottom-info">
@@ -667,7 +706,6 @@
 
     createDiceCup(0, -1.8, false);
     for (let i = 0; i < 5; i++) {
-      // 야추 세트 시작 시 컵 내부/주위에 주사위를배치
       createDice((Math.random() - 0.5) * 0.4, -1.8 + (Math.random() - 0.5) * 0.4, false);
     }
     createYatzyBoard(-3.5, 0, false);
@@ -676,9 +714,8 @@
     if (isLocal) broadcastData({ type: 'setup_yatzy' });
   }
 
-  /* --- [추가] 컵 속에 들어있는 주사위 감지 및 컵 굴리기 기믹 --- */
   function getDiceInCup(cup) {
-    const CUP_RADIUS = 1.1; // 컵 내부로 볼 반경 거리
+    const CUP_RADIUS = 1.1;
     const diceList = objects.filter(o => o.userData.type === 'dice' && !o.userData.isKeep);
     return diceList.filter(d => {
       const dist = Math.hypot(d.position.x - cup.position.x, d.position.z - cup.position.z);
@@ -715,20 +752,17 @@
       progress += 0.05;
 
       if (progress < 0.6) {
-        // 1단계: 컵을 들어올리고 뒤집으며 컵 안의 주사위가 흩어짐
         cup.position.y = 0.27 + Math.sin((progress / 0.6) * Math.PI) * 2.2;
         cup.rotation.z = Math.sin((progress / 0.6) * Math.PI) * Math.PI;
         cup.position.x = startPos.x + (Math.random() - 0.5) * 0.2;
         cup.position.z = startPos.z + (Math.random() - 0.5) * 0.2;
 
-        // 주사위들을 컵 위치 근처에서 같이 흔듦
         diceInCup.forEach(dice => {
           dice.position.x = cup.position.x + (Math.random() - 0.5) * 0.4;
           dice.position.z = cup.position.z + (Math.random() - 0.5) * 0.4;
           dice.position.y = cup.position.y;
         });
       } else {
-        // 2단계: 컵이 원래대로 내려옴
         const t = (progress - 0.6) / 0.4;
         cup.position.y = THREE.MathUtils.lerp(startPos.y + 2.2, startPos.y, t);
         cup.rotation.z = THREE.MathUtils.lerp(Math.PI, 0, t);
@@ -743,7 +777,6 @@
         cup.rotation.copy(startRot);
         cup.userData.isShaking = false;
 
-        // 컵 안의 주사위들을 사방으로 바깥에 펼쳐 떨어트리며 굴림
         diceInCup.forEach((dice, idx) => {
           const angle = (idx / diceInCup.length) * Math.PI * 2;
           const targetX = startPos.x + Math.cos(angle) * (1.2 + Math.random() * 0.6);
@@ -1036,25 +1069,20 @@
     scoreMap["Sixes"] = counts[6] * 6;
     scoreMap["Choice"] = sum;
 
-    // 4 of a Kind
     scoreMap["4ofKind"] = counts.some(c => c >= 4) ? sum : 0;
 
-    // Full House
     const has3 = counts.some(c => c === 3);
     const has2 = counts.some(c => c === 2);
     const has5 = counts.some(c => c === 5);
     scoreMap["FullHouse"] = ((has3 && has2) || has5) ? sum : 0;
 
-    // Small Straight
     const unique = [...new Set(vals)].sort((a,b)=>a-b).join('');
     const isSStraight = /1234|2345|3456/.test(unique);
     scoreMap["SStraight"] = isSStraight ? 15 : 0;
 
-    // Large Straight
     const isLStraight = /12345|23456/.test(unique);
     scoreMap["LStraight"] = isLStraight ? 30 : 0;
 
-    // Yatzy
     scoreMap["Yatzy"] = counts.some(c => c === 5) ? 50 : 0;
 
     return scoreMap;
@@ -1100,7 +1128,6 @@
   function recordYatzyScore(playerKey, category, score, isLocal = true) {
     yatzyScores[playerKey][category] = score;
 
-    // Subtotal & Bonus 계산
     let sub = 0;
     ['Aces', 'Twos', 'Threes', 'Fours', 'Fives', 'Sixes'].forEach(k => {
       sub += (yatzyScores[playerKey][k] || 0);
@@ -1108,7 +1135,6 @@
     yatzyScores[playerKey].Subtotal = sub;
     yatzyScores[playerKey].Bonus = (sub >= 63) ? 35 : 0;
 
-    // Total 계산
     let tot = sub + yatzyScores[playerKey].Bonus;
     ['Choice', '4ofKind', 'FullHouse', 'SStraight', 'LStraight', 'Yatzy'].forEach(k => {
       tot += (yatzyScores[playerKey][k] || 0);
@@ -1117,7 +1143,6 @@
 
     updateYatzyBoardTexture();
 
-    // 주사위 Keep 초기화 및 턴 초기화
     yatzyRollsLeft = 3;
     objects.filter(o => o.userData.type === 'dice').forEach(d => {
       d.userData.isKeep = false;
@@ -1164,6 +1189,7 @@
     }
     if (hasYatzyBoard) {
       html += `
+        <button class="ui-btn btn-blue" id="dyn-yatzy-rules-btn">📖 Yatzy 룰 설명</button>
         <button class="ui-btn btn-orange" id="dyn-yatzy-roll-btn">🎲 전체 굴리기 (${yatzyRollsLeft}/3)</button>
         <button class="ui-btn btn-green" id="dyn-yatzy-score-btn">📋 점수 기록하기</button>
       `;
@@ -1191,6 +1217,9 @@
       };
     }
     if (hasYatzyBoard) {
+      document.getElementById('dyn-yatzy-rules-btn').onclick = () => {
+        document.getElementById('yatzy-rules-modal').style.display = 'flex';
+      };
       document.getElementById('dyn-yatzy-roll-btn').onclick = () => rollYatzyDice(true);
       document.getElementById('dyn-yatzy-score-btn').onclick = () => openYatzyScoreModal();
     }
@@ -1200,7 +1229,6 @@
       objects = []; cardSlots = [];
       clearSelectionGroup();
       
-      // 판 비우기 시 스코어 보드 및 게임 데이터 리셋
       resetYatzyScoreBoard();
       
       updateDynamicActionBar();
@@ -1211,6 +1239,10 @@
 
   document.getElementById('close-yatzy-modal').onclick = () => {
     document.getElementById('yatzy-modal').style.display = 'none';
+  };
+
+  document.getElementById('close-yatzy-rules-modal').onclick = () => {
+    document.getElementById('yatzy-rules-modal').style.display = 'none';
   };
 
   function createLineMesh(points, colorHex, radius) {
@@ -1462,7 +1494,7 @@
   }
 
   function onTouchStart(e) {
-    if (e.target.closest('#top-bar, #bottom-info, #prop-modal, #dynamic-action-bar, #chat-container, #pen-tools-panel, #yatzy-modal')) return;
+    if (e.target.closest('#top-bar, #bottom-info, #prop-modal, #dynamic-action-bar, #chat-container, #pen-tools-panel, #yatzy-modal, #yatzy-rules-modal')) return;
 
     if (isCamModeAlwaysOn || (e.touches && e.touches.length > 1)) {
       selectedObj = null; controls.enabled = true; return;
@@ -1536,7 +1568,7 @@
   }
 
   function onTouchMove(e) {
-    if (e.target.closest('#top-bar, #bottom-info, #prop-modal, #dynamic-action-bar, #chat-container, #pen-tools-panel, #yatzy-modal')) return;
+    if (e.target.closest('#top-bar, #bottom-info, #prop-modal, #dynamic-action-bar, #chat-container, #pen-tools-panel, #yatzy-modal, #yatzy-rules-modal')) return;
 
     const pos = getTouchPos(e);
 
