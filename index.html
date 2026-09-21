@@ -1188,7 +1188,7 @@
     const has5 = counts.some(c => c === 5);
     scoreMap["FullHouse"] = ((has3 && has2) || has5) ? sum : 0;
 
-    const unique = [...new Set(vals)].sort((a,b)=>a-b).join('');
+    const unique = [...new Set(vals)].sort((a, b) => a - b).join('');
     const isSStraight = /1234|2345|3456/.test(unique);
     scoreMap["SStraight"] = isSStraight ? 15 : 0;
 
@@ -1951,6 +1951,9 @@
 
       if (progress < 1) requestAnimationFrame(animateRoll);
       else {
+        dice.rotation.x = rotX;
+        dice.rotation.y = rotY;
+        dice.rotation.z = rotZ;
         dice.position.y = 0.61;
         dice.userData.isRolling = false;
         updateYatzyHintText();
@@ -2096,4 +2099,3 @@
 </script>
 </body>
 </html>
-
