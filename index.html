@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Mobile Tabletop Simulator - Yatzy Enhanced</title>
+  <title>Mobile Tabletop Simulator - Yatzy Enhanced (4P)</title>
   <style>
     * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
     body { margin: 0; overflow: hidden; touch-action: none; font-family: 'Pretendard', sans-serif; background-color: #0f172a; }
@@ -52,7 +52,7 @@
     }
     .size-btn.selected { background: #3b82f6; border-color: #60a5fa; }
     
-    /* Dynamic Action Bar (spawned when prop selected) */
+    /* Dynamic Action Bar */
     #dynamic-action-bar {
       position: absolute; top: 70px; left: 50%; transform: translateX(-50%);
       z-index: 110; display: none; gap: 8px; padding: 6px 12px;
@@ -129,7 +129,7 @@
     /* Yatzy Score Modal Overlay */
     #yatzy-modal {
       position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-      z-index: 300; display: none; flex-direction: column; width: 320px;
+      z-index: 300; display: none; flex-direction: column; width: 340px;
       background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(12px);
       border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 16px;
       padding: 16px; box-shadow: 0 20px 40px rgba(0,0,0,0.8); color: white; pointer-events: auto;
@@ -191,7 +191,7 @@
 
 <!-- Yatzy Auto Score Modal -->
 <div id="yatzy-modal">
-  <h3>🎲 야추 점수 기록</h3>
+  <h3>🎲 야추 점수 기록 (최대 4인)</h3>
   <div class="score-list" id="yatzy-score-list"></div>
   <button class="ui-btn btn-red" style="width:100%; justify-content:center;" id="close-yatzy-modal">닫기</button>
 </div>
@@ -209,7 +209,7 @@
     </select>
     <span id="status" style="color:#f59e0b;">(대기중)</span>
   </div>
-  <div>🛠 <b>야추 지원:</b> 야추 세트 생성 후 [주사위 5개 굴리기] 버튼과 [점수 기록 모달]을 통해 자동으로 족보를 계산하고 기록할 수 있습니다.</div>
+  <div>🛠 <b>야추 지원:</b> 최대 4인(P1~P4)까지 점수 기록 및 족보 계산을 지원하며 판 비우기 시 스코어보드가 초기화됩니다.</div>
 </div>
 
 <div id="chat-container">
@@ -346,12 +346,25 @@
   let lastEraserPoint = null;
   let eraserCursorMesh = null;
 
-  /* --- 야추 게임 데이터 상태 --- */
+  /* --- 야추 게임 데이터 상태 (4인 지원) --- */
   let yatzyRollsLeft = 3;
-  let yatzyScores = {
-    P1: { Aces: null, Twos: null, Threes: null, Fours: null, Fives: null, Sixes: null, Subtotal: 0, Bonus: 0, Choice: null, "4ofKind": null, FullHouse: null, SStraight: null, LStraight: null, Yatzy: null, Total: 0 },
-    P2: { Aces: null, Twos: null, Threes: null, Fours: null, Fives: null, Sixes: null, Subtotal: 0, Bonus: 0, Choice: null, "4ofKind": null, FullHouse: null, SStraight: null, LStraight: null, Yatzy: null, Total: 0 }
-  };
+  
+  function getEmptyYatzyScores() {
+    return {
+      P1: { Aces: null, Twos: null, Threes: null, Fours: null, Fives: null, Sixes: null, Subtotal: 0, Bonus: 0, Choice: null, "4ofKind": null, FullHouse: null, SStraight: null, LStraight: null, Yatzy: null, Total: 0 },
+      P2: { Aces: null, Twos: null, Threes: null, Fours: null, Fives: null, Sixes: null, Subtotal: 0, Bonus: 0, Choice: null, "4ofKind": null, FullHouse: null, SStraight: null, LStraight: null, Yatzy: null, Total: 0 },
+      P3: { Aces: null, Twos: null, Threes: null, Fours: null, Fives: null, Sixes: null, Subtotal: 0, Bonus: 0, Choice: null, "4ofKind": null, FullHouse: null, SStraight: null, LStraight: null, Yatzy: null, Total: 0 },
+      P4: { Aces: null, Twos: null, Threes: null, Fours: null, Fives: null, Sixes: null, Subtotal: 0, Bonus: 0, Choice: null, "4ofKind": null, FullHouse: null, SStraight: null, LStraight: null, Yatzy: null, Total: 0 }
+    };
+  }
+
+  let yatzyScores = getEmptyYatzyScores();
+
+  function resetYatzyScoreBoard() {
+    yatzyScores = getEmptyYatzyScores();
+    yatzyRollsLeft = 3;
+    updateYatzyBoardTexture();
+  }
 
   const suits = ['♠', '♥', '♦', '♣'];
   const values = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
@@ -431,16 +444,16 @@
     new THREE.MeshStandardMaterial({ map: createDiceFaceTexture(4), roughness: 0.2 })
   ];
 
-  /* --- [야추 전용] 점수판 텍스처 생성 및 갱신 --- */
+  /* --- [야추 전용] 4인 점수판 텍스처 생성 및 갱신 --- */
   function createYatzyBoardTexture() {
-    const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 768;
+    const canvas = document.createElement('canvas'); canvas.width = 600; canvas.height = 768;
     const ctx = canvas.getContext('2d');
 
-    ctx.fillStyle = '#f8fafc'; ctx.fillRect(0, 0, 512, 768);
-    ctx.lineWidth = 4; ctx.strokeStyle = '#0f172a'; ctx.strokeRect(10, 10, 492, 748);
+    ctx.fillStyle = '#f8fafc'; ctx.fillRect(0, 0, 600, 768);
+    ctx.lineWidth = 4; ctx.strokeStyle = '#0f172a'; ctx.strokeRect(10, 10, 580, 748);
 
-    ctx.fillStyle = '#0f172a'; ctx.font = 'bold 36px sans-serif'; ctx.textAlign = 'center';
-    ctx.fillText('YATZY SCOREBOARD', 256, 55);
+    ctx.fillStyle = '#0f172a'; ctx.font = 'bold 32px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('YATZY SCOREBOARD (4P)', 300, 50);
 
     const categories = [
       { name: "Aces (1)", key: "Aces" },
@@ -460,36 +473,44 @@
       { name: "TOTAL", key: "Total" }
     ];
 
-    ctx.lineWidth = 2; ctx.font = 'bold 20px sans-serif';
-    ctx.beginPath(); ctx.moveTo(20, 80); ctx.lineTo(492, 80); ctx.stroke();
+    ctx.lineWidth = 2; ctx.font = 'bold 16px sans-serif';
+    ctx.beginPath(); ctx.moveTo(20, 75); ctx.lineTo(580, 75); ctx.stroke();
     
-    ctx.beginPath(); ctx.moveTo(230, 80); ctx.lineTo(230, 740); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(360, 80); ctx.lineTo(360, 740); ctx.stroke();
+    // 세로 구분선 (카테고리, P1, P2, P3, P4)
+    const colX = [200, 295, 390, 485, 580];
+    colX.forEach(x => {
+      ctx.beginPath(); ctx.moveTo(x, 75); ctx.lineTo(x, 740); ctx.stroke();
+    });
 
-    ctx.fillText("CATEGORY", 125, 105);
-    ctx.fillText("P1", 295, 105);
-    ctx.fillText("P2", 426, 105);
+    ctx.fillText("CATEGORY", 110, 98);
+    ctx.fillText("P1", 247, 98);
+    ctx.fillText("P2", 342, 98);
+    ctx.fillText("P3", 437, 98);
+    ctx.fillText("P4", 532, 98);
 
-    let y = 115;
+    let y = 108;
     for (let i = 0; i < categories.length; i++) {
       const cat = categories[i];
-      ctx.beginPath(); ctx.moveTo(20, y); ctx.lineTo(492, y); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(20, y); ctx.lineTo(580, y); ctx.stroke();
       ctx.textAlign = 'left';
       if (cat.key === "Subtotal" || cat.key === "Bonus" || cat.key === "Total") {
         ctx.fillStyle = '#3b82f6';
       } else {
         ctx.fillStyle = '#0f172a';
       }
-      ctx.fillText(cat.name, 30, y + 28);
+      ctx.fillText(cat.name, 28, y + 26);
 
-      // P1, P2 점수 표시
+      // P1~P4 점수 표시
       ctx.textAlign = 'center';
-      const valP1 = yatzyScores.P1[cat.key];
-      const valP2 = yatzyScores.P2[cat.key];
-      if (valP1 !== null && valP1 !== undefined) ctx.fillText(valP1.toString(), 295, y + 28);
-      if (valP2 !== null && valP2 !== undefined) ctx.fillText(valP2.toString(), 426, y + 28);
+      const pXs = [247, 342, 437, 532];
+      ['P1', 'P2', 'P3', 'P4'].forEach((pKey, idx) => {
+        const val = yatzyScores[pKey][cat.key];
+        if (val !== null && val !== undefined) {
+          ctx.fillText(val.toString(), pXs[idx], y + 26);
+        }
+      });
 
-      y += 40;
+      y += 42;
     }
     return new THREE.CanvasTexture(canvas);
   }
@@ -615,7 +636,7 @@
     const id = customId || ('yatzy_board_' + (++objectIdCounter));
     if (objects.some(o => o.userData.id === id)) return;
 
-    const geo = new THREE.BoxGeometry(3.0, 0.05, 4.5);
+    const geo = new THREE.BoxGeometry(3.5, 0.05, 4.5);
     const boardTex = createYatzyBoardTexture();
     const mats = [
       new THREE.MeshStandardMaterial({ color: 0x334155 }),
@@ -642,7 +663,7 @@
     objects = [];
     clearSelectionGroup();
 
-    yatzyRollsLeft = 3;
+    resetYatzyScoreBoard();
 
     for (let i = 0; i < 5; i++) {
       createDice(-1.2 + i * 0.6, 1.5, false);
@@ -930,18 +951,18 @@
     // 4 of a Kind
     scoreMap["4ofKind"] = counts.some(c => c >= 4) ? sum : 0;
 
-    // Full House (3+2)
+    // Full House
     const has3 = counts.some(c => c === 3);
     const has2 = counts.some(c => c === 2);
     const has5 = counts.some(c => c === 5);
     scoreMap["FullHouse"] = ((has3 && has2) || has5) ? sum : 0;
 
-    // Small Straight (4연속)
+    // Small Straight
     const unique = [...new Set(vals)].sort((a,b)=>a-b).join('');
     const isSStraight = /1234|2345|3456/.test(unique);
     scoreMap["SStraight"] = isSStraight ? 15 : 0;
 
-    // Large Straight (5연속)
+    // Large Straight
     const isLStraight = /12345|23456/.test(unique);
     scoreMap["LStraight"] = isLStraight ? 30 : 0;
 
@@ -954,7 +975,7 @@
   function openYatzyScoreModal() {
     const vals = getDiceValues();
     const possibleScores = calculateYatzyScores(vals);
-    const playerKey = (mySeat === 2) ? 'P2' : 'P1';
+    const playerKey = `P${mySeat}`;
     const playerScores = yatzyScores[playerKey];
 
     const container = document.getElementById('yatzy-score-list');
@@ -973,7 +994,7 @@
 
       row.innerHTML = `
         <span><b>${labelMap[key]}</b>: ${isAlreadyUsed ? playerScores[key] + 'pt (완료)' : '+' + calcVal + 'pt'}</span>
-        <button ${isAlreadyUsed ? 'disabled' : ''}>기록</button>
+        <button ${isAlreadyUsed ? 'disabled' : ''}>${playerKey} 기록</button>
       `;
 
       if (!isAlreadyUsed) {
@@ -1080,6 +1101,10 @@
       cardSlots.forEach(slot => scene.remove(slot));
       objects = []; cardSlots = [];
       clearSelectionGroup();
+      
+      // 판 비우기 시 스코어 보드 및 게임 데이터 리셋
+      resetYatzyScoreBoard();
+      
       updateDynamicActionBar();
       broadcastData({ type: 'clear' });
     };
@@ -1640,7 +1665,6 @@
     if (isLocal) broadcastData({ type: 'flip', id: card.userData.id });
   }
 
-  /* --- 정밀한 눈금 회전 각도 정의 --- */
   const diceFaceRotations = {
     1: { x: 0, y: 0, z: 0 },
     6: { x: 0, y: Math.PI, z: 0 },
@@ -1743,6 +1767,7 @@
       cardSlots.forEach(slot => scene.remove(slot));
       objects = []; cardSlots = [];
       clearSelectionGroup();
+      resetYatzyScoreBoard();
       updateDynamicActionBar();
     } else if (data.type === 'create_slots') {
       createSlotLine(data.count, false);
