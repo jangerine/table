@@ -166,6 +166,9 @@
 #muffin-log{height:150px;overflow:auto;background:#020617;border-radius:10px;padding:8px;font-size:10px;line-height:1.35;margin-top:8px}
 #muffin-players{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}.mp{background:#1e293b;border-radius:10px;padding:7px;font-size:10px}.mp b{color:#fbbf24}.mp .mini{color:#94a3b8}
 #muffin-targets{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}.mtarget{padding:7px 4px;border:1px solid #475569;border-radius:8px;background:#1e293b;color:#fff;font-size:10px}
+#muffin-picker{display:flex;flex-direction:column;gap:6px;margin:8px 0}.mpick-title{font-size:11px;font-weight:900;color:#fbbf24}.mpick-list{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;max-height:180px;overflow:auto}.mpick-item{padding:9px 6px;border:1px solid #475569;border-radius:9px;background:#1e293b;color:#fff;font-size:11px;font-weight:700}.mpick-item:active{background:#334155}.mpick-cancel{padding:7px;border:0;border-radius:8px;background:#475569;color:#fff;font-weight:800}
+#muffin-toast{position:absolute;left:50%;bottom:8px;transform:translateX(-50%);max-width:92vw;background:rgba(2,6,23,.95);border:1px solid rgba(251,191,36,.5);color:#fef3c7;font-size:11px;font-weight:700;border-radius:10px;padding:8px 12px;display:none;pointer-events:none;z-index:5}
+.mtrap-row{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}.mtrap-chip{display:flex;align-items:center;gap:6px;background:#3b0764;border:1px solid #a855f7;border-radius:9px;padding:5px 7px;font-size:10px;color:#fff}.mtrap-chip button{padding:4px 8px;border:0;border-radius:7px;background:#a855f7;color:#fff;font-weight:800;font-size:10px}
 @media(max-width:700px){#top-bar{height:auto}.btn-group-left{max-width:72vw}.ui-btn{font-size:10px;padding:6px 8px}#muffin-top{top:105px}#muffin-hands{bottom:92px}.mh-card{min-width:82px;width:82px;height:118px}.mh-card .ct{font-size:9px}}
 </style>
 </head>
@@ -207,6 +210,7 @@
   <button id="add-deck-btn">🎴 52장 전체 덱 리셋</button>
   <button id="add-dice-btn">🎲 주사위 1개 추가</button>
   <button id="add-yatzy-btn" style="background: linear-gradient(135deg, #10b981, #047857);">🎲 야추(Yatzy) 세트 생성</button>
+  <button id="add-muffin-btn" style="background: linear-gradient(135deg, #f97316, #ea580c);">🧁 머핀 타임 세팅 (8인)</button>
 </div>
 
 <!-- Yatzy Auto Score Modal -->
@@ -241,7 +245,10 @@
     </div>
     <div id="muffin-players"></div>
     <div class="mm-row" id="muffin-targets"></div>
+    <div id="muffin-picker"></div>
+    <div class="mtrap-row" id="muffin-traps"></div>
     <div id="muffin-log"></div>
+    <div id="muffin-toast"></div>
   </div>
 </div>
 <div id="bottom-info">
@@ -254,10 +261,14 @@
       <option value="2">P2 (북)</option>
       <option value="3" selected>P3 (서)</option>
       <option value="4">P4 (동)</option>
+      <option value="5">P5 (남동)</option>
+      <option value="6">P6 (남서)</option>
+      <option value="7">P7 (북동)</option>
+      <option value="8">P8 (북서)</option>
     </select>
     <span id="status" style="color:#f59e0b;">(대기중)</span>
   </div>
-  <div>🛠 <b>야추 지원:</b> 주사위를 컵 주변에 두고 컵을 클릭하면 컵 속 주사위만 따로 굴릴 수 있습니다.</div>
+  <div>🛠 <b>야추 지원:</b> 주사위를 컵 주변에 두고 컵을 클릭하면 컵 속 주사위만 따로 굴릴 수 있습니다.<br>🧁 <b>머핀 타임(최대 8인):</b> 소품 추가 → 머핀 타임 세팅 → 게임 시작(3장씩 배분). 덱 탭=1장 가져오기, 내 카드를 중앙으로 드래그=내기.</div>
 </div>
 
 <div id="chat-container">
@@ -291,6 +302,10 @@
     else if (mySeat === 2) camera.position.set(0, 16, -15);
     else if (mySeat === 3) camera.position.set(-15, 16, 0);
     else if (mySeat === 4) camera.position.set(15, 16, 0);
+    else if (mySeat === 5) camera.position.set(10.6, 16, 10.6);
+    else if (mySeat === 6) camera.position.set(-10.6, 16, 10.6);
+    else if (mySeat === 7) camera.position.set(10.6, 16, -10.6);
+    else if (mySeat === 8) camera.position.set(-10.6, 16, -10.6);
   }
   updateCameraPosition();
 
@@ -977,9 +992,7 @@
     const deckCards = objects.filter(o => o.userData.type === 'card' && Math.hypot(o.position.x, o.position.z) < 1.5);
     if (deckCards.length < 2) return;
 
-    const input = prompt(`몇 장의 카드를 떼어내시겠습니까? (최대 ${deckCards.length - 1}장)`, '5');
-    const cutCount = parseInt(input, 10);
-    if (isNaN(cutCount) || cutCount < 1 || cutCount >= deckCards.length) return;
+    const cutCount = Math.min(5, deckCards.length - 1);
 
     deckCards.sort((a, b) => b.position.y - a.position.y);
     const cutCards = deckCards.slice(0, cutCount);
@@ -1425,11 +1438,10 @@
   document.getElementById('add-deck-btn').addEventListener('click', () => spawnFullDeck(true));
   document.getElementById('add-dice-btn').addEventListener('click', () => createDice());
   document.getElementById('add-yatzy-btn').addEventListener('click', () => setupYatzySet(true));
+  document.getElementById('add-muffin-btn').addEventListener('click', (e) => { e.stopPropagation(); document.getElementById('prop-modal').style.display = 'none'; if (window.setupMuffinTable) window.setupMuffinTable(true); });
 
   document.getElementById('add-slot-btn').addEventListener('click', () => {
-    const input = prompt('생성할 슬롯(순서 칸)의 개수를 입력하세요:', '5');
-    const count = parseInt(input, 10);
-    if (!isNaN(count) && count > 0) createSlotLine(count, true);
+    createSlotLine(5, true);
   });
 
   document.getElementById('player-seat-select').addEventListener('change', (e) => {
@@ -1440,6 +1452,7 @@
       alignCardRotationBySeat(c);
       updateHandVisibility(c);
     });
+    if (window.__muffinRender) window.__muffinRender();
   });
 
   let isSelectMode = false;
@@ -2022,31 +2035,41 @@
   const allNames=new Set([...MP.actionNames,...MP.trapNames,...MP.counterNames]);
   function mpId(){return 'm'+Date.now().toString(36)+'_'+(++MP.seq)+'_'+mySeat}
   function mpLog(t){const el=document.getElementById('muffin-log');if(!el)return;const d=document.createElement('div');d.textContent=t;el.appendChild(d);el.scrollTop=el.scrollHeight}
+  function mpToast(t,ms=2200){try{const el=document.getElementById('muffin-toast');if(!el){mpLog(t);return}el.textContent=t;el.style.display='block';if(mpToast._t)clearTimeout(mpToast._t);mpToast._t=setTimeout(()=>{el.style.display='none'},ms)}catch(e){mpLog(t)}}
+  function mpNotify(t){mpLog(t);mpToast(t)}
+  function mpPick(title,items){return new Promise(resolve=>{const box=document.getElementById('muffin-picker');if(!box){resolve(-1);return}box.innerHTML='';const tt=document.createElement('div');tt.className='mpick-title';tt.textContent=title;box.appendChild(tt);const list=document.createElement('div');list.className='mpick-list';box.appendChild(list);let done=false;const finish=v=>{if(done)return;done=true;box.innerHTML='';resolve(v)};items.forEach((it,idx)=>{const b=document.createElement('button');b.className='mpick-item';b.textContent=it.label||it.name||('선택 '+(idx+1));b.onclick=()=>finish(it.value!==undefined?it.value:idx);list.appendChild(b)});const c=document.createElement('button');c.className='mpick-cancel';c.textContent='취소';c.onclick=()=>finish(-1);box.appendChild(c);const modal=document.getElementById('muffin-modal');if(modal&&modal.style.display==='none')modal.style.display='block'})}
+  function mpConfirmChoice(title){return mpPick(title,[{label:'확인',value:true},{label:'취소',value:false}]).then(v=>v===true)}
   function mpCard(name,type,owner=0){return {id:mpId(),name,type,owner,faceUp:false}}
-  function mpSnapshot(){return {mode:MP.mode,pack:MP.pack,turn:MP.turn,direction:MP.direction,goal:MP.goal,deck:MP.deck,discard:MP.discard,players:MP.players,lastAction:MP.lastAction,currentAction:MP.currentAction,pending:MP.pending,started:MP.started}}
-  function mpApplySnapshot(st){if(!st)return;Object.assign(MP,{mode:st.mode||'official',pack:st.pack||'all',turn:st.turn||1,direction:st.direction||1,goal:st.goal||10,deck:st.deck||[],discard:st.discard||[],players:st.players||MP.players,lastAction:st.lastAction||null,currentAction:st.currentAction||null,pending:st.pending||null,started:!!st.started});mpRender()}
+  function mpSnapshot(){return {mode:MP.mode,pack:MP.pack,turn:MP.turn,turnCount:MP.turnCount||0,direction:MP.direction,goal:MP.goal,deck:MP.deck,discard:MP.discard,players:MP.players,lastAction:MP.lastAction,currentAction:MP.currentAction,pending:MP.pending,winCandidate:MP.winCandidate||null,noWinUntil:MP.noWinUntil||0,noActionsUntil:MP.noActionsUntil||0,started:MP.started}}
+  function mpApplySnapshot(st){if(!st)return;Object.assign(MP,{mode:st.mode||'official',pack:st.pack||'all',turn:st.turn||1,turnCount:st.turnCount||0,direction:st.direction||1,goal:st.goal||10,deck:st.deck||[],discard:st.discard||[],players:st.players||MP.players,lastAction:st.lastAction||null,currentAction:st.currentAction||null,pending:st.pending||null,winCandidate:st.winCandidate||null,noWinUntil:st.noWinUntil||0,noActionsUntil:st.noActionsUntil||0,started:!!st.started});mpRender()}
   function mpBroadcast(payload){broadcastData(Object.assign({type:'muffin'},payload))}
   function mpSync(){mpBroadcast({op:'state',state:mpSnapshot()})}
   function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
   function mpBuildDeck(){
     const d=[];
     const push=(arr,type)=>arr.forEach(n=>d.push(mpCard(n,type)));
-    push(MP.actionNames,'action');push(MP.trapNames,'trap');push(MP.counterNames,'counter');
-    // 230-card library = base + Kickstarter + two expansion packs represented by the full library.
+    if(MP.pack==='ks'){
+      push(MP.actionNames.slice(0,100),'action');push(MP.trapNames.slice(0,30),'trap');push(MP.counterNames.slice(0,30),'counter');
+    } else {
+      push(MP.actionNames,'action');push(MP.trapNames,'trap');push(MP.counterNames,'counter');
+    }
     return shuffle(d);
   }
-  function mpResetState(){if(MP.pendingTimer){clearTimeout(MP.pendingTimer);MP.pendingTimer=null}MP.deck=mpBuildDeck();MP.discard=[];MP.turn=1;MP.direction=1;MP.goal=10;MP.lastAction=null;MP.currentAction=null;MP.pending=null;MP.winCandidate=null;MP.started=true;MP.players.forEach(p=>{p.hand=[];p.traps=[];p.skipped=false})}
+  function mpResetState(){if(MP.pendingTimer){clearTimeout(MP.pendingTimer);MP.pendingTimer=null}MP.deck=mpBuildDeck();MP.discard=[];MP.turn=1;MP.turnCount=0;MP.direction=1;MP.goal=10;MP.lastAction=null;MP.currentAction=null;MP.pending=null;MP.winCandidate=null;MP.noWinUntil=0;MP.noActionsUntil=0;MP.started=true;MP.players.forEach(p=>{p.hand=[];p.traps=[];p.skipped=false;p.muffinAnnounced=false;p.extraActions=0})}
   function recycle(){if(!MP.deck.length&&MP.discard.length){MP.deck=shuffle(MP.discard.splice(0));MP.deck.forEach(c=>{c.owner=0;c.faceUp=false})}}
-  function mpDraw(seat,n=1){const p=MP.players[seat-1];for(let i=0;i<n;i++){recycle();if(!MP.deck.length)break;const c=MP.deck.pop();c.owner=seat;c.faceUp=false;p.hand.push(c)}mpCheckMuffin(seat);mpRender()}
-  function mpDiscardCards(p,count){let n=Math.min(Math.max(0,count),p.hand.length);for(let i=0;i<n;i++)MP.discard.push(p.hand.splice(Math.floor(Math.random()*p.hand.length),1)[0]);return n}
-  function mpTakeRandom(from,to,count=1){const a=MP.players[from-1],b=MP.players[to-1];for(let i=0;i<count&&a.hand.length;i++){const c=a.hand.splice(Math.floor(Math.random()*a.hand.length),1)[0];c.owner=to;b.hand.push(c)}mpCheckMuffin(to)}
+  function mpValidateMuffin(seat){const p=MP.players[seat-1];if(!p)return;if(p.hand.length!==MP.goal&&p.muffinAnnounced){p.muffinAnnounced=false;if(MP.winCandidate&&MP.winCandidate.seat===seat){MP.winCandidate=null;mpLog('💨 P'+seat+'의 MUFFIN TIME 선언이 깨졌습니다 (현재 '+p.hand.length+'장)');}}}
+  function mpDraw(seat,n=1){const p=MP.players[seat-1];for(let i=0;i<n;i++){recycle();if(!MP.deck.length)break;const c=MP.deck.pop();c.owner=seat;c.faceUp=false;p.hand.push(c)}mpValidateMuffin(seat);mpAutoDeclare(seat);mpRender()}
+  function mpDiscardCards(p,count){let n=Math.min(Math.max(0,count),p.hand.length);for(let i=0;i<n;i++)MP.discard.push(p.hand.splice(Math.floor(Math.random()*p.hand.length),1)[0]);mpValidateMuffin(p.seat);return n}
+  function mpTakeRandom(from,to,count=1){const a=MP.players[from-1],b=MP.players[to-1];for(let i=0;i<count&&a.hand.length;i++){const c=a.hand.splice(Math.floor(Math.random()*a.hand.length),1)[0];c.owner=to;b.hand.push(c)}mpValidateMuffin(from);mpValidateMuffin(to);mpAutoDeclare(to)}
   function mpGiveRandom(from,to,count=1){mpTakeRandom(from,to,count)}
-  function mpChooseTarget(cb,label='대상 선택'){const box=document.getElementById('muffin-targets');box.innerHTML='<b style="grid-column:1/-1">'+label+'</b>';MP.players.forEach(p=>{if(p.seat===mySeat)return;const b=document.createElement('button');b.className='mtarget';b.textContent='P'+p.seat+' · '+p.hand.length+'장';b.onclick=()=>{box.innerHTML='';cb(p.seat)}})}
-  function mpChooseCardFromHand(seat,cb,filter=()=>true){const p=MP.players[seat-1];const opts=p.hand.filter(filter);if(!opts.length){alert('조건에 맞는 카드가 없습니다.');return}const list=opts.map((c,i)=>(i+1)+'. '+c.name).join('\n');const k=parseInt(prompt('카드 선택:\n'+list,'1'))-1;if(k>=0&&k<opts.length)cb(opts[k])}
+  function mpChooseTarget(cb,label='대상 선택'){const box=document.getElementById('muffin-targets');if(!box){cb(-1);return}box.innerHTML='<b style="grid-column:1/-1">'+label+' (취소 가능)</b>';MP.players.forEach(p=>{if(p.seat===mySeat)return;const b=document.createElement('button');b.className='mtarget';b.textContent='P'+p.seat+' · '+p.hand.length+'장';b.onclick=()=>{box.innerHTML='';cb(p.seat)}});const c=document.createElement('button');c.className='mtarget';c.style.background='#475569';c.textContent='취소';c.onclick=()=>{box.innerHTML='';cb(-1)};box.appendChild(c)}
+  function mpChooseCardFromHand(seat,cb,filter=()=>true){const p=MP.players[seat-1];const opts=p.hand.filter(filter);if(!opts.length){mpToast('조건에 맞는 카드가 없습니다.');return}mpPick('카드 선택',opts.map(c=>({label:c.name+' ('+c.type+')',value:c.id}))).then(v=>{if(v===-1||v===false)return;const found=opts.find(c=>c.id===v);if(found)cb(found)})}
   function mpMoveCard(card,from,to){const i=from.hand.indexOf(card);if(i>=0)from.hand.splice(i,1);card.owner=to.seat;to.hand.push(card)}
-  function mpNextTurn(){if(MP.mode==='free')return;let tries=0;do{MP.turn=((MP.turn-1+MP.direction+8)%8)+1;tries++}while(MP.players[MP.turn-1].skipped&&tries<9);MP.players[MP.turn-1].skipped=false;mpBroadcast({op:'turn',turn:MP.turn});mpCheckMuffin(MP.turn)}
+  function mpNextTurn(){if(MP.mode==='free')return;let tries=0;do{MP.turn=((MP.turn-1+MP.direction+8)%8)+1;tries++;MP.turnCount=(MP.turnCount||0)+1}while(MP.players[MP.turn-1].skipped&&tries<9);MP.players[MP.turn-1].skipped=false;if(MP.winCandidate){const wc=MP.winCandidate;const cand=MP.players[wc.seat-1];if(!cand.muffinAnnounced||cand.hand.length!==MP.goal){MP.winCandidate=null}else{wc.remain=(wc.remain||7)-1;if(MP.turn===wc.seat){if(cand.hand.length===MP.goal){mpLog('🏆 P'+wc.seat+' 승리! MUFFIN TIME을 한 바퀴 유지했습니다!');mpNotify('🏆 P'+wc.seat+' 승리! MUFFIN TIME!');MP.started=false;MP.winCandidate=null;mpSync();mpRender();return}else{MP.winCandidate=null}}}}mpBroadcast({op:'turn',turn:MP.turn,turnCount:MP.turnCount,winCandidate:MP.winCandidate,started:MP.started,state:mpSnapshot()});mpRender()}
+  function mpAutoDeclare(seat){const p=MP.players[seat-1];if(!MP.started||!p||p.hand.length!==MP.goal||p.muffinAnnounced||MP.noWinUntil===seat)return}
+  function mpDeclareMuffin(seat){const p=MP.players[seat-1];if(!MP.started){mpToast('게임을 먼저 시작하세요.');return false}if(p.hand.length!==MP.goal){mpToast('정확히 '+MP.goal+'장일 때만 외칠 수 있습니다 (현재 '+p.hand.length+'장)');return false}if(MP.noWinUntil===seat){mpToast('이번 라운드는 승리 선언이 금지되어 있습니다.');return false}if(MP.mode==='free'&&p.muffinAnnounced&&MP.winCandidate&&MP.winCandidate.seat===seat){mpLog('🏆 P'+seat+' 승리! MUFFIN TIME을 유지했습니다! (자유 모드 재확인)');mpNotify('🏆 P'+seat+' 승리! MUFFIN TIME!');MP.started=false;MP.winCandidate=null;mpSync();mpRender();return true}p.muffinAnnounced=true;MP.winCandidate={seat,remain:7,declaredAt:Date.now()};mpLog('🧁 P'+seat+'가 "MUFFIN TIME!"을 선언! '+(MP.mode==='official'?'다음 자기 턴까지 ':'다시 한 번 버튼을 눌러 유지 확인 시 ')+MP.goal+'장을 유지하면 승리');mpSync();mpRender();return true}
   function isMini(name){return ['JOUST TIME','LIE TO ME','SHOWDOWN','MYSTERY BUTTON','CAN\'T BREATHE','BABY VOICE','ALPHABET','OH NO!','CAN YOU DO THIS?','STANDING UP SCHOOL','OKAY, DRAW!','NEW CAMERA','TAKE IT OUTSIDE'].includes(name.toUpperCase())}
-  function manual(name,seat){mpLog('🟨 '+name+' — 실제 말하기/행동/신체조건이 필요한 카드입니다. 테이블에서 조건을 실행한 뒤 해당 카드의 "효과 적용"을 눌러주세요.');alert(name+'\n\n실제 행동이 필요한 카드입니다. 참가자들이 조건을 수행한 뒤 효과를 수동으로 적용하세요.');}
+  function manual(name,seat){mpNotify('🟨 '+name+' — 실제 말하기/행동이 필요한 카드. 테이블에서 수행 후 효과를 수동 적용하세요.')}
   function desc(name,type){
     const n=name.toUpperCase();
     if(type==='counter')return '현재 진행 중인 효과에 반응하는 카운터';
@@ -2055,7 +2078,16 @@
       'MUFFIN TIME':'5장 뽑기','MAGICAL PONY':'4장 뽑기','LEVEL UP':'나 2장, 다른 모든 플레이어 1장 뽑기','DO THE FLOP!':'모두 1장 버리기','MINE TURTLE':'모두 3장 버리기','MY LEMONS':'내 카드 4장 버리기','I WANNA DIE':'내 패 전부 버리기','ONLY ONE':'모두 1장만 남기기','YOU\'RE FAT':'대상 5장 뽑기','BARBERSHOP QUARTET':'대상에게서 4장 훔치거나 내가 4장 뽑기','GOT YOUR NOSE':'대상 1장 훔치기','PULL MY FINGER':'대상 1장 훔치기','STOLEN FACE':'대상 2장 훔치기','YAY! COOKIES!':'모두에게서 1장씩 훔치기','YOU\'RE ADOPTED':'버림더미 위 3장 회수','HOMEWORK':'덱 위 5장 중 1장 선택','MAGIC TRICK':'덱에서 원하는 카드 검색','TIME OF DEATH':'승리 목표를 1~20으로 변경','PARALLEL UNIVERSE':'내 패 수만큼 뽑기','GROW UP FAST':'모두 7장으로 맞추기','I SUCK AT THIS GAME':'최저 손패 플레이어 3장 뽑기','WHAT ARE YOU DOING?!':'모든 손패를 섞어 균등 재분배','HOLD THIS':'대상과 손패 교환','ALIEN INVASION':'내 손패 전부 대상에게 주기','MINE NOW':'상대 함정 1장 가져오기','CANNONBALL':'각자 함정 1장 버리기','PUNCH EM':'대상 함정 전부 버리기','SHOOT YOUR PROBLEMS':'모든 함정 버리기','SUDDENLY PINEAPPLES':'모든 설치 함정 버리기','FALLING UP':'턴 방향 반전','KILLED US ALL':'나 2장, 나머지 1장씩 버리기','THROW THE CHEESE':'나를 제외한 모두 1장 버리기','NEW YOU':'내 패 전부 버리고 같은 수만큼 다시 뽑기','POINTLESS':'아무 일도 없음','FAMILY':'수동 효과'};return m[n]||'카드 효과를 실행';
   }
   function removeTrap(p,c){const i=p.traps.indexOf(c);if(i>=0){p.traps.splice(i,1);c.owner=0;MP.discard.push(c);return true}return false}
-  function chooseTrap(seat,cb,fromAll=false){const pools=fromAll?MP.players.flatMap(p=>p.traps.map(c=>({p,c}))):MP.players[seat-1].traps.map(c=>({p:MP.players[seat-1],c}));if(!pools.length){alert('설치된 함정이 없습니다.');return}const list=pools.map((x,i)=>(i+1)+'. P'+x.p.seat+' '+x.c.name).join('\n');const k=parseInt(prompt('함정 선택:\n'+list,'1'))-1;if(k>=0&&k<pools.length)cb(pools[k].p,pools[k].c)}
+  function chooseTrap(seat,cb,fromAll=false){const pools=fromAll?MP.players.flatMap(p=>p.traps.map(c=>({p,c}))):MP.players[seat-1].traps.map(c=>({p:MP.players[seat-1],c}));if(!pools.length){mpToast('설치된 함정이 없습니다.');return}mpPick('함정 선택',pools.map((x,i)=>({label:'P'+x.p.seat+' '+x.c.name,value:i}))).then(v=>{if(v===-1||v===false)return;const sel=pools[v];if(sel)cb(sel.p,sel.c)})}
+  function mpTrapDesc(name){const n=String(name||'').toUpperCase();const m={'A ROBBERY':'누가 카드를 뽑으면 1장 훔치기','SNIPER PUG':'누가 나를 공격하면 2장 버리게 하기','CATCH!':'상대가 나에게서 훔치려 하면 무효 + 상대 1장 버리기','CAUGHT YOU':'상대 행동 무효화','WHAT TIME IS IT?':'MUFFIN TIME 선언 무효화','DON\'T TOUCH':'내 카드가 대상이 되면 취소','JACK IN THE BOX':'다음 내 턴 시작 시 2장 뽑기','MAGIC WORD':'상대가 말실수 시 1장 훔치기(수동)','COUNTDOWN':'상대 턴 스킵','HIGH FIVE':'수동 미니게임','TIRED?':'대상 2장 버리기'};return m[n]||'조건 달성 시 발동 (탭하여 수동 발동)'}
+  function mpActivateTrap(trapId){const me=MP.players[mySeat-1];const idx=me.traps.findIndex(c=>c.id===trapId);if(idx<0){mpToast('내 함정이 아닙니다.');return}const trap=me.traps[idx];const n=trap.name.toUpperCase();
+    const consume=()=>{me.traps.splice(idx,1);trap.faceUp=true;MP.discard.push(trap);mpValidateMuffin(mySeat)};
+    if(n==='CATCH!'||n==='CAUGHT YOU'||n==='DON\'T TOUCH'||n==='WHAT?!'||n==='YOU FOOL'||n==='HELLO THERE'){if(!MP.pending){mpToast('현재 대응할 효과가 없어 발동할 수 없습니다.');return}MP.pending.cancelled=true;MP.pending.counter=trap;consume();mpLog('🪤 P'+mySeat+' 함정 발동: '+trap.name+' → 현재 효과 무효!');mpSync();mpRender();return}
+    if(n==='WHAT TIME IS IT?'){const cand=MP.winCandidate;if(!cand){mpToast('무효화할 MUFFIN TIME 선언이 없습니다.');return}const p=MP.players[cand.seat-1];p.muffinAnnounced=false;MP.winCandidate=null;consume();mpLog('🪤 P'+mySeat+' 함정 발동: '+trap.name+' → P'+cand.seat+'의 MUFFIN TIME 무효!');mpSync();mpRender();return}
+    if(n==='A ROBBERY'||n==='SNIPER PUG'||n==='GULLIBLE'||n==='FACE IN THE FACE'){mpChooseTarget(t=>{if(t<0)return;if(n==='SNIPER PUG'){mpDiscardCards(MP.players[t-1],2)}else{mpTakeRandom(t,mySeat,1)}consume();mpLog('🪤 P'+mySeat+' 함정 발동: '+trap.name+' → P'+t);mpSync();mpRender()},'함정 대상 선택: '+trap.name);return}
+    if(n==='COUNTDOWN'||n==='TIRED?'||n==='NEEDLES'||n==='UPSIDE DOWN'){mpChooseTarget(t=>{if(t<0)return;if(n==='COUNTDOWN'){MP.players[t-1].skipped=true;mpLog('🪤 P'+mySeat+' 함정 발동: '+trap.name+' → P'+t+' 다음 턴 스킵')}else{mpDiscardCards(MP.players[t-1],n==='TIRED?'?2:1);mpLog('🪤 P'+mySeat+' 함정 발동: '+trap.name+' → P'+t+' 카드 버림')}consume();mpSync();mpRender()},'함정 대상 선택: '+trap.name);return}
+    if(n==='JACK IN THE BOX'){consume();mpDraw(mySeat,2);mpLog('🪤 P'+mySeat+' 함정 발동: '+trap.name+' → 2장 뽑음');mpSync();mpRender();return}
+    mpChooseTarget(t=>{consume();if(t>0){mpLog('🪤 P'+mySeat+' 함정 발동: '+trap.name+' → P'+t+' (테이블에서 실제 조건 확인 후 수동 적용)')}else{mpLog('🪤 P'+mySeat+' 함정 발동: '+trap.name+' (수동 적용)')}mpSync();mpRender()},'함정 ['+trap.name+'] 대상 선택(수동 확인용)')}
 
   // ----- counters / interrupt stack -----
   const counterRules={
@@ -2067,7 +2099,7 @@
     MP.pendingTimer=setTimeout(()=>{if(MP.pending&&!MP.pending.resolved){MP.pending.resolved=true;resolve();MP.pending=null;mpSync();mpRender()}},4500);
   }
   function mpPlayCounter(cardId){
-    if(!MP.pending){alert('현재 대응할 효과가 없습니다.');return}
+    if(!MP.pending){mpToast('현재 대응할 효과가 없습니다.');return}
     const p=MP.players[mySeat-1],idx=p.hand.findIndex(c=>c.id===cardId);if(idx<0)return;const c=p.hand[idx];
     if(c.type!=='counter')return;
     p.hand.splice(idx,1);MP.discard.push(c);
@@ -2113,11 +2145,11 @@
     if(n==='GOT YOUR NOSE'||n==='PULL MY FINGER'){mpChooseTarget(t=>mpTakeRandom(t,seat,1));return}
     if(n==='STOLEN FACE'){mpChooseTarget(t=>mpTakeRandom(t,seat,2));return}
     if(n==='YAY! COOKIES!'){MP.players.filter(q=>q.seat!==seat).forEach(q=>mpTakeRandom(q.seat,seat,1));return}
-    if(n==='BARBERSHOP QUARTET'){mpChooseTarget(t=>{const mode=confirm('확인을 누르면 대상에게서 4장 훔칩니다.\n취소하면 덱에서 4장 뽑습니다.');if(mode)mpTakeRandom(t,seat,4);else mpDraw(seat,4)});return}
+    if(n==='BARBERSHOP QUARTET'){mpChooseTarget(t=>{if(t<0)return;mpConfirmChoice('P'+t+'에게서 4장 훔치기? (취소=덱에서 4장 뽑기)').then(ok=>{if(ok)mpTakeRandom(t,seat,4);else mpDraw(seat,4);mpValidateMuffin(seat);mpSync();mpRender()})});return}
     if(n==='YOU\'RE ADOPTED'){for(let i=0;i<3&&MP.discard.length;i++){const x=MP.discard.pop();x.owner=seat;p.hand.push(x)}return}
-    if(n==='HOMEWORK'){const top=MP.deck.slice(-5);const names=top.map((x,i)=>(i+1)+'. '+x.name).join('\n');const k=parseInt(prompt('상위 5장 중 선택:\n'+names,'1'))-1;if(k>=0&&k<top.length){const x=top[k],i=MP.deck.indexOf(x);MP.deck.splice(i,1);x.owner=seat;p.hand.push(x)}return}
-    if(n==='MAGIC TRICK'){const q=prompt('찾을 카드 이름(영문):','MUFFIN TIME');const i=MP.deck.findIndex(x=>x.name.toUpperCase()===String(q).toUpperCase());if(i>=0){const x=MP.deck.splice(i,1)[0];x.owner=seat;p.hand.push(x)}else alert('덱에 없습니다.');return}
-    if(n==='TIME OF DEATH'){const g=parseInt(prompt('승리 목표 1~20:',String(MP.goal)));if(g>=1&&g<=20)MP.goal=g;return}
+    if(n==='HOMEWORK'){const top=MP.deck.slice(-5);if(!top.length){mpToast('덱이 비어 있습니다.');return}mpPick('덱 위 5장 중 1장 선택',top.map(x=>({label:x.name+' ('+x.type+')',value:x.id}))).then(v=>{if(v===-1||v===false)return;const x=MP.deck.find(y=>y.id===v);if(x){MP.deck.splice(MP.deck.indexOf(x),1);x.owner=seat;p.hand.push(x);mpValidateMuffin(seat);mpSync();mpRender()}});return}
+    if(n==='MAGIC TRICK'){const uniq=[...new Set(MP.deck.map(x=>x.name))].slice(0,40);if(!uniq.length){mpToast('덱이 비어 있습니다.');return}mpPick('덱에서 검색할 카드 (상위 40종)',uniq.map(nm=>({label:nm,value:nm}))).then(v=>{if(v===-1||v===false)return;const i=MP.deck.findIndex(x=>x.name===v);if(i>=0){const x=MP.deck.splice(i,1)[0];x.owner=seat;p.hand.push(x);mpValidateMuffin(seat);mpSync();mpRender()}else mpToast('덱에 없습니다.')});return}
+    if(n==='TIME OF DEATH'){mpPick('승리 목표 변경',[{label:'5장',value:5},{label:'7장',value:7},{label:'10장 (기본)',value:10},{label:'12장',value:12},{label:'15장',value:15},{label:'20장',value:20}]).then(v=>{if(v===-1||v===false)return;MP.goal=v;MP.players.forEach(q=>mpValidateMuffin(q.seat));mpLog('☠ TIME OF DEATH → 승리 목표 '+v+'장');mpSync();mpRender()});return}
     if(n==='PARALLEL UNIVERSE'){mpDraw(seat,p.hand.length);return}
     if(n==='GROW UP FAST'){MP.players.forEach(q=>{while(q.hand.length<7)mpDraw(q.seat,1);while(q.hand.length>7)mpDiscardCards(q,1)});return}
     if(n==='I SUCK AT THIS GAME'){const m=Math.min(...MP.players.map(q=>q.hand.length));MP.players.filter(q=>q.hand.length===m).forEach(q=>mpDraw(q.seat,3));return}
@@ -2134,8 +2166,8 @@
     if(n==='NEW YOU'){const k=p.hand.length;mpDiscardCards(p,k);mpDraw(seat,k);return}
     if(n==='FALLING UP'){MP.direction*=-1;return}
     if(n==='I LIKE TRAINS'||n==='SKATEBOARDS'||n==='HERE IT COMES'){const prev=((seat-1-MP.direction+16)%8)+1;const q=MP.players[prev-1];const amt=q.hand.length;while(q.hand.length)mpMoveCard(q.hand[q.hand.length-1],q,p);return}
-    if(n==='THE END'){alert('특수 승리 카드: 다음 내 턴 시작 시 손패가 가장 적은 플레이어가 승리합니다.');return}
-    if(n==='ONE YEAR TO LIVE'){alert('특수 승리 카드: 다음 내 턴 시작 시 손패가 가장 많은 플레이어가 승리합니다.');return}
+    if(n==='THE END'){mpLog('📜 THE END — 다음 내 턴 시작 시 손패가 가장 적은 플레이어가 승리 (수동 판정)');mpToast('THE END: 다음 내 턴 시작 시 최소 손패가 승리');return}
+    if(n==='ONE YEAR TO LIVE'){mpLog('📜 ONE YEAR TO LIVE — 다음 내 턴 시작 시 손패가 가장 많은 플레이어가 승리 (수동 판정)');mpToast('ONE YEAR: 다음 내 턴 시작 시 최대 손패가 승리');return}
     if(n==='SHOOT ME'){p.winCandidate='nonempty';return}
     if(n==='DON\'T WANT TO BE FAT'||n==='DIE POTATO'){mpChooseTarget(t=>mpDiscardCards(MP.players[t-1],5));return}
     if(n==='YOU CAN WAIT'){mpChooseTarget(t=>{MP.players[t-1].skipped=true});return}
@@ -2144,13 +2176,13 @@
     if(n==='WHOSE IDEA'){mpChooseTarget(t=>mpTakeRandom(t,seat,3));return}
     if(n==='YOU\'RE DEAD'){mpChooseTarget(t=>{const q=MP.players[t-1];q.hand=q.hand.filter(x=>{if(x.type==='counter'){MP.discard.push(x);return false}return true})});return}
     if(n==='WHO\'S THERE?'){chooseTrap(seat,(q,x)=>x.faceUp=true,true);return}
-    if(n==='I SENTENCE YOU'){mpChooseTarget(t=>{if(confirm('확인: 다음 턴 건너뛰기\n취소: 카드 3장 버리기'))MP.players[t-1].skipped=true;else mpDiscardCards(MP.players[t-1],3)});return}
+    if(n==='I SENTENCE YOU'){mpChooseTarget(t=>{if(t<0)return;mpConfirmChoice('P'+t+' 다음 턴 스킵? (취소=3장 버리기)').then(ok=>{if(ok)MP.players[t-1].skipped=true;else mpDiscardCards(MP.players[t-1],3);mpSync();mpRender()})});return}
     if(n==='IN SYNC'&&MP.lastAction&&MP.lastAction.id!==c.id){executeAction(MP.lastAction,seat,{});return}
     if(n==='SCREW GRAVITY'){for(let i=0;i<3;i++){recycle();if(MP.deck.length){const x=MP.deck.shift();x.owner=seat;p.hand.push(x)}}return}
     if(n==='YOU\'RE ADOPTED')return;
     if(n==='MUFFIN FACTORY'){p.extraActions=(p.extraActions||0)+2;return}
     if(n==='QUICKFIRE'){MP.players.filter(q=>q.seat!==seat).forEach(q=>{while(q.hand.some(x=>x.type==='trap')&&q.traps.length<3){const x=q.hand.find(y=>y.type==='trap');q.hand.splice(q.hand.indexOf(x),1);q.traps.push(x)}});return}
-    if(n==='LET YOU GO'){const k=parseInt(prompt('버릴 카드 수:', '1'));if(k>0)mpDiscardCards(p,k);return}
+    if(n==='LET YOU GO'){mpPick('버릴 카드 수',[{label:'1장',value:1},{label:'2장',value:2},{label:'3장',value:3},{label:'5장',value:5}]).then(v=>{if(v===-1||v===false)return;mpDiscardCards(p,v);mpSync();mpRender()});return}
     if(n==='BANANA PEEL'){c.faceUp=true;MP.deck.unshift(c);shuffle(MP.deck);return}
     if(n==='HERE COMES THE AEROPLANE'||n==='I\'M ON MY WAY'){const next=((seat-1+MP.direction+8)%8)+1;const q=MP.players[next-1];c.owner=next;q.hand.push(c);return}
     if(n==='HEY, YOU TWO SHOULD KISS!'){mpDraw(seat,2);if(p.hand.length){mpChooseTarget(t=>{mpTakeRandom(seat,t,1)})}return}
@@ -2162,40 +2194,40 @@
     if(n==='I\'M A DOCTOR'){mpDraw(seat,p.lastLost||0);p.lastLost=0;return}
     if(n==='HIT BY A CARD'){mpChooseTarget(t=>{mpDiscardCards(MP.players[t-1],999);mpDraw(seat,3)});return}
     if(n==='TIME MACHINE'){const i=MP.discard.map(x=>x.name).lastIndexOf(c.name);if(i>=0){const x=MP.discard.splice(i,1)[0];x.owner=seat;p.hand.push(x)}return}
-    if(n==='PIE FLAVOUR'){const top=MP.discard.slice(-10);if(top.length){const list=top.map((x,i)=>(i+1)+'. '+x.name).join('\n');const k=parseInt(prompt('버림더미 상위 10장 중 선택:\n'+list,'1'))-1;if(k>=0&&k<top.length){const x=top[k],i=MP.discard.indexOf(x);MP.discard.splice(i,1);x.owner=seat;p.hand.push(x)}}return}
+    if(n==='PIE FLAVOUR'){const top=MP.discard.slice(-10);if(!top.length){mpToast('버림더미가 비어 있습니다.');return}mpPick('버림더미 상위 10장 중 회수',top.map(x=>({label:x.name,value:x.id}))).then(v=>{if(v===-1||v===false)return;const i=MP.discard.findIndex(x=>x.id===v);if(i>=0){const x=MP.discard.splice(i,1)[0];x.owner=seat;p.hand.push(x);mpValidateMuffin(seat);mpSync();mpRender()}});return}
     if(n==='YOU\'RE A CHAIR'){MP.players.forEach(q=>{const opp=MP.players[((q.seat-1+4)%8)];q.traps.splice(0).forEach(x=>{x.owner=opp.seat;opp.traps.push(x)})});return}
     if(n==='IS THIS YOU?'){mpDraw(seat,3);mpChooseTarget(t=>mpDraw(t,3));return}
     if(n==='IS THIS YOURS?'){mpChooseTarget(t=>{const q=MP.players[t-1];q.traps.splice(0).forEach(x=>{x.owner=t;q.hand.push(x)})});return}
     if(n==='YOU\'RE BLIND'){mpChooseTarget(t=>{const q=MP.players[t-1];let x;do{recycle();x=MP.deck.pop();if(!x)break;if(x.type==='action'){x.owner=t;q.hand.push(x);executeAction(x,t,{});break}else MP.discard.push(x)}while(MP.deck.length)});return}
-    if(n==='CONFESSION'){mpDraw(seat,3);alert('당신의 새 카드 3장을 다른 플레이어에게 공개하세요.');return}
+    if(n==='CONFESSION'){mpDraw(seat,3);mpNotify('CONFESSION: 새 카드 3장을 다른 플레이어에게 공개하세요.');return}
     if(n==='BOUND TOGETHER'){const pool=[];MP.players.forEach(q=>{while(q.hand.length)pool.push(q.hand.pop())});shuffle(pool);let i=0;while(pool.length){const q=MP.players[i++%8],x=pool.pop();x.owner=q.seat;q.hand.push(x)}return}
     if(n==='IS THIS YOURS?')return;
     if(n==='TALL SHORTY'||n==='LITTLE BABY'||n==='JOHNNY BIG FEET'||n==='BIG BABY'||n==='CAT ALLERGY'||n==='NO DOG?!'||n==='COOL HAT'||n==='NICE HAT'||n==='SNAKE ARMS'||n==='JEWELLERY'||n==='YOU\'RE A NERD'||n==='MEDICATION TIME'||n==='DAY OF BIRTH'||n==='NO, LLAMA! NO!'||n==='PARKED CAR'||n==='WRONG HOUSE'||n==='GET OFF MY PROPERTY'||n==='RAINBOWS'||n==='I AM LONELY'||n==='I USED TO BE A COW'||n==='WHAT\'S THEIR NAME? '){manual(n,seat);return}
     manual(n,seat);
   }
   function runMiniGame(n,seat){
-    if(n==='MYSTERY BUTTON'){const heads=Math.random()<.5;if(heads)mpDraw(seat,3);else mpDiscardCards(MP.players[seat-1],3);mpLog('🪙 MYSTERY BUTTON → '+(heads?'앞면: +3':'뒷면: -3'));return}
+    if(n==='MYSTERY BUTTON'){const heads=Math.random()<.5;if(heads)mpDraw(seat,3);else mpDiscardCards(MP.players[seat-1],3);mpLog('🪙 MYSTERY BUTTON → '+(heads?'앞면: +3':'뒷면: -3'));mpSync();mpRender();return}
     mpLog('🎮 '+n+' 미니게임 시작 — 미니게임은 카운터할 수 없습니다. 참가자들이 실제로 겨룬 뒤 승자를 선택하세요.');
-    mpChooseTarget(t=>{const winner=confirm('확인 = 선택한 상대가 승리 / 취소 = 나(P'+seat+')가 승리');const w=winner?t:seat;mpDraw(w,3);mpLog('🎮 '+n+' 승자 P'+w+' → +3장')},'미니게임 상대 선택');
+    mpChooseTarget(t=>{if(t<0)return;mpConfirmChoice('P'+t+'가 승리? (취소=나 P'+seat+'가 승리)').then(ok=>{const w=ok?t:seat;mpDraw(w,3);mpLog('🎮 '+n+' 승자 P'+w+' → +3장');mpSync();mpRender()})},'미니게임 상대 선택');
   }
-  function mpCheckMuffin(seat){const p=MP.players[seat-1];if(!MP.started||p.hand.length!==MP.goal)return;if(MP.noWinUntil===seat)return;if(!p.muffinAnnounced){p.muffinAnnounced=true;MP.winCandidate={seat,announcedAt:Date.now()};mpLog('🧁 P'+seat+'가 정확히 '+MP.goal+'장을 모아 "MUFFIN TIME!"을 선언했습니다. 다음 자기 턴 시작까지 유지해야 합니다.');mpBroadcast({op:'state',state:mpSnapshot()});}}
-  function mpCheckStartWin(seat){const p=MP.players[seat-1];if(p.muffinAnnounced&&p.hand.length===MP.goal){alert('🧁 P'+seat+' 승리! MUFFIN TIME!');mpLog('🏆 P'+seat+' 승리');MP.started=false;return true}return false}
+  function mpCheckMuffin(seat){mpAutoDeclare(seat)}
+  function mpCheckStartWin(seat){const p=MP.players[seat-1];if(p&&p.muffinAnnounced&&p.hand.length===MP.goal&&MP.winCandidate&&MP.winCandidate.seat===seat&&MP.winCandidate.remain<=0){mpLog('🏆 P'+seat+' 승리');mpNotify('🏆 P'+seat+' 승리! MUFFIN TIME!');MP.started=false;return true}return false}
   function mpPlay(cardId){
     const p=MP.players[mySeat-1],idx=p.hand.findIndex(c=>c.id===cardId);if(idx<0)return;const c=p.hand[idx];
-    if(!MP.started){alert('게임을 먼저 시작하세요.');return}
+    if(!MP.started){mpToast('게임을 먼저 시작하세요.');return}
     if(c.type==='counter'){mpPlayCounter(cardId);return}
-    if(MP.pending){alert('현재 다른 효과의 카운터 창입니다. 먼저 반응을 처리하세요.');return}
-    if(MP.mode==='official'&&MP.turn!==mySeat){alert('현재 P'+MP.turn+'의 턴입니다.');return}
-    if(MP.noActionsUntil===mySeat&&c.type==='action'){alert('행동 카드가 금지된 상태입니다.');return}
-    p.hand.splice(idx,1);c.owner=0;
-    if(c.type==='trap'){if(p.traps.length>=3){p.hand.splice(idx,0,c);alert('함정은 최대 3장입니다. 기존 함정을 하나 교체해야 합니다.');return}p.traps.push(c);c.faceUp=false;mpLog('🪤 P'+mySeat+' 함정 설치: '+c.name);mpSync();mpRender();return}
+    if(MP.pending){mpToast('카운터 창 진행 중입니다. 먼저 반응을 처리하세요.');return}
+    if(MP.mode==='official'&&MP.turn!==mySeat){mpToast('현재 P'+MP.turn+'의 턴입니다.');return}
+    if(MP.noActionsUntil===mySeat&&c.type==='action'){mpToast('행동 카드가 금지된 상태입니다.');return}
+    p.hand.splice(idx,1);c.owner=0;mpValidateMuffin(mySeat);
+    if(c.type==='trap'){if(p.traps.length>=3){p.hand.splice(idx,0,c);mpToast('함정은 최대 3장입니다.');return}p.traps.push(c);c.faceUp=false;mpLog('🪤 P'+mySeat+' 함정 설치: '+c.name+' ('+mpTrapDesc(c.name)+')');mpSync();mpRender();if(MP.mode==='official'&&!p.extraActions){mpNextTurn();mpSync();mpRender()}else if(p.extraActions>0){p.extraActions--}return}
     MP.discard.push(c);MP.currentAction={card:c,seat:mySeat,started:Date.now()};mpLog('▶ P'+mySeat+' '+c.name+' · '+desc(c.name,c.type));
-    const finish=()=>{if(MP.pending)resolvePending();mpRender();mpSync()};
+    const finish=()=>{if(MP.pending)resolvePending();mpValidateMuffin(mySeat);if(MP.mode==='official'){const acted=MP.players[mySeat-1];if(acted.extraActions>0){acted.extraActions--}else{mpNextTurn()}}mpRender();mpSync()};
     openCounterWindow({card:c,seat:mySeat},finish);
   }
-  function mpPlaceTrap(){const p=MP.players[mySeat-1];if(MP.mode==='official'&&MP.turn!==mySeat){alert('현재 턴이 아닙니다.');return}mpChooseCardFromHand(mySeat,c=>{if(c.type!=='trap')return;const i=p.hand.indexOf(c);if(p.traps.length>=3){alert('함정은 최대 3장입니다.');return}p.hand.splice(i,1);p.traps.push(c);c.owner=mySeat;c.faceUp=false;mpLog('🪤 함정 설치: '+c.name);mpSync();mpRender()},c=>c.type==='trap')}
-  function mpDrawLocal(){if(MP.mode==='official'&&MP.turn!==mySeat){alert('현재 P'+MP.turn+'의 턴입니다.');return}if(mpCheckStartWin(mySeat))return;mpDraw(mySeat,1);if(MP.mode==='official')mpNextTurn();mpSync();mpRender()}
-  function mpStart(){MP.mode=document.getElementById('mm-mode').value;MP.pack=document.getElementById('mm-pack').value;mpResetState();MP.players.forEach(p=>{p.firstGame=true;mpDraw(p.seat,3);p.muffinAnnounced=false});mpLog('🧁 게임 시작 · 8인 · '+(MP.mode==='official'?'원본 턴':'자유 행동')+' · '+MP.deck.length+'장');mp3DRender();mpSync();mpRender()}
+  function mpPlaceTrap(){const p=MP.players[mySeat-1];if(MP.mode==='official'&&MP.turn!==mySeat){mpToast('현재 턴이 아닙니다.');return}mpChooseCardFromHand(mySeat,c=>{if(c.type!=='trap')return;const i=p.hand.indexOf(c);if(p.traps.length>=3){mpToast('함정은 최대 3장입니다.');return}p.hand.splice(i,1);p.traps.push(c);c.owner=mySeat;c.faceUp=false;mpValidateMuffin(mySeat);mpLog('🪤 함정 설치: '+c.name+' — '+mpTrapDesc(c.name));mpSync();mpRender()},c=>c.type==='trap')}
+  function mpDrawLocal(){if(!MP.started){mpToast('게임을 먼저 시작하세요.');return}if(MP.mode==='official'&&MP.turn!==mySeat){mpToast('현재 P'+MP.turn+'의 턴입니다.');return}const me=MP.players[mySeat-1];if(me.muffinAnnounced&&me.hand.length===MP.goal&&MP.winCandidate&&MP.winCandidate.seat===mySeat&&MP.winCandidate.remain<=1){mpLog('🏆 P'+mySeat+' 승리! MUFFIN TIME을 유지했습니다!');mpNotify('🏆 P'+mySeat+' 승리! MUFFIN TIME!');MP.started=false;MP.winCandidate=null;mpSync();mpRender();return}mpDraw(mySeat,1);if(MP.mode==='official')mpNextTurn();mpSync();mpRender()}
+  function mpStart(){MP.mode=document.getElementById('mm-mode').value;MP.pack=document.getElementById('mm-pack').value;mpResetState();muffin3D.positions.clear();MP.players.forEach(p=>{p.firstGame=true;for(let i=0;i<3;i++){recycle();if(MP.deck.length){const c=MP.deck.pop();c.owner=p.seat;c.faceUp=false;p.hand.push(c)}}p.muffinAnnounced=false});MP.active=true;document.getElementById('muffin-panel').style.display='block';document.getElementById('muffin-hud').style.display='block';document.getElementById('muffin-modal').style.display='none';mpLog('🧁 게임 시작 · 최대 8인 · '+MP.mode+' · 1인 3장씩 플라잉 카드 배분 완료 (덱 탭=가져오기, 중앙 드래그=내기) · 남은 덱 '+MP.deck.length+'장');mp3DRender();mpSync();mpRender()}
 
   // ----- 3D tabletop layer -----
   const muffin3D={cards:new Map(),deck:null,discard:null,positions:new Map()};
@@ -2209,12 +2241,40 @@
   function muffin3DSavePosition(obj,broadcast=true){if(!obj||obj.userData.type!=='muffin_card')return;const pos={x:obj.position.x,z:obj.position.z,rot:obj.rotation.y};muffin3D.positions.set(obj.userData.muffinId,pos);if(broadcast)broadcastData({type:'muffin_move',id:obj.userData.muffinId,x:pos.x,z:pos.z,rotY:pos.rot})}
   function muffin3DDeckTap(obj){if(obj.userData.type==='muffin_deck'){mpDrawLocal();return true}return false}
 
-  function mpRender(){if(!MP.active)return;mp3DRender();const p=MP.players[mySeat-1];const pending=MP.pending;document.getElementById('muffin-status').innerHTML='<b>🧁 P'+mySeat+'</b> · 내 패 <b>'+p.hand.length+'</b> · 함정 <b>'+p.traps.length+'/3</b> · 덱 <b>'+MP.deck.length+'</b> · 버림 <b>'+MP.discard.length+'</b> · 목표 <b>'+MP.goal+'</b> · '+(MP.mode==='official'?'현재 P'+MP.turn+' 턴':'자유 행동')+(pending?' · <span style="color:#fbbf24">⚡ 카운터 가능</span>':'');const hand=document.getElementById('muffin-hands');hand.innerHTML='';p.hand.forEach(c=>{const d=document.createElement('button');d.className='mh-card '+c.type;d.innerHTML='<div class="badge">'+c.type.toUpperCase()+'</div><div class="ct">'+c.name+'</div><div class="ce">'+desc(c.name,c.type)+'</div>';d.onclick=()=>mpPlay(c.id);hand.appendChild(d)});const ps=document.getElementById('muffin-players');ps.innerHTML='';MP.players.forEach(q=>{const d=document.createElement('div');d.className='mp';d.innerHTML='<b>P'+q.seat+'</b> · 패 '+q.hand.length+' · 함정 '+q.traps.length+(q.seat===mySeat?' · YOU':'')+'<div class="mini">'+q.traps.map(x=>'🪤 '+x.name).join('<br>')+'</div>';ps.appendChild(d)});const box=document.getElementById('muffin-targets');if(pending){box.innerHTML='<b style="grid-column:1/-1;color:#fbbf24">⚡ '+pending.card.name+' 대응 중 — 4초</b>';const cs=p.hand.filter(x=>x.type==='counter');cs.forEach(c=>{const b=document.createElement('button');b.className='mtarget';b.style.background='#14532d';b.textContent='🟢 '+c.name;b.onclick=()=>mpPlayCounter(c.id);box.appendChild(b)})}}
-  function mpOpen(){MP.active=true;document.getElementById('muffin-panel').style.display='block';document.getElementById('muffin-hud').style.display='block';document.getElementById('muffin-modal').style.display='none';if(!MP.started){mpResetState();MP.players.forEach(p=>{p.firstGame=true;mpDraw(p.seat,3);p.muffinAnnounced=false});mpLog('🧁 머핀 타임 테이블 준비 · 중앙 덱과 8인 초기 손패 3장 배치');mpSync()}mpRender()}
+  function mpRender(){if(!MP.active)return;mp3DRender();const p=MP.players[mySeat-1];const pending=MP.pending;const wc=MP.winCandidate;document.getElementById('muffin-status').innerHTML='<b>🧁 P'+mySeat+'</b> · 내 패 <b>'+p.hand.length+'</b> · 함정 <b>'+p.traps.length+'/3</b> · 덱 <b>'+MP.deck.length+'</b> · 버림 <b>'+MP.discard.length+'</b> · 목표 <b>'+MP.goal+'</b> · '+(MP.mode==='official'?'현재 P'+MP.turn+' 턴':'자유 행동')+(wc?' · <span style="color:#fbbf24">🧁 P'+wc.seat+' 선언 유지중(남은 '+wc.remain+')</span>':'')+(pending?' · <span style="color:#fbbf24">⚡ 카운터 가능</span>':'');const hand=document.getElementById('muffin-hands');hand.innerHTML='';p.hand.forEach(c=>{const d=document.createElement('button');d.className='mh-card '+c.type;d.innerHTML='<div class="badge">'+c.type.toUpperCase()+'</div><div class="ct">'+c.name+'</div><div class="ce">'+(c.type==='trap'?mpTrapDesc(c.name):desc(c.name,c.type))+'</div>';d.onclick=()=>mpPlay(c.id);hand.appendChild(d)});const ps=document.getElementById('muffin-players');ps.innerHTML='';MP.players.forEach(q=>{const d=document.createElement('div');d.className='mp';d.innerHTML='<b>P'+q.seat+(q.muffinAnnounced?' 🧁':'')+'</b> · 패 '+q.hand.length+' · 함정 '+q.traps.length+(q.seat===mySeat?' · YOU':'')+'<div class="mini">'+q.traps.map(x=>'🪤 '+x.name).join('<br>')+'</div>';ps.appendChild(d)});const tc=document.getElementById('muffin-traps');if(tc){tc.innerHTML='<b style="font-size:10px;color:#e9d5ff">내 함정:</b>';if(!p.traps.length){tc.innerHTML+='<span style="font-size:10px;color:#94a3b8"> 없음 — 손패의 함정 카드를 탭해 설치</span>'}p.traps.forEach(t=>{const s=document.createElement('span');s.className='mtrap-chip';s.innerHTML='🪤 '+t.name+' ';const b=document.createElement('button');b.textContent='발동';b.onclick=()=>mpActivateTrap(t.id);s.appendChild(b);tc.appendChild(s)})}const box=document.getElementById('muffin-targets');if(pending){box.innerHTML='<b style="grid-column:1/-1;color:#fbbf24">⚡ '+pending.card.name+' 대응 중 — 카운터 카드를 탭하세요 (약 4초)</b>';const cs=p.hand.filter(x=>x.type==='counter');if(!cs.length){const nb=document.createElement('button');nb.className='mtarget';nb.style.background='#475569';nb.textContent='대응 없음(대기)';nb.onclick=()=>{box.innerHTML=''};box.appendChild(nb)}cs.forEach(c=>{const b=document.createElement('button');b.className='mtarget';b.style.background='#14532d';b.textContent='🟢 '+c.name;b.onclick=()=>mpPlayCounter(c.id);box.appendChild(b)})}}
+  function mpOpen(){MP.active=true;document.getElementById('muffin-panel').style.display='block';document.getElementById('muffin-hud').style.display='block';document.getElementById('muffin-modal').style.display='none';if(!MP.started){mpSetupDeckOnly();mpLog('🧁 머핀 타임 준비 · 덱 '+MP.deck.length+'장. [게임 시작]을 누르면 8인에게 3장씩 배분됩니다.');mpSync()}mpRender()}
+  function mpSetupDeckOnly(){if(MP.pendingTimer){clearTimeout(MP.pendingTimer);MP.pendingTimer=null}try{MP.mode=document.getElementById('mm-mode').value;MP.pack=document.getElementById('mm-pack').value}catch(e){}MP.deck=mpBuildDeck();MP.discard=[];MP.turn=1;MP.turnCount=0;MP.direction=1;MP.goal=10;MP.lastAction=null;MP.currentAction=null;MP.pending=null;MP.winCandidate=null;MP.noWinUntil=0;MP.noActionsUntil=0;MP.started=false;MP.players.forEach(p=>{p.hand=[];p.traps=[];p.skipped=false;p.muffinAnnounced=false;p.extraActions=0})}
+  function setupMuffinTable(isLocal=true){
+    objects.forEach(obj=>scene.remove(obj));objects=[];
+    cardSlots.forEach(slot=>scene.remove(slot));cardSlots=[];
+    clearSelectionGroup();resetYatzyScoreBoard();
+    muffin3D.positions.clear();
+    try{MP.mode=document.getElementById('mm-mode').value;MP.pack=document.getElementById('mm-pack').value}catch(e){}
+    mpSetupDeckOnly();
+    MP.active=true;
+    document.getElementById('muffin-panel').style.display='block';
+    document.getElementById('muffin-hud').style.display='block';
+    document.getElementById('muffin-modal').style.display='block';
+    updateDynamicActionBar();
+    mpLog('🧁 머핀 타임 세팅 완료 (최대 8인) · 중앙 덱 '+MP.deck.length+'장. [게임 시작 / 초기화]를 누르면 3장씩 배분됩니다. 덱 탭=1장 가져오기, 카드를 중앙으로 드래그=내기 (플라잉 카드).');
+    mpRender();
+    if(isLocal)mpBroadcast({op:'setup',state:mpSnapshot()});
+  }
+  function mpApplySetupRemote(state){
+    objects.forEach(obj=>scene.remove(obj));objects=[];
+    cardSlots.forEach(slot=>scene.remove(slot));cardSlots=[];
+    clearSelectionGroup();resetYatzyScoreBoard();
+    muffin3D.positions.clear();
+    MP.active=true;
+    document.getElementById('muffin-panel').style.display='block';
+    document.getElementById('muffin-hud').style.display='block';
+    updateDynamicActionBar();
+    mpApplySnapshot(state);
+  }
   function mpClose(){MP.active=false;document.getElementById('muffin-panel').style.display='none'}
-  function mpHandle(data){if(data.type!=='muffin')return;if(data.op==='start'||data.op==='state'||data.op==='counter'){mpApplySnapshot(data.state);return}if(data.op==='turn'){MP.turn=data.turn;mpRender()}}
+  function mpHandle(data){if(data.type!=='muffin')return;if(data.op==='setup'){mpApplySetupRemote(data.state);return}if(data.op==='start'||data.op==='state'||data.op==='counter'){mpApplySnapshot(data.state);return}if(data.op==='turn'){if(data.state){mpApplySnapshot(data.state)}else{MP.turn=data.turn;if(data.turnCount!==undefined)MP.turnCount=data.turnCount;if(data.winCandidate!==undefined)MP.winCandidate=data.winCandidate;if(data.started!==undefined)MP.started=data.started;mpRender()}}}
   const oldHandleNetworkData=handleNetworkData;handleNetworkData=function(data){oldHandleNetworkData(data);try{mpHandle(data)}catch(e){console.error('Muffin sync',e)}};
-  document.getElementById('muffin-launch').addEventListener('click',e=>{e.stopPropagation();mpOpen()});document.getElementById('muffin-close').addEventListener('click',mpClose);document.getElementById('mm-close').addEventListener('click',()=>document.getElementById('muffin-modal').style.display='none');document.getElementById('muffin-new').addEventListener('click',()=>{document.getElementById('muffin-modal').style.display='block'});document.getElementById('muffin-hand').addEventListener('click',()=>{document.getElementById('muffin-modal').style.display='none';mpRender()});document.getElementById('muffin-draw').addEventListener('click',mpDrawLocal);document.getElementById('muffin-trap').addEventListener('click',mpPlaceTrap);document.getElementById('mm-start').addEventListener('click',mpStart);document.getElementById('mm-draw3').addEventListener('click',()=>{for(let i=0;i<3;i++)mpDraw(mySeat,1);mpSync();mpRender()});document.getElementById('mm-mode').addEventListener('change',e=>MP.mode=e.target.value);document.getElementById('mm-pack').addEventListener('change',e=>MP.pack=e.target.value);document.getElementById('mm-muffin').addEventListener('click',()=>{if(MP.players[mySeat-1].hand.length===MP.goal)MP.players[mySeat-1].muffinAnnounced=true;mpCheckMuffin(mySeat);mpSync();mpRender()});mpLog('머핀 타임 물리 테이블 엔진 준비 완료.');
+  document.getElementById('muffin-launch').addEventListener('click',e=>{e.stopPropagation();mpOpen()});document.getElementById('muffin-close').addEventListener('click',mpClose);document.getElementById('mm-close').addEventListener('click',()=>document.getElementById('muffin-modal').style.display='none');document.getElementById('muffin-new').addEventListener('click',()=>{document.getElementById('muffin-modal').style.display='block'});document.getElementById('muffin-hand').addEventListener('click',()=>{document.getElementById('muffin-modal').style.display='none';mpRender()});document.getElementById('muffin-draw').addEventListener('click',mpDrawLocal);document.getElementById('muffin-trap').addEventListener('click',mpPlaceTrap);document.getElementById('mm-start').addEventListener('click',mpStart);document.getElementById('mm-draw3').addEventListener('click',()=>{for(let i=0;i<3;i++)mpDraw(mySeat,1);mpSync();mpRender()});document.getElementById('mm-mode').addEventListener('change',e=>MP.mode=e.target.value);document.getElementById('mm-pack').addEventListener('change',e=>MP.pack=e.target.value);document.getElementById('mm-muffin').addEventListener('click',()=>{mpDeclareMuffin(mySeat);mpSync();mpRender()});window.setupMuffinTable=setupMuffinTable;window.__muffinRender=mpRender;mpLog('머핀 타임 물리 테이블 엔진 준비 완료.');
 })();
 
   function animate() {
